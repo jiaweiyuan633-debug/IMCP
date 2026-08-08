@@ -156,6 +156,9 @@ function onSearch(model: Record<string, unknown>) {
 }
 
 function onReset() {
+  Object.keys(searchModel).forEach((key) => {
+    searchModel[key] = undefined
+  })
   pageNum.value = 1
   loadData()
 }
