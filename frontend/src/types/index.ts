@@ -41,3 +41,50 @@ export interface LoginForm {
   password: string
 }
 
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  pageNum: number
+  pageSize: number
+}
+
+export interface UserVo {
+  id: number
+  username: string
+  nickname?: string
+  avatar?: string
+  email?: string
+  phone?: string
+  status: number
+  lastLoginTime?: string
+  createdAt?: string
+  roleIds: number[]
+  roleNames: string[]
+}
+
+export interface RoleVo {
+  id: number
+  code: string
+  name: string
+  description?: string
+  status: number
+  sort: number
+  createdAt?: string
+  menuIds: number[]
+}
+
+export interface RoleOptionVo {
+  id: number
+  code: string
+  name: string
+}
+
+export interface SearchField {
+  label: string
+  prop: string
+  type?: 'input' | 'select'
+  placeholder?: string
+  options?: { label: string; value: string | number }[]
+}
+
+
