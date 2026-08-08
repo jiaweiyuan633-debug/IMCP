@@ -10,11 +10,13 @@ import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.UserInfoVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
 import com.example.admin.module.system.entity.SysLoginLog;
+import com.example.admin.module.system.entity.SysMenu;
 import com.example.admin.module.system.entity.SysUser;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.module.system.vo.MenuVo;
 import com.example.admin.security.JwtUtil;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
@@ -29,6 +31,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -61,6 +64,7 @@ public class AuthService {
 
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         List<String> perms = menuMapper.selectPermsByUserId(user.getId());
+        List<MenuVo> menus = buildMenuTree(menuMapper.selectMenusByUserId(user.getId()));
         String accessJti = jwtUtil.generateJti();
         String refreshJti = jwtUtil.generateJti();
 
@@ -82,7 +86,7 @@ public class AuthService {
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .user(toUserInfo(user, roles, perms))
+                .user(toUserInfo(user, roles, perms, menus))
                 .build();
     }
 
@@ -102,6 +106,7 @@ public class AuthService {
         tokenService.revokeRefreshToken(refreshJti);
         List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
         List<String> perms = menuMapper.selectPermsByUserId(userId);
+        List<MenuVo> menus = buildMenuTree(menuMapper.selectMenusByUserId(userId));
         String accessJti = jwtUtil.generateJti();
         String newRefreshJti = jwtUtil.generateJti();
 
@@ -113,7 +118,7 @@ public class AuthService {
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .user(toUserInfo(user, roles, perms))
+                .user(toUserInfo(user, roles, perms, menus))
                 .build();
     }
 
@@ -132,7 +137,8 @@ public class AuthService {
         if (user == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
-        return toUserInfo(user, loginUser.getRoles(), loginUser.getPerms());
+        List<MenuVo> menus = buildMenuTree(menuMapper.selectMenusByUserId(user.getId()));
+        return toUserInfo(user, loginUser.getRoles(), loginUser.getPerms(), menus);
     }
 
     @Transactional
@@ -149,7 +155,7 @@ public class AuthService {
         userMapper.updateById(user);
     }
 
-    private UserInfoVo toUserInfo(SysUser user, List<String> roles, List<String> perms) {
+    private UserInfoVo toUserInfo(SysUser user, List<String> roles, List<String> perms, List<MenuVo> menus) {
         return UserInfoVo.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -157,7 +163,35 @@ public class AuthService {
                 .avatar(user.getAvatar())
                 .roles(roles == null ? Collections.emptyList() : roles)
                 .perms(perms == null ? Collections.emptyList() : perms)
+                .menus(menus == null ? Collections.emptyList() : menus)
                 .build();
+    }
+
+    private List<MenuVo> buildMenuTree(List<SysMenu> menus) {
+        return buildChildren(menus, 0L);
+    }
+
+    private List<MenuVo> buildChildren(List<SysMenu> menus, Long parentId) {
+        List<MenuVo> children = new ArrayList<>();
+        for (SysMenu menu : menus) {
+            if (parentId.equals(menu.getParentId())) {
+                children.add(MenuVo.builder()
+                        .id(menu.getId())
+                        .parentId(menu.getParentId())
+                        .name(menu.getName())
+                        .type(menu.getType())
+                        .path(menu.getPath())
+                        .component(menu.getComponent())
+                        .perm(menu.getPerm())
+                        .icon(menu.getIcon())
+                        .sort(menu.getSort())
+                        .visible(menu.getVisible())
+                        .status(menu.getStatus())
+                        .children(buildChildren(menus, menu.getId()))
+                        .build());
+            }
+        }
+        return children;
     }
 
     private String resolveToken(HttpServletRequest request) {

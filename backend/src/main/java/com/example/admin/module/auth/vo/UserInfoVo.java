@@ -1,5 +1,6 @@
 package com.example.admin.module.auth.vo;
 
+import com.example.admin.module.system.vo.MenuVo;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,5 +16,6 @@ public class UserInfoVo {
     private String avatar;
     private List<String> roles;
     private List<String> perms;
+    private List<MenuVo> menus;
 }
 
