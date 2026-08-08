@@ -1,0 +1,115 @@
+package com.example.admin.common.aspect;
+
+import com.example.admin.common.annotation.OperLog;
+import com.example.admin.module.system.entity.SysOperLog;
+import com.example.admin.module.system.mapper.SysOperLogMapper;
+import com.example.admin.security.SecurityUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+
+@Slf4j
+@Aspect
+@Component
+@RequiredArgsConstructor
+public class OperLogAspect {
+
+    private static final int MAX_PARAMS_LENGTH = 2000;
+    private static final int MAX_RESULT_LENGTH = 2000;
+    private static final int MAX_ERROR_LENGTH = 1000;
+
+    private final SysOperLogMapper operLogMapper;
+    private final ObjectMapper objectMapper;
+
+    @Around("@annotation(operLog)")
+    public Object around(ProceedingJoinPoint joinPoint, OperLog operLog) throws Throwable {
+        long start = System.currentTimeMillis();
+        Object result = null;
+        Throwable error = null;
+        try {
+            result = joinPoint.proceed();
+            return result;
+        } catch (Throwable throwable) {
+            error = throwable;
+            throw throwable;
+        } finally {
+            saveLog(joinPoint, operLog, start, result, error);
+        }
+    }
+
+    private void saveLog(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
+        try {
+            SysOperLog operLogEntity = new SysOperLog();
+            operLogEntity.setUserId(tryGetUserId());
+            operLogEntity.setModule(operLog.module());
+            operLogEntity.setAction(operLog.action());
+            operLogEntity.setMethod(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
+            operLogEntity.setDurationMs(System.currentTimeMillis() - start);
+            operLogEntity.setStatus(error == null ? 1 : 0);
+            operLogEntity.setOperTime(LocalDateTime.now());
+            if (error != null) {
+                operLogEntity.setErrorMsg(truncate(error.getMessage(), MAX_ERROR_LENGTH));
+            }
+
+            ServletRequestAttributes attributes =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                operLogEntity.setRequestUrl(request.getRequestURI());
+                operLogEntity.setRequestMethod(request.getMethod());
+                operLogEntity.setIp(request.getRemoteAddr());
+            }
+            operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs())));
+            operLogEntity.setResult(toJson(result));
+            operLogMapper.insert(operLogEntity);
+        } catch (Exception exception) {
+            log.warn("Failed to write oper log", exception);
+        }
+    }
+
+    private List<Object> filterArgs(Object[] args) {
+        return Arrays.stream(args)
+                .filter(arg -> !(arg instanceof ServletRequest) && !(arg instanceof ServletResponse))
+                .toList();
+    }
+
+    private String toJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return truncate(objectMapper.writeValueAsString(value), MAX_RESULT_LENGTH);
+        } catch (Exception exception) {
+            return truncate(String.valueOf(value), MAX_RESULT_LENGTH);
+        }
+    }
+
+    private Long tryGetUserId() {
+        try {
+            return SecurityUtils.getUserId();
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+}
+

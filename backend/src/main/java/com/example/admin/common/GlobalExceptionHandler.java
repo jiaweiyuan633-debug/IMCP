@@ -5,6 +5,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 
 @Slf4j
 @RestControllerAdvice
@@ -20,6 +23,11 @@ public class GlobalExceptionHandler {
         FieldError fieldError = exception.getBindingResult().getFieldError();
         String message = fieldError == null ? "参数错误" : fieldError.getDefaultMessage();
         return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Result<Void>> handleAccessDeniedException(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(ResultCode.FORBIDDEN));
     }
 
     @ExceptionHandler(Exception.class)
