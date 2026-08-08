@@ -25,5 +25,10 @@ jwt:
   access-token-expire-minutes: ${JWT_ACCESS_EXPIRE_MINUTES:120}
   refresh-token-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
 
+app:
+  callback-base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
+  ai:
+    scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
+
 knife4j:
   enable: true

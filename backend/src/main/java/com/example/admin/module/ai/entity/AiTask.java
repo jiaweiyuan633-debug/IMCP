@@ -1,0 +1,31 @@
+package com.example.admin.module.ai.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@TableName("ai_task")
+public class AiTask {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String taskNo;
+    private String bizType;
+    private Long bizId;
+    private String serviceCode;
+    private String status;
+    private String paramsJson;
+    private String errorMsg;
+    private Integer retryCount;
+    private Integer maxRetry;
+    private Integer timeoutSeconds;
+    private String callbackUrl;
+    private Long createdBy;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+

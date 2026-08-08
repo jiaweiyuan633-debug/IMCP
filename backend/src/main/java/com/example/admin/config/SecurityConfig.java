@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/refresh",
+                                "/api/ai/callback/**",
                                 "/doc.html",
                                 "/webjars/**",
                                 "/v3/api-docs/**",
