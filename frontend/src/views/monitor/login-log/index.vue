@@ -1,0 +1,6 @@
+<template>
+  <a-card title="登录日志">
+    <a-empty description="B7 实现" />
+  </a-card>
+</template>
+
