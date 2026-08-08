@@ -30,3 +30,7 @@ Thumbs.db
 
 # Local MySQL dev data
 .mysql-dev/
+
+# Local runtime
+.runtime/
+logs/
