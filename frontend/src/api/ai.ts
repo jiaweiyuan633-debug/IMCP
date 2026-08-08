@@ -41,7 +41,7 @@ export interface AiTaskVo {
 }
 
 export function getAiConfigs(): Promise<AiConfigVo[]> {
-  return request.get('/api/ai/config')
+  return request.get('/ai/config')
 }
 
 export function updateAiConfig(
@@ -54,7 +54,7 @@ export function updateAiConfig(
     enabled: number
   },
 ): Promise<void> {
-  return request.put(`/api/ai/config/${id}`, { ...data, id })
+  return request.put(`/ai/config/${id}`, { ...data, id })
 }
 
 export function createAiTask(data: {
@@ -62,18 +62,18 @@ export function createAiTask(data: {
   serviceCode?: string
   params: Record<string, unknown>
 }): Promise<number> {
-  return request.post('/api/ai/tasks', data)
+  return request.post('/ai/tasks', data)
 }
 
 export function getAiTaskPage(params: Record<string, unknown>): Promise<PageResult<AiTaskVo>> {
-  return request.get('/api/ai/tasks', { params })
+  return request.get('/ai/tasks', { params })
 }
 
 export function getAiTaskDetail(id: number): Promise<AiTaskVo> {
-  return request.get(`/api/ai/tasks/${id}`)
+  return request.get(`/ai/tasks/${id}`)
 }
 
 export function cancelAiTask(id: number): Promise<void> {
-  return request.delete(`/api/ai/tasks/${id}`)
+  return request.delete(`/ai/tasks/${id}`)
 }
 

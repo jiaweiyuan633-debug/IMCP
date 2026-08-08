@@ -5,7 +5,7 @@ import type { Result } from '@/types'
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/utils/auth'
 
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
   timeout: 20000,
 })
 
@@ -31,7 +31,7 @@ async function refreshAccessToken(): Promise<boolean> {
   refreshing = true
   try {
     const response = await axios.post<Result<{ accessToken: string; refreshToken: string }>>(
-      `${service.defaults.baseURL}/api/auth/refresh`,
+      `${service.defaults.baseURL}/auth/refresh`,
       { refreshToken },
     )
     if (response.data.code === 0) {
