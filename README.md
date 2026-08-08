@@ -64,6 +64,10 @@ cd docker
 docker compose up -d --build
 ```
 
+默认端口为 `3306/6379/8080/8000/80`。如果本机已有 MySQL/Redis 或开发服务占用端口，可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT` 覆盖主机端口。
+
+该交付已在 Docker Desktop 完成全栈启动和 14 项冒烟验证。
+
 服务地址：
 
 | 服务 | 地址 |

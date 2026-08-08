@@ -54,6 +54,9 @@ public class AiTaskService {
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
 
+    @Value("${app.ai-base-url:}")
+    private String aiBaseUrl;
+
     @Transactional
     public Long create(AiTaskCreateRequest request) {
         AiServiceConfig config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfig>()
@@ -78,6 +81,9 @@ public class AiTaskService {
         taskMapper.insert(task);
 
         try {
+            if (StringUtils.hasText(aiBaseUrl)) {
+                config.setBaseUrl(aiBaseUrl);
+            }
             pythonClient.createTask(
                     config,
                     taskNo,

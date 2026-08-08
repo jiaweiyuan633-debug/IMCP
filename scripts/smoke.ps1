@@ -93,6 +93,17 @@ Check 'AI 任务全链路成功' (
     $summaryStatus -eq 'SUCCEEDED' -and $null -ne $summaryDetail.data.result.resultJson
 )
 
+$testerQuery = Invoke-Api -Method Get -Url "$BaseUrl/api/system/user?username=tester&pageSize=5" -Headers $adminHeaders
+if ($testerQuery.data.total -eq 0) {
+    Invoke-Api -Method Post -Url "$BaseUrl/api/system/user" -Headers $adminHeaders -Body @{
+        username = 'tester'
+        password = 'tester123'
+        nickname = '冒烟测试账号'
+        status = 1
+        roleIds = @(2)
+    } | Out-Null
+}
+
 $testerLogin = Invoke-Api -Method Post -Url "$BaseUrl/api/auth/login" -Body @{
     username = 'tester'
     password = 'tester123'

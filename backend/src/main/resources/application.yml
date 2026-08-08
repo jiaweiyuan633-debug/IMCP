@@ -27,6 +27,7 @@ jwt:
 
 app:
   callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
+  ai-base-url: ${AI_BASE_URL:}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
 

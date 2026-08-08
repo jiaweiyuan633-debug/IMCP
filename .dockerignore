@@ -1,0 +1,12 @@
+.git
+.runtime
+logs
+frontend/node_modules
+frontend/dist
+backend/target
+ai-service/.venv
+ai-service/.pytest_cache
+ai-service/.ruff_cache
+**/__pycache__
+*.log
+
