@@ -1,3 +1,4 @@
+import asyncio
 import re
 from collections import Counter
 
@@ -5,6 +6,9 @@ from collections import Counter
 class KeywordExtractService:
 
     async def run(self, params: dict) -> dict:
+        delay = float(params.get("delay_seconds", 0))
+        if delay > 0:
+            await asyncio.sleep(delay)
         content = str(params.get("content", "")).strip()
         if not content:
             raise ValueError("content is required")

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.services import SERVICE_REGISTRY, get_service
 MAX_RETRY = 3
 KEY_PREFIX = "ai:task:"
 TASK_TTL_SECONDS = 60 * 60 * 24
+
+logger = logging.getLogger(__name__)
 
 
 class TaskManager:
@@ -105,12 +108,15 @@ class TaskManager:
             "status": data.get("status"),
             "result": data.get("result"),
             "error": data.get("error"),
+            "retry_count": data.get("retry_count", 0),
         }
         headers = {"X-Ai-Service-Token": self.settings.callback_token}
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                await client.post(callback_url, json=payload, headers=headers)
-        except httpx.HTTPError:
+            async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
+                response = await client.post(callback_url, json=payload, headers=headers)
+            logger.info("AI callback for %s returned status %s", task_no, response.status_code)
+        except httpx.HTTPError as exception:
+            logger.warning("AI callback for %s failed: %s", task_no, exception)
             return
 
     async def _save(self, task_no: str, data: dict[str, Any]) -> None:
