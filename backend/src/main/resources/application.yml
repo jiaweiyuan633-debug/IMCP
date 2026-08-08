@@ -20,6 +20,10 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+jwt:
+  secret: ${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}
+  access-token-expire-minutes: ${JWT_ACCESS_EXPIRE_MINUTES:120}
+  refresh-token-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
+
 knife4j:
   enable: true
-
