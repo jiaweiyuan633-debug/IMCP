@@ -47,7 +47,7 @@ router.beforeEach(async (to) => {
         }
       })
       permissionStore.setRoutes(user)
-      return { ...to, replace: true }
+      return { path: to.fullPath, replace: true }
     } finally {
       recoveringNotFound = false
     }

@@ -22,7 +22,8 @@ function loadView(component?: string): () => Promise<unknown> {
   if (!component) {
     return () => import('@/views/not-found/index.vue')
   }
-  const loader = viewModules[`../views/${component}.vue`]
+  const candidates = [`../views/${component}.vue`, `../views/${component}/index.vue`]
+  const loader = candidates.map((path) => viewModules[path]).find(Boolean)
   if (loader) {
     return loader as () => Promise<unknown>
   }
