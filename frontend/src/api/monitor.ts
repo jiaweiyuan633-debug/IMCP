@@ -50,26 +50,26 @@ export interface DashboardStatsVo {
 }
 
 export function getLoginLogPage(params: Record<string, unknown>): Promise<PageResult<LoginLogVo>> {
-  return request.get('/api/monitor/login-log', { params })
+  return request.get('/monitor/login-log', { params })
 }
 
 export function getOperLogPage(params: Record<string, unknown>): Promise<PageResult<OperLogVo>> {
-  return request.get('/api/monitor/oper-log', { params })
+  return request.get('/monitor/oper-log', { params })
 }
 
 export function getOnlineUsers(): Promise<OnlineUserVo[]> {
-  return request.get('/api/monitor/online')
+  return request.get('/monitor/online')
 }
 
 export function kickOnlineUser(tokenId: string): Promise<void> {
-  return request.delete(`/api/monitor/online/${tokenId}`)
+  return request.delete(`/monitor/online/${tokenId}`)
 }
 
 export function clearCacheKey(key: string): Promise<void> {
-  return request.delete(`/api/monitor/cache/${encodeURIComponent(key)}`)
+  return request.delete(`/monitor/cache/${encodeURIComponent(key)}`)
 }
 
 export function getDashboardStats(): Promise<DashboardStatsVo> {
-  return request.get('/api/monitor/stats')
+  return request.get('/monitor/stats')
 }
 
