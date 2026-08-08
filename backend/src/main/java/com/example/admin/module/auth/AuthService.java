@@ -8,6 +8,7 @@ import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.UserInfoVo;
+import com.example.admin.module.monitor.vo.OnlineUserVo;
 import com.example.admin.module.system.entity.SysLoginLog;
 import com.example.admin.module.system.entity.SysUser;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
@@ -67,6 +68,12 @@ public class AuthService {
         String refreshToken = jwtUtil.createRefreshToken(refreshJti, user.getId(), user.getUsername());
         tokenService.saveAccessToken(accessJti, refreshJti);
         tokenService.saveRefreshToken(refreshJti, String.valueOf(user.getId()));
+        tokenService.saveOnlineUser(accessJti, OnlineUserVo.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .ip(httpRequest.getRemoteAddr())
+                .userAgent(httpRequest.getHeader("User-Agent"))
+                .build());
 
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
