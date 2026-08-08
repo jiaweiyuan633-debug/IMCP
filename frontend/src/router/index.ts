@@ -28,9 +28,30 @@ const router = createRouter({
   ],
 })
 
+let recoveringNotFound = false
+
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   const permissionStore = usePermissionStore()
+
+  if (to.name === 'NotFound' && userStore.isLoggedIn && !recoveringNotFound) {
+    recoveringNotFound = true
+    try {
+      removeDynamicRoutes()
+      permissionStore.reset()
+      const user = userStore.userInfo || (await userStore.fetchMe())
+      const routes = buildDynamicRouteChildren(user.menus)
+      routes.forEach((route) => {
+        if (route.name && !router.hasRoute(route.name)) {
+          router.addRoute('Root', route)
+        }
+      })
+      permissionStore.setRoutes(user)
+      return { ...to, replace: true }
+    } finally {
+      recoveringNotFound = false
+    }
+  }
 
   if (to.path === '/login') {
     removeDynamicRoutes()
