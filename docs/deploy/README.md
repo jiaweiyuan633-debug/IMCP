@@ -69,6 +69,28 @@ cd docker
 docker compose up -d --build
 ```
 
+默认使用本机 `3306/6379/8080/8000/80` 端口。如需避开本机已有服务，可覆盖主机端口：
+
+```powershell
+$env:MYSQL_PORT='13306'
+$env:REDIS_PORT='16379'
+$env:BACKEND_PORT='18080'
+$env:AI_PORT='18000'
+$env:FRONTEND_PORT='18081'
+docker compose up -d --build
+```
+
+Compose 已设置 `AI_BASE_URL=http://ai-service:8000`，Java 服务会自动使用该地址调用 Python 服务，不受数据库里默认 `localhost` 配置影响。
+
+如果 Docker Hub 拉取镜像超时，可先通过 DaoCloud 镜像源拉取并打上标准标签，再执行 `docker compose up -d --build`：
+
+```bash
+docker pull docker.m.daocloud.io/library/mysql:8.0
+docker tag docker.m.daocloud.io/library/mysql:8.0 mysql:8.0
+docker pull docker.m.daocloud.io/library/redis:7-alpine
+docker tag docker.m.daocloud.io/library/redis:7-alpine redis:7-alpine
+```
+
 服务：
 
 | 服务 | 端口 | 说明 |
@@ -80,6 +102,7 @@ docker compose up -d --build
 | frontend | 80 | Nginx 托管前端 |
 
 默认数据库密码为 `root123456`，生产环境务必通过环境变量覆盖。
+当前交付已在 Docker Desktop 完成全栈启动验证，冒烟脚本 `PASS=14 FAIL=0`。
 
 ## 3. 生产部署检查项
 
