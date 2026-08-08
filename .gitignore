@@ -1,0 +1,32 @@
+# Java
+backend/target/
+*.class
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.eslintcache
+.pnpm-store/
+
+# Python
+ai-service/.venv/
+ai-service/.pytest_cache/
+ai-service/.ruff_cache/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local env
+.env
+*.local
+
+# Local MySQL dev data
+.mysql-dev/
