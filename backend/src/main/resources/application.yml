@@ -26,7 +26,7 @@ jwt:
   refresh-token-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
 
 app:
-  callback-base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
+  callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
 
