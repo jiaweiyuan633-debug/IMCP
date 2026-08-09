@@ -125,7 +125,7 @@
               <ul>
                 <li v-for="item in plan.items" :key="item">{{ item }}</li>
               </ul>
-              <a class="btn" :class="plan.popular ? 'btn-primary' : 'btn-ghost'" href="#contact">立即咨询</a>
+              <a class="btn btn-primary" href="#contact">立即咨询</a>
             </article>
           </div>
         </div>
