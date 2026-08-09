@@ -5,7 +5,9 @@ import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.dto.MessageSendRequest;
 import com.example.admin.module.system.entity.SysMessageDO;
+import com.example.admin.module.system.entity.SysNoticeDO;
 import com.example.admin.module.system.entity.SysWorkflowDO;
+import com.example.admin.module.system.vo.NotificationFeedItemVO;
 import com.example.admin.module.system.warmflow.WarmFlowWorkflowService;
 import com.example.admin.security.SecurityUtils;
 import jakarta.validation.Valid;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/system/message")
@@ -28,6 +31,7 @@ import java.util.List;
 public class SystemMessageController {
 
     private final SystemMessageService messageService;
+    private final SystemNoticeService noticeService;
     private final WarmFlowWorkflowService workflowService;
 
     @GetMapping
@@ -44,6 +48,35 @@ public class SystemMessageController {
     @PreAuthorize("isAuthenticated()")
     public Result<List<SysMessageDO>> latest(@RequestParam(defaultValue = "5") int limit) {
         return Result.success(messageService.latest(limit));
+    }
+
+    @GetMapping("/feed")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<NotificationFeedItemVO>> feed(@RequestParam(defaultValue = "8") int limit) {
+        int capped = Math.min(Math.max(limit, 1), 20);
+        List<NotificationFeedItemVO> items = new ArrayList<>();
+        for (SysMessageDO message : messageService.latest(capped)) {
+            NotificationFeedItemVO item = new NotificationFeedItemVO();
+            item.setKind("message");
+            item.setId(message.getId());
+            item.setTitle(message.getTitle());
+            item.setContent(message.getContent());
+            item.setCreatedAt(message.getCreatedAt() == null ? null : message.getCreatedAt().toString());
+            item.setTag(null);
+            items.add(item);
+        }
+        for (SysNoticeDO notice : noticeService.latest(capped)) {
+            NotificationFeedItemVO item = new NotificationFeedItemVO();
+            item.setKind("notice");
+            item.setId(notice.getId());
+            item.setTitle(notice.getNoticeTitle());
+            item.setContent(notice.getNoticeContent());
+            item.setCreatedAt(notice.getCreatedAt() == null ? null : notice.getCreatedAt().toString());
+            item.setTag(null);
+            items.add(item);
+        }
+        items.sort((a, b) -> String.valueOf(b.getCreatedAt()).compareTo(String.valueOf(a.getCreatedAt())));
+        return Result.success(items.stream().limit(capped).toList());
     }
 
     @GetMapping("/{id}")
@@ -63,7 +96,7 @@ public class SystemMessageController {
     public Result<PageResult<SysWorkflowDO>> todos(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize) {
-        return Result.success(workflowService.taskPage(pageNum, pageSize));
+        return Result.success(workflowService.taskPage(pageNum, pageSize, null));
     }
 
     @PostMapping

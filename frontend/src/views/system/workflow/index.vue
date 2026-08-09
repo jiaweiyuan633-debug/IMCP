@@ -2,6 +2,12 @@
   <a-card :title="t('page.workflowTitle')">
     <a-tabs v-model:active-key="activeKey">
       <a-tab-pane key="instances" :tab="t('page.workflowInstances')">
+        <ProSearchForm
+          :fields="instanceSearchFields"
+          :loading="instanceLoading"
+          @search="onInstanceSearch"
+          @reset="onInstanceReset"
+        />
         <div class="toolbar">
           <a-button type="primary" @click="openWorkflowCreate">{{ t('page.workflowStart') }}</a-button>
         </div>
@@ -33,6 +39,12 @@
       </a-tab-pane>
 
       <a-tab-pane key="tasks" :tab="t('page.workflowTasks')">
+        <ProSearchForm
+          :fields="taskSearchFields"
+          :loading="taskLoading"
+          @search="onTaskSearch"
+          @reset="onTaskReset"
+        />
         <ProTable
           v-model:page-num="taskPageNum"
           v-model:page-size="taskPageSize"
@@ -184,6 +196,7 @@ import { message, Modal } from 'ant-design-vue'
 import { DeleteOutlined } from '@ant-design/icons-vue'
 import ModalForm from '@/components/ModalForm.vue'
 import ProTable from '@/components/ProTable.vue'
+import ProSearchForm from '@/components/ProSearchForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import {
   approveWorkflow,
@@ -208,6 +221,7 @@ import {
 } from '@/api/system'
 import type { ProcessDefVo, ProcessNodeVo, WorkflowLogVo, WorkflowVo } from '@/api/system'
 import type { RoleOptionVo } from '@/types'
+import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -258,12 +272,34 @@ const instancePageSize = ref(10)
 const instanceTotal = ref(0)
 const instanceLoading = ref(false)
 const instanceRecords = ref<WorkflowVo[]>([])
+const instanceSearchModel = reactive<Record<string, unknown>>({})
+
+const instanceSearchFields: SearchField[] = [
+  { label: t('page.workflowName'), prop: 'processName' },
+  {
+    label: t('page.workflowStatus'),
+    prop: 'status',
+    type: 'select',
+    options: [
+      { label: t('common.pending'), value: 'PENDING' },
+      { label: t('common.approved'), value: 'APPROVED' },
+      { label: t('common.rejected'), value: 'REJECTED' },
+      { label: t('common.withdrawn'), value: 'WITHDRAWN' },
+    ],
+  },
+  { label: t('page.workflowBizType'), prop: 'bizType' },
+]
 
 const taskPageNum = ref(1)
 const taskPageSize = ref(10)
 const taskTotal = ref(0)
 const taskLoading = ref(false)
 const taskRecords = ref<WorkflowVo[]>([])
+const taskSearchModel = reactive<Record<string, unknown>>({})
+
+const taskSearchFields: SearchField[] = [
+  { label: t('page.workflowName'), prop: 'processName' },
+]
 
 const defPageNum = ref(1)
 const defPageSize = ref(10)
@@ -323,7 +359,13 @@ const nodeViewRecords = ref<Array<ProcessNodeVo & { roleName?: string }>>([])
 async function loadInstances() {
   instanceLoading.value = true
   try {
-    const data = await getWorkflowPage({ pageNum: instancePageNum.value, pageSize: instancePageSize.value })
+    const data = await getWorkflowPage({
+      pageNum: instancePageNum.value,
+      pageSize: instancePageSize.value,
+      processName: (instanceSearchModel.processName as string) || undefined,
+      status: instanceSearchModel.status as string | undefined,
+      bizType: instanceSearchModel.bizType as string | undefined,
+    })
     instanceRecords.value = data.records
     instanceTotal.value = data.total
   } finally {
@@ -334,7 +376,11 @@ async function loadInstances() {
 async function loadTasks() {
   taskLoading.value = true
   try {
-    const data = await getWorkflowTasks({ pageNum: taskPageNum.value, pageSize: taskPageSize.value })
+    const data = await getWorkflowTasks({
+      pageNum: taskPageNum.value,
+      pageSize: taskPageSize.value,
+      processName: (taskSearchModel.processName as string) || undefined,
+    })
     taskRecords.value = data.records
     taskTotal.value = data.total
   } finally {
@@ -472,6 +518,34 @@ function onDefDelete(record: ProcessDefVo) {
       loadDefs()
     },
   })
+}
+
+function onInstanceSearch(model: Record<string, unknown>) {
+  Object.assign(instanceSearchModel, model)
+  instancePageNum.value = 1
+  loadInstances()
+}
+
+function onInstanceReset() {
+  Object.keys(instanceSearchModel).forEach((key) => {
+    instanceSearchModel[key] = undefined
+  })
+  instancePageNum.value = 1
+  loadInstances()
+}
+
+function onTaskSearch(model: Record<string, unknown>) {
+  Object.assign(taskSearchModel, model)
+  taskPageNum.value = 1
+  loadTasks()
+}
+
+function onTaskReset() {
+  Object.keys(taskSearchModel).forEach((key) => {
+    taskSearchModel[key] = undefined
+  })
+  taskPageNum.value = 1
+  loadTasks()
 }
 
 async function onPublish(record: ProcessDefVo) {

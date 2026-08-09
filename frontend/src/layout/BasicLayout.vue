@@ -198,8 +198,7 @@ import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getAccessToken } from '@/utils/auth'
 import {
-  getLatestMessages,
-  getLatestNotices,
+  getNotificationFeed,
   getNoticeSseTicket,
   getUnreadMessageCount,
   getUnreadNoticeCount,
@@ -208,7 +207,7 @@ import {
   markMessageRead,
   markNoticeRead,
 } from '@/api/system'
-import type { MessageVo, NoticeVo } from '@/api/system'
+import type { MessageVo, NotificationFeedItem, NoticeVo } from '@/api/system'
 import { API_BASE_URL } from '@/utils/env'
 import dayjs from 'dayjs'
 import GlobalSearch from '@/components/GlobalSearch.vue'
@@ -428,9 +427,20 @@ const noticeItems = computed(() => {
 })
 
 async function refreshNoticeItems() {
-  const [messages, notices] = await Promise.all([getLatestMessages(), getLatestNotices()])
-  latestMessages.value = messages
-  latestNotices.value = notices
+  const feed = await getNotificationFeed()
+  latestMessages.value = feed
+    .filter((item): item is NotificationFeedItem & { kind: 'message' } => item.kind === 'message')
+    .map((item) => ({ id: item.id, title: item.title, content: item.content, createdAt: item.createdAt, messageType: 'SYSTEM', readFlag: 0 }))
+  latestNotices.value = feed
+    .filter((item): item is NotificationFeedItem & { kind: 'notice' } => item.kind === 'notice')
+    .map((item) => ({
+      id: item.id,
+      noticeTitle: item.title,
+      noticeContent: item.content,
+      noticeType: 1,
+      status: 1,
+      createdAt: item.createdAt,
+    }))
 }
 
 async function getUnreadTotal(): Promise<number> {

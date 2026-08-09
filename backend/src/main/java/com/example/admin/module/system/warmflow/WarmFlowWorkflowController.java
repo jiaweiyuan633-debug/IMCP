@@ -32,16 +32,21 @@ public class WarmFlowWorkflowController {
     public Result<PageResult<SysWorkflowDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
-            @RequestParam(required = false) String status) {
-        return Result.success(workflowService.page(pageNum, pageSize, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String processName,
+            @RequestParam(required = false) String bizType,
+            @RequestParam(required = false) Long applicantId,
+            @RequestParam(required = false) Long defId) {
+        return Result.success(workflowService.page(pageNum, pageSize, status, processName, bizType, applicantId, defId));
     }
 
     @GetMapping("/tasks")
     @PreAuthorize("hasAuthority('system:workflow:list')")
     public Result<PageResult<SysWorkflowDO>> tasks(
             @RequestParam(defaultValue = "1") long pageNum,
-            @RequestParam(defaultValue = "10") long pageSize) {
-        return Result.success(workflowService.taskPage(pageNum, pageSize));
+            @RequestParam(defaultValue = "10") long pageSize,
+            @RequestParam(required = false) String processName) {
+        return Result.success(workflowService.taskPage(pageNum, pageSize, processName));
     }
 
     @PostMapping

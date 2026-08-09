@@ -364,6 +364,19 @@ export interface MessageVo {
   createdAt?: string
 }
 
+export interface NotificationFeedItem {
+  kind: 'message' | 'notice'
+  id: number
+  title: string
+  content?: string
+  createdAt?: string
+  tag?: string | null
+}
+
+export function getNotificationFeed(limit = 8): Promise<NotificationFeedItem[]> {
+  return request.get('/system/message/feed', { params: { limit } })
+}
+
 export function getMessagePage(params: Record<string, unknown>): Promise<PageResult<MessageVo>> {
   return request.get('/system/message', { params })
 }

@@ -61,19 +61,28 @@ public class WarmFlowWorkflowService {
     private final SystemMessageService messageService;
     private final ObjectMapper objectMapper;
 
-    public PageResult<SysWorkflowDO> page(long pageNum, long pageSize, String status) {
+    public PageResult<SysWorkflowDO> page(long pageNum, long pageSize, String status, String processName,
+                                          String bizType, Long applicantId, Long defId) {
         Instance query = FlowEngine.newIns();
         if (StringUtils.hasText(status)) {
             query.setFlowStatus(toWarmStatus(status));
         }
-        Page<Instance> result = FlowEngine.insService().page(query, new Page<>((int) pageNum, (int) pageSize));
-        List<SysWorkflowDO> records = result.getList().stream()
+        List<SysWorkflowDO> all = FlowEngine.insService().list(query).stream()
                 .map(this::toWorkflowVO)
+                .filter(Objects::nonNull)
+                .filter(vo -> !StringUtils.hasText(processName) || contains(vo.getProcessName(), processName))
+                .filter(vo -> !StringUtils.hasText(bizType) || contains(vo.getBizType(), bizType))
+                .filter(vo -> applicantId == null || applicantId.equals(vo.getApplicantId()))
+                .filter(vo -> defId == null || defId.equals(vo.getFlowDefId()))
+                .sorted(Comparator.comparing(SysWorkflowDO::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-        return new PageResult<>(records, result.getTotal(), result.getPageNum(), result.getPageSize());
+        int from = (int) Math.min((pageNum - 1) * pageSize, all.size());
+        int to = (int) Math.min(from + pageSize, all.size());
+        return new PageResult<>(all.subList(from, to), all.size(), pageNum, pageSize);
     }
 
-    public PageResult<SysWorkflowDO> taskPage(long pageNum, long pageSize) {
+    public PageResult<SysWorkflowDO> taskPage(long pageNum, long pageSize, String processName) {
         LoginUser user = SecurityUtils.getLoginUser();
         String handler = USER_PREFIX + user.getUserId();
         Set<Long> taskIds = new HashSet<>();
@@ -87,6 +96,13 @@ public class WarmFlowWorkflowService {
         }
         List<Task> tasks = FlowEngine.taskService().getByIds(new ArrayList<>(taskIds)).stream()
                 .filter(task -> FlowStatus.APPROVAL.getKey().equals(task.getFlowStatus()))
+                .filter(task -> {
+                    if (!StringUtils.hasText(processName)) {
+                        return true;
+                    }
+                    SysWorkflowDO vo = toWorkflowVO(FlowEngine.insService().getById(task.getInstanceId()));
+                    return vo != null && contains(vo.getProcessName(), processName);
+                })
                 .sorted(Comparator.comparing(Task::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
         int from = (int) Math.min((pageNum - 1) * pageSize, tasks.size());
@@ -404,5 +420,9 @@ public class WarmFlowWorkflowService {
             case "4", "5", "6", "10" -> WorkflowStatus.WITHDRAWN.name();
             default -> WorkflowStatus.PENDING.name();
         };
+    }
+
+    private boolean contains(String value, String keyword) {
+        return value != null && value.toLowerCase().contains(keyword.toLowerCase());
     }
 }

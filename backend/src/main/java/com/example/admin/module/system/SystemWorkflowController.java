@@ -24,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/system/workflow")
 @RequiredArgsConstructor
+@Deprecated
 public class SystemWorkflowController {
 
     private final SystemWorkflowService workflowService;

@@ -68,7 +68,7 @@ import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import { deleteFile, downloadFile, getFilePage } from '@/api/system'
-import { getStorageQuota, type StorageQuota } from '@/api/common'
+import { getFileAccessToken, getStorageQuota, type StorageQuota } from '@/api/common'
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
@@ -201,9 +201,9 @@ function scanStatusMeta(status?: string): { text: string; color: string } {
   return { text: t('page.fileScanSkipped'), color: 'default' }
 }
 
-function openPreview(record: FileVo) {
+async function openPreview(record: FileVo) {
   previewRecord.value = record
-  previewUrl.value = withToken(record)
+  previewUrl.value = await freshUrl(record)
   previewName.value = record.originalName || record.fileName
   previewOpen.value = true
 }
@@ -217,8 +217,14 @@ function withToken(record: FileVo): string {
 }
 
 async function onCopyLink(record: FileVo) {
-  await navigator.clipboard.writeText(withToken(record))
+  await navigator.clipboard.writeText(await freshUrl(record))
   message.success(t('page.fileCopied'))
+}
+
+async function freshUrl(record: FileVo): Promise<string> {
+  const url = contentUrl(record)
+  const token = await getFileAccessToken(url)
+  return `${url}?token=${encodeURIComponent(token)}`
 }
 
 async function onDownload(record: FileVo) {

@@ -79,7 +79,7 @@ Check '文件管理接口' ($filePage.code -eq 0)
 $alertPage = Invoke-Api -Method Get -Url "$BaseUrl/api/monitor/alert-rule?pageNum=1&pageSize=5" -Headers $adminHeaders
 Check '告警规则接口' ($alertPage.code -eq 0)
 
-$workflowDefPage = Invoke-Api -Method Get -Url "$BaseUrl/api/system/workflow/def?pageNum=1&pageSize=5" -Headers $adminHeaders
+$workflowDefPage = Invoke-Api -Method Get -Url "$BaseUrl/api/system/workflow-engine/def?pageNum=1&pageSize=5" -Headers $adminHeaders
 Check '流程定义接口' ($workflowDefPage.code -eq 0)
 
 $sseTicket = Invoke-Api -Method Get -Url "$BaseUrl/api/system/notice/ticket" -Headers $adminHeaders

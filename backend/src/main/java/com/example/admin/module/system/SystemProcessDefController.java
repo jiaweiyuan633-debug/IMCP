@@ -24,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/system/workflow/def")
 @RequiredArgsConstructor
+@Deprecated
 public class SystemProcessDefController {
 
     private final ProcessDefService processDefService;
