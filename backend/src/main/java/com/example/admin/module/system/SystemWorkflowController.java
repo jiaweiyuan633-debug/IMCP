@@ -7,6 +7,7 @@ import com.example.admin.module.system.dto.WorkflowDelegateRequest;
 import jakarta.validation.Valid;
 import com.example.admin.module.system.entity.SysWorkflow;
 import com.example.admin.module.system.entity.SysWorkflowLog;
+import com.example.admin.module.system.entity.SysProcessNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,7 +55,7 @@ public class SystemWorkflowController {
     @PreAuthorize("hasAuthority('system:workflow:approve')")
     @OperLog(module = "工作流", action = "审批通过")
     public Result<Void> approve(@PathVariable Long id, @RequestBody WorkflowRemarkRequest request) {
-        workflowService.approve(id, request.getRemark());
+        workflowService.approve(id, request.getNodeId(), request.getRemark());
         return Result.success();
     }
 
@@ -86,6 +87,12 @@ public class SystemWorkflowController {
     @PreAuthorize("hasAuthority('system:workflow:list')")
     public Result<List<SysWorkflowLog>> logs(@PathVariable Long id) {
         return Result.success(workflowService.logs(id));
+    }
+
+    @GetMapping("/{id}/nodes")
+    @PreAuthorize("hasAuthority('system:workflow:list')")
+    public Result<List<SysProcessNode>> currentNodes(@PathVariable Long id) {
+        return Result.success(workflowService.currentNodes(id));
     }
 }
 

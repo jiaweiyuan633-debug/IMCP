@@ -98,6 +98,9 @@ public class ProcessDefService {
             node.setProcessDefId(defId);
             node.setNodeName(item.getNodeName());
             node.setNodeKey(item.getNodeKey());
+            node.setNodeType(item.getNodeType() == null ? "APPROVE" : item.getNodeType());
+            node.setConditionExpression(item.getConditionExpression());
+            node.setTimeoutHours(item.getTimeoutHours() == null ? 48 : item.getTimeoutHours());
             node.setNodeOrder(item.getNodeOrder() == null ? order : item.getNodeOrder());
             node.setApproverRoleId(item.getApproverRoleId());
             nodeMapper.insert(node);

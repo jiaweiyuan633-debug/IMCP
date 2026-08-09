@@ -6,5 +6,6 @@ import lombok.Data;
 public class WorkflowRemarkRequest {
 
     private String remark;
+    private Long nodeId;
 }
 

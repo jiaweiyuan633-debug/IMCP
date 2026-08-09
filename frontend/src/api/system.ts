@@ -391,6 +391,8 @@ export interface WorkflowVo {
   bizType: string
   processDefId?: number
   currentNodeName?: string
+  currentNodeIds?: string
+  formData?: string
   assigneeUserId?: number
   assigneeName?: string
   applicantName?: string
@@ -412,8 +414,8 @@ export function createWorkflow(data: Record<string, unknown>): Promise<number> {
   return request.post('/system/workflow', data)
 }
 
-export function approveWorkflow(id: number, remark?: string): Promise<void> {
-  return request.put(`/system/workflow/${id}/approve`, { remark })
+export function approveWorkflow(id: number, remark?: string, nodeId?: number): Promise<void> {
+  return request.put(`/system/workflow/${id}/approve`, { remark, nodeId })
 }
 
 export function rejectWorkflow(id: number, remark?: string): Promise<void> {
@@ -454,8 +456,15 @@ export interface ProcessNodeVo {
   id?: number
   nodeName: string
   nodeKey: string
+  nodeType?: string
+  conditionExpression?: string
+  timeoutHours?: number
   nodeOrder: number
   approverRoleId?: number
+}
+
+export function getWorkflowCurrentNodes(id: number): Promise<ProcessNodeVo[]> {
+  return request.get(`/system/workflow/${id}/nodes`)
 }
 
 export function getProcessDefPage(params: Record<string, unknown>): Promise<PageResult<ProcessDefVo>> {

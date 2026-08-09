@@ -20,6 +20,10 @@ public class SysWorkflow {
     private Long processDefId;
     private Long currentNodeId;
     private String currentNodeName;
+    private String currentNodeIds;
+    private String formData;
+    private LocalDateTime currentNodeAssignedAt;
+    private Integer timeoutNotified;
     private Long assigneeUserId;
     private String assigneeName;
     private Long bizId;

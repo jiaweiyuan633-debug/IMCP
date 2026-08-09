@@ -33,6 +33,9 @@ public class ProcessDefSaveRequest {
         private String nodeName;
         @NotBlank(message = "节点标识不能为空")
         private String nodeKey;
+        private String nodeType;
+        private String conditionExpression;
+        private Integer timeoutHours;
         private Integer nodeOrder;
         private Long approverRoleId;
     }

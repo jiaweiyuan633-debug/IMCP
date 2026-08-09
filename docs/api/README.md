@@ -75,6 +75,7 @@ Java 后端统一响应结构：
 | 文件管理 | `/api/system/file` | 文件分页、删除 |
 | 工作流 | `/api/system/workflow` | 发起、分页、待办、通过、拒绝、撤回、转办、审批日志 |
 | 流程定义 | `/api/system/workflow/def` | 流程定义 CRUD、节点查询 |
+| 当前节点 | `/api/system/workflow/{id}/nodes` | 当前待办节点查询 |
 
 ## 监控
 

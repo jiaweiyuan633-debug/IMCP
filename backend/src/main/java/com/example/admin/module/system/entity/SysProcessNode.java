@@ -17,6 +17,9 @@ public class SysProcessNode {
     private Long processDefId;
     private String nodeName;
     private String nodeKey;
+    private String nodeType;
+    private String conditionExpression;
+    private Integer timeoutHours;
     private Integer nodeOrder;
     private Long approverRoleId;
     private LocalDateTime createdAt;
