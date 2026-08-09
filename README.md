@@ -10,7 +10,7 @@
 - 统一文件服务：本地磁盘/MinIO 统一 SPI、上传校验、文件分类、SHA256、ClamAV 病毒扫描、存储配额、签名内容端点、鉴权下载
 - 消息中心：系统消息、审批待办、全员广播、未读角标、已读管理、顶部铃铛聚合消息与公告、WebSocket + SSE 实时推送
 - 工程能力：Quartz JDBC 持久化定时任务、Excel 导入导出、OpenAPI
-- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V31
+- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V33
 - 工程规范：阿里巴巴 Java 开发手册分批整改、统一错误码、日志脱敏、核心 Service 单测、Manager 分层
 - 实时协作：SSE Ticket + WebSocket 双通道、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
 - 完整工作流：基于 Warm-Flow 1.8.9 的流程定义、条件/并行节点、发布/取消发布、表单数据、待办任务、通过/驳回/撤回/转办、审批日志，存量 `sys_process_def` 启动时自动迁移兼容
@@ -18,7 +18,7 @@
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式、PWA 离线缓存
 - 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
-- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、覆盖率门槛、CodeQL，冒烟与压测脚本
+- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、前端 ESLint、后端 JaCoCo 覆盖率门槛、CodeQL，冒烟与压测脚本
 
 ## 扩展进度
 
@@ -62,7 +62,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V32）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V33）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 k8s/         Kubernetes 清单与 Helm Chart

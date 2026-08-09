@@ -26,7 +26,10 @@ public class TotpService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final byte[] encryptionKey;
 
-    public TotpService(@Value("${app.totp.encryption-key:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}") String key) {
+    public TotpService(@Value("${app.totp.encryption-key:}") String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalStateException("TOTP 加密密钥未配置，请通过环境变量 TOTP_ENCRYPTION_KEY 注入（不得复用 JWT_SECRET）");
+        }
         try {
             this.encryptionKey = MessageDigest.getInstance("SHA-256")
                     .digest(key.getBytes(StandardCharsets.UTF_8));

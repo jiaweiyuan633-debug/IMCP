@@ -128,6 +128,12 @@ const createForm = reactive({
   paramsText: '{"content":"Please enter the text to analyze","max_length":200}',
 })
 let taskStream: EventSource | null = null
+// SSE 受控重连：指数退避 + 上限；终态或组件卸载后停止
+let taskRetryCount = 0
+let taskDisposed = false
+let taskStopped = false
+let taskReconnectTimer: number | undefined
+const TASK_MAX_RETRY = 8
 
 const prettyResult = computed(() => {
   const raw = detail.value?.result?.resultJson
@@ -169,6 +175,8 @@ async function onCreate() {
 async function openDetail(record: AiTaskVo) {
   detailOpen.value = true
   closeTaskStream()
+  taskStopped = false
+  taskRetryCount = 0
   await loadDetail(record.id)
   if (detail.value && !isTerminal(detail.value.status)) {
     startTaskStream(record.id)
@@ -176,23 +184,52 @@ async function openDetail(record: AiTaskVo) {
 }
 
 async function startTaskStream(id: number) {
-  const ticket = await getAiSseTicket()
+  if (taskStream || taskDisposed || taskStopped) {
+    return
+  }
+  let ticket: string
+  try {
+    ticket = await getAiSseTicket()
+  } catch {
+    scheduleTaskReconnect(id)
+    return
+  }
+  if (taskStream || taskDisposed || taskStopped) {
+    return
+  }
   const source = new EventSource(`${API_BASE_URL}/ai/tasks/${id}/stream?ticket=${encodeURIComponent(ticket)}`)
   source.addEventListener('task', (event) => {
     try {
       const data = JSON.parse((event as MessageEvent).data) as AiTaskVo
       detail.value = data
+      taskRetryCount = 0
       if (isTerminal(data.status)) {
-        closeTaskStream()
+        stopTaskStream()
       }
     } catch {
       // ignore malformed events
     }
   })
   source.onerror = () => {
-    closeTaskStream()
+    source.close()
+    taskStream = null
+    scheduleTaskReconnect(id)
   }
   taskStream = source
+}
+
+function scheduleTaskReconnect(id: number) {
+  if (taskDisposed || taskStopped || taskRetryCount >= TASK_MAX_RETRY) {
+    return
+  }
+  taskRetryCount += 1
+  const delay = Math.min(1000 * 2 ** (taskRetryCount - 1), 30000)
+  taskReconnectTimer = window.setTimeout(() => startTaskStream(id), delay)
+}
+
+function stopTaskStream() {
+  taskStopped = true
+  closeTaskStream()
 }
 
 async function loadDetail(id: number) {
@@ -208,6 +245,10 @@ function isTerminal(status: string) {
 }
 
 function closeTaskStream() {
+  if (taskReconnectTimer) {
+    clearTimeout(taskReconnectTimer)
+    taskReconnectTimer = undefined
+  }
   if (taskStream) {
     taskStream.close()
     taskStream = null
@@ -226,7 +267,10 @@ function onCancel(record: AiTaskVo) {
   })
 }
 
-onBeforeUnmount(closeTaskStream)
+onBeforeUnmount(() => {
+  taskDisposed = true
+  closeTaskStream()
+})
 </script>
 
 <style scoped>

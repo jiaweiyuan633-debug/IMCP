@@ -1,9 +1,13 @@
 server:
   port: ${SERVER_PORT:8080}
+  # 优雅停机：先停止接收新请求，给在途请求留出完成窗口
+  shutdown: graceful
 
 spring:
   application:
     name: admin-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   profiles:
     active: dev
   jackson:
@@ -19,7 +23,16 @@ spring:
       initialize-schema: always
     properties:
       org.quartz.scheduler.instanceName: adminScheduler
-      org.quartz.jobStore.isClustered: false
+      org.quartz.scheduler.instanceId: AUTO
+      org.quartz.jobStore.isClustered: true
+  datasource:
+    hikari:
+      pool-name: AdminHikariCP
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
 management:
   tracing:
@@ -35,6 +48,9 @@ management:
   endpoint:
     health:
       show-details: always
+      # 暴露 /actuator/health/readiness 与 /actuator/health/liveness 供 k8s 探针细分
+      probes:
+        enabled: true
 
 logging:
   pattern:
@@ -51,7 +67,7 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 jwt:
-  secret: ${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}
+  secret: ${JWT_SECRET:}
   access-token-expire-minutes: ${JWT_ACCESS_EXPIRE_MINUTES:120}
   refresh-token-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
 
@@ -74,10 +90,10 @@ app:
         port: ${CLAMAV_PORT:3310}
         timeout-seconds: ${CLAMAV_TIMEOUT_SECONDS:10}
   totp:
-    encryption-key: ${TOTP_ENCRYPTION_KEY:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}
+    encryption-key: ${TOTP_ENCRYPTION_KEY:}
   sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}
   cors:
-    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
   api-rate-limit-per-minute: ${API_RATE_LIMIT_PER_MINUTE:300}
   upload:
     max-size-mb: ${UPLOAD_MAX_SIZE_MB:20}

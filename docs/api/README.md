@@ -139,5 +139,5 @@ Python 服务接口：
 - OpenAPI JSON：`http://localhost:8080/v3/api-docs`
 - 刷新本地契约：`scripts/fetch-openapi.ps1`
 
-接口契约以运行时 OpenAPI 为准，CI 会在每次提交时执行后端测试、前端测试与构建、AI 测试与规范检查。
+接口契约以运行时 OpenAPI 为准，CI 会在每次提交时执行后端测试与覆盖率门槛、前端 lint/测试/构建、AI 测试与规范检查。
 

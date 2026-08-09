@@ -36,7 +36,22 @@ public class CommonController {
         if (!isAccessiblePath(url)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "非法文件地址");
         }
+        // 文件内容令牌签发前校验文件归属，防止为其他租户的文件签发访问令牌（跨租户文件读取）
+        Long fileId = parseFileId(url);
+        if (fileId != null) {
+            fileStorageManager.getOwnedOrThrow(fileId);
+        }
         return Result.success(fileAccessService.issue(url));
+    }
+
+    private Long parseFileId(String url) {
+        if (url.startsWith("/files/")) {
+            String idPart = url.substring("/files/".length());
+            if (idPart.matches("\\d+")) {
+                return Long.valueOf(idPart);
+            }
+        }
+        return null;
     }
 
     @PostMapping("/upload")

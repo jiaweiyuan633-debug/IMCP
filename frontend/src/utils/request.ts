@@ -19,18 +19,25 @@ service.interceptors.request.use((config) => {
   return config
 })
 
-let refreshing = false
+// 共享同一个刷新 Promise：并发 401 只触发一次刷新，
+// 其余请求等待同一结果，避免旧 token 清除前的轮询竞态导致反复刷新/死循环
+let refreshPromise: Promise<boolean> | null = null
 
-async function refreshAccessToken(): Promise<boolean> {
+function refreshAccessToken(): Promise<boolean> {
   const refreshToken = getRefreshToken()
   if (!refreshToken) {
-    return false
+    return Promise.resolve(false)
   }
-  if (refreshing) {
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    return Boolean(getAccessToken())
+  if (!refreshPromise) {
+    refreshPromise = doRefresh(refreshToken).finally(() => {
+      refreshPromise = null
+    })
   }
-  refreshing = true
+  return refreshPromise
+}
+
+async function doRefresh(refreshToken: string): Promise<boolean> {
+  let failed = false
   try {
     const response = await axios.post<Result<{ accessToken: string; refreshToken: string }>>(
       `${service.defaults.baseURL}/auth/refresh`,
@@ -40,16 +47,15 @@ async function refreshAccessToken(): Promise<boolean> {
       setTokens(response.data.data.accessToken, response.data.data.refreshToken)
       return true
     }
-    clearTokens()
-    router.push('/login')
-    return false
+    failed = true
   } catch {
+    failed = true
+  }
+  if (failed) {
     clearTokens()
     router.push('/login')
-    return false
-  } finally {
-    refreshing = false
   }
+  return false
 }
 
 service.interceptors.response.use(

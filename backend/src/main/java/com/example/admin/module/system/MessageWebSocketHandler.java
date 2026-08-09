@@ -1,9 +1,6 @@
 package com.example.admin.module.system;
 
-import com.example.admin.security.JwtUtil;
-import com.example.admin.security.TokenService;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
+import com.example.admin.common.SseTicketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,8 +18,7 @@ import java.net.URI;
 public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     private final MessageWebSocketService messageWebSocketService;
-    private final JwtUtil jwtUtil;
-    private final TokenService tokenService;
+    private final SseTicketService sseTicketService;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -53,31 +49,30 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * 鉴权改用短期一次性 ticket（与 SSE 同机制，Redis 存 userId、60s 过期），
+     * 不再允许在 URL 上携带长期 access token，避免凭证进入代理/访问日志。
+     */
     private Long authenticate(WebSocketSession session) {
-        String token = tokenFromQuery(session.getUri());
-        if (!StringUtils.hasText(token)) {
+        String ticket = ticketFromQuery(session.getUri());
+        if (!StringUtils.hasText(ticket)) {
             return null;
         }
-        try {
-            Claims claims = jwtUtil.parse(token);
-            if (!tokenService.hasValidAccessToken(claims.getId())) {
-                return null;
-            }
-            Long userId = Long.valueOf(claims.getSubject());
-            session.getAttributes().put("userId", userId);
-            return userId;
-        } catch (JwtException | IllegalArgumentException exception) {
+        Long userId = sseTicketService.consume(ticket);
+        if (userId == null) {
             return null;
         }
+        session.getAttributes().put("userId", userId);
+        return userId;
     }
 
-    private String tokenFromQuery(URI uri) {
+    private String ticketFromQuery(URI uri) {
         if (uri == null || uri.getQuery() == null) {
             return null;
         }
         for (String part : uri.getQuery().split("&")) {
-            if (part.startsWith("token=")) {
-                return part.substring("token=".length());
+            if (part.startsWith("ticket=")) {
+                return part.substring("ticket=".length());
             }
         }
         return null;

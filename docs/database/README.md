@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V29。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V33。
 
 ## 版本记录
 
@@ -35,6 +35,10 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V27 | 登录日志、操作日志、工作流、AI 任务、公告、定时任务高频查询索引 |
 | V28 | 所有自增主键统一为 `BIGINT UNSIGNED` |
 | V29 | 普通用户角色移除看板权限，授权通知公告菜单 |
+| V30 | 文件存储增强：`content_type/category/sha256/扫描状态/逻辑删除` |
+| V31 | 消息中心：`sys_message`、`sys_message_read` 与消息待办、铃铛聚合 |
+| V32 | Warm-Flow 工作流引擎表（`flow_definition/flow_node/flow_skip/flow_ins_order/flow_task` 等） |
+| V33 | `sys_user` 用户名唯一键按租户隔离（`uk_sys_user_tenant_username`） |
 
 ## 表清单
 
@@ -80,10 +84,13 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_notice` | 通知公告，含审计字段、乐观锁 |
 | `sys_notice_read` | 通知已读 |
 | `sys_file` | 文件元数据，含租户、存储类型 |
+| `sys_message` | 系统消息，含租户、类型、标题、内容、已读状态 |
+| `sys_message_read` | 消息已读 |
 | `sys_workflow` | 工作流实例，含流程定义、当前节点、审计字段、乐观锁 |
 | `sys_workflow_log` | 工作流审批日志 |
 | `sys_process_def` | 流程定义，含租户、唯一流程标识 |
 | `sys_process_node` | 流程节点，含审批角色 |
+| Warm-Flow 引擎表 | `flow_definition/flow_node/flow_skip/flow_ins_order/flow_task` 等流程引擎持久化表 |
 
 ### AI
 
@@ -97,7 +104,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 
 - 用户、角色、部门、岗位使用逻辑删除。
 - `created_by/updated_by` 由 `MyMetaObjectHandler` 自动填充，核心业务表带 `version` 乐观锁并由 `OptimisticLockerInnerInterceptor` 校验。
-- 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
+- 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_message`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
+- 用户名唯一性按租户隔离：`sys_user` 使用 `uk_sys_user_tenant_username(tenant_id, username)`，多租户下各租户可存在同名账号。
 - 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
 - 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，对 `sys_user/ai_task/sys_oper_log/sys_login_log` 自动注入权限条件。
 - 权限、字典、参数支持 Redis 缓存，权限变更自动失效缓存。

@@ -2,6 +2,7 @@ package com.example.admin.module.ai;
 
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
@@ -74,7 +75,9 @@ public class AiTaskService {
     @Value("${app.ai-base-url:}")
     private String aiBaseUrl;
 
-    @Transactional
+    // 外部提交移出事务边界：任务先落库（PENDING，autocommit 立即可见），再同步提交 AI 服务。
+    // 避免 DB 事务/连接被外部 HTTP 往返长时间占用；若 AI 侧已受理而本侧提交失败，
+    // 任务仍保留在库中由 AiTaskScanner 按超时补偿，不再产生孤儿任务。
     public Long create(AiTaskCreateRequest request) {
         AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
                 .eq(AiServiceConfigDO::getCode, request.getServiceCode()));
@@ -199,13 +202,28 @@ public class AiTaskService {
             throw new BusinessException(ResultCode.AI_CALLBACK_STATUS_INVALID);
         }
 
+        // 条件 UPDATE 原子抢占终态：仅当任务仍处于非终态时才更新，重复/并发回调影响行数为 0 则直接忽略，
+        // 避免重复插入结果行与重复推送通知（ai_task 无 version 列，check-then-act 存在竞态）
+        int updated = taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                .eq(AiTaskDO::getTaskNo, request.getTaskNo())
+                .in(AiTaskDO::getStatus,
+                        AiTaskStatus.PENDING.name(),
+                        AiTaskStatus.QUEUED.name(),
+                        AiTaskStatus.RUNNING.name())
+                .set(AiTaskDO::getStatus, status)
+                .set(AiTaskDO::getErrorMsg, request.getError())
+                .set(AiTaskDO::getRetryCount,
+                        request.getRetryCount() == null ? task.getRetryCount() : request.getRetryCount())
+                .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
+        if (updated == 0) {
+            return;
+        }
         task.setStatus(status);
         task.setErrorMsg(request.getError());
         if (request.getRetryCount() != null) {
             task.setRetryCount(request.getRetryCount());
         }
         task.setUpdatedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
 
         if (AiTaskStatus.SUCCEEDED.name().equals(status)) {
             AiTaskResultDO result = new AiTaskResultDO();

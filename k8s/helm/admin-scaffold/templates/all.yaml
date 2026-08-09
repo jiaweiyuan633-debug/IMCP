@@ -47,13 +47,13 @@ spec:
             {{- toYaml .Values.resources.backend | nindent 12 }}
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
@@ -346,6 +346,14 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
+          # API/SSE 直达后端，避免经前端 nginx 二次转发
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-backend
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

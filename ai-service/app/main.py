@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 
@@ -13,6 +13,7 @@ from app.tasks.manager import TaskManager
 async def lifespan(app: FastAPI):
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     app.state.task_manager = TaskManager(redis, settings)
+    app.state.redis = redis
     yield
     await redis.aclose()
 
@@ -30,5 +31,13 @@ app.include_router(api_router)
 
 
 @app.get("/health", tags=["core"])
-async def health() -> dict[str, str]:
+async def health(response: Response) -> dict[str, str]:
+    # 探活检查依赖的 Redis；不可用时返回 503，供 k8s readiness/liveness 探针正确判定
+    redis = getattr(app.state, "redis", None)
+    if redis is not None:
+        try:
+            await redis.ping()
+        except Exception:
+            response.status_code = 503
+            return {"status": "error", "service": settings.app_name, "detail": "redis unreachable"}
     return {"status": "ok", "service": settings.app_name}

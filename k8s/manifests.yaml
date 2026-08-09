@@ -17,6 +17,18 @@ spec:
           image: admin-backend:latest
           ports:
             - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
           envFrom:
             - configMapRef:
                 name: admin-config
@@ -51,6 +63,18 @@ spec:
           image: ai-service:latest
           ports:
             - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
           envFrom:
             - configMapRef:
                 name: admin-config
@@ -106,6 +130,14 @@ spec:
     - host: admin.example.com
       http:
         paths:
+          # API/SSE 直达后端，避免经前端 nginx 二次转发
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-backend
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

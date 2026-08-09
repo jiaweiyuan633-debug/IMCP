@@ -12,7 +12,7 @@
           <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
             <template #title>
               <component :is="iconOf(menu.icon)" />
-              <span>{{ menu.name }}</span>
+              <span>{{ menuTitle(menu.name) }}</span>
             </template>
             <a-menu-item
               v-for="child in menu.children"
@@ -20,12 +20,12 @@
               @click="navigate(fullPath(child, fullPath(menu)))"
             >
               <component :is="iconOf(child.icon)" />
-              <span>{{ child.name }}</span>
+              <span>{{ menuTitle(child.name) }}</span>
             </a-menu-item>
           </a-sub-menu>
           <a-menu-item v-else :key="fullPath(menu)" @click="navigate(fullPath(menu))">
             <component :is="iconOf(menu.icon)" />
-            <span>{{ menu.name }}</span>
+            <span>{{ menuTitle(menu.name) }}</span>
           </a-menu-item>
         </template>
       </a-menu>
@@ -43,19 +43,19 @@
           <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
             <template #title>
               <component :is="iconOf(menu.icon)" />
-              <span>{{ menu.name }}</span>
+              <span>{{ menuTitle(menu.name) }}</span>
             </template>
             <a-menu-item
               v-for="child in menu.children"
               :key="fullPath(child, fullPath(menu))"
             >
               <component :is="iconOf(child.icon)" />
-              <span>{{ child.name }}</span>
+              <span>{{ menuTitle(child.name) }}</span>
             </a-menu-item>
           </a-sub-menu>
           <a-menu-item v-else :key="fullPath(menu)">
             <component :is="iconOf(menu.icon)" />
-            <span>{{ menu.name }}</span>
+            <span>{{ menuTitle(menu.name) }}</span>
           </a-menu-item>
         </template>
       </a-menu>
@@ -72,6 +72,7 @@
           </a-button>
           <a-breadcrumb class="header-breadcrumb">
             <a-breadcrumb-item v-for="item in breadcrumbs" :key="item">{{ item }}</a-breadcrumb-item>
+
           </a-breadcrumb>
         </div>
         <div class="header-right">
@@ -139,7 +140,7 @@
           <a-tab-pane
             v-for="tab in appStore.tabs"
             :key="tab.path"
-            :tab="tab.title"
+            :tab="menuTitle(tab.title)"
             :closable="tab.path !== '/dashboard'"
           />
         </a-tabs>
@@ -196,7 +197,6 @@ import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getAccessToken } from '@/utils/auth'
 import { navigateToBiz } from '@/utils/bizRoute'
 import {
   getNotificationFeed,
@@ -218,12 +218,16 @@ const router = useRouter()
 const appStore = useAppStore()
 const permissionStore = usePermissionStore()
 const userStore = useUserStore()
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const latestMessages = ref<MessageVo[]>([])
 const latestNotices = ref<NoticeVo[]>([])
 const unreadCount = ref(0)
 let noticeStream: EventSource | null = null
 let messageSocket: WebSocket | null = null
+// SSE 受控重连：指数退避、有上限，组件卸载后不再重连
+let noticeRetryCount = 0
+const NOTICE_MAX_RETRY = 5
+let noticeDisposed = false
 const mobileDrawer = ref(false)
 const isMobile = ref(false)
 const offline = ref(false)
@@ -255,6 +259,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  noticeDisposed = true
   window.removeEventListener('resize', onResize)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('online', onOnline)
@@ -294,15 +299,24 @@ const iconMap: Record<string, Component> = {
   WifiOutlined,
 }
 
+// 动态菜单/路由标题来自后端配置；若恰好是 i18n key 则翻译，否则原样展示，
+// 使后端菜单（如存 menu.xxx 形式）也能随语言切换
+function menuTitle(value?: string): string {
+  if (!value) {
+    return ''
+  }
+  return te(value) ? t(value) : value
+}
+
 const breadcrumbs = computed(() =>
-  route.matched.filter((item) => item.meta.title).map((item) => item.meta.title as string),
+  route.matched.filter((item) => item.meta.title).map((item) => menuTitle(item.meta.title as string)),
 )
 
 watch(
   () => route.path,
   () => {
     const title = route.meta.title as string | undefined
-    document.title = title ? `${title} - ${t('app.title')}` : t('app.title')
+    document.title = title ? `${menuTitle(title)} - ${t('app.title')}` : t('app.title')
     if (title) {
       appStore.addTab({ path: route.path, title })
     }
@@ -468,50 +482,72 @@ async function getUnreadTotal(): Promise<number> {
 }
 
 function startNoticeStream() {
-  if (noticeStream) {
+  if (noticeStream || noticeDisposed) {
     return
   }
   getNoticeSseTicket()
     .then((ticket) => {
+      if (noticeStream || noticeDisposed) {
+        return
+      }
       const source = new EventSource(`${API_BASE_URL}/system/notice/stream?ticket=${encodeURIComponent(ticket)}`)
       source.addEventListener('notice', async () => {
+        noticeRetryCount = 0
         await refreshNoticeItems()
         unreadCount.value = await getUnreadTotal()
       })
       source.onerror = () => {
         source.close()
         noticeStream = null
+        scheduleNoticeReconnect()
       }
       noticeStream = source
     })
     .catch(() => {
       noticeStream = null
+      scheduleNoticeReconnect()
     })
 }
 
-function startMessageSocket() {
-  const token = getAccessToken()
-  if (!token) {
+function scheduleNoticeReconnect() {
+  if (noticeDisposed || noticeRetryCount >= NOTICE_MAX_RETRY) {
     return
   }
-  try {
-    const wsBase = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
-    const socket = new WebSocket(`${wsBase}/ws/messages?token=${encodeURIComponent(token)}`)
-    socket.onmessage = async () => {
-      await refreshNoticeItems()
-      unreadCount.value = await getUnreadTotal()
-    }
-    socket.onclose = () => {
-      messageSocket = null
-    }
-    socket.onerror = () => {
-      socket.close()
-      messageSocket = null
-    }
-    messageSocket = socket
-  } catch {
-    messageSocket = null
+  noticeRetryCount += 1
+  const delay = Math.min(1000 * 2 ** (noticeRetryCount - 1), 30000)
+  setTimeout(() => {
+    startNoticeStream()
+  }, delay)
+}
+
+function startMessageSocket() {
+  if (messageSocket) {
+    return
   }
+  // WS 鉴权同样走短期一次性 ticket，不在 URL 上暴露长期 access token
+  getNoticeSseTicket()
+    .then((ticket) => {
+      if (messageSocket) {
+        return
+      }
+      const wsBase = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
+      const socket = new WebSocket(`${wsBase}/ws/messages?ticket=${encodeURIComponent(ticket)}`)
+      socket.onmessage = async () => {
+        await refreshNoticeItems()
+        unreadCount.value = await getUnreadTotal()
+      }
+      socket.onclose = () => {
+        messageSocket = null
+      }
+      socket.onerror = () => {
+        socket.close()
+        messageSocket = null
+      }
+      messageSocket = socket
+    })
+    .catch(() => {
+      messageSocket = null
+    })
 }
 </script>
 

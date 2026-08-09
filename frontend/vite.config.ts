@@ -39,12 +39,14 @@ export default defineConfig({
     port: 5173,
   },
   build: {
-    chunkSizeWarningLimit: 900,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks: {
           antd: ['ant-design-vue', '@ant-design/icons-vue'],
-          echarts: ['echarts'],
+          // echarts 已按需引入（echarts/core + charts/components/renderers），
+          // 手动分块只聚合实际使用的子入口，避免把全量 echarts 打进包
+          echarts: ['echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers'],
           vendor: ['vue', 'vue-router', 'pinia', 'axios', 'vue-i18n'],
         },
       },

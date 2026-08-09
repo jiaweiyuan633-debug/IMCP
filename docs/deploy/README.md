@@ -74,7 +74,7 @@ Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%�
 
 ## 3. 可观测性
 
-- 后端健康检查：`/actuator/health`
+- 后端健康检查：`/actuator/health`（Kubernetes 探针细分使用 `/actuator/health/readiness` 与 `/actuator/health/liveness`）
 - Prometheus 指标：`/actuator/prometheus`
 - AI 指标：`/api/v1/metrics`
 - 结构化日志包含 `requestId/traceId`
@@ -98,13 +98,14 @@ scripts/fetch-openapi.ps1
 
 ## 5. 生产检查项
 
-- 修改 `JWT_SECRET`、MySQL/Redis 密码、AI 回调 Token
+- 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 回调 Token
+- `CALLBACK_BASE_URL` 配置为 AI 服务可访问的地址（默认 `127.0.0.1` 仅限本地联调），否则 AI 回调无法到达后端
 - 按需启用 MinIO 对象存储并配置生命周期策略
 - 开启 HTTPS 和 WAF
 - 配置 Prometheus + Grafana 告警
 - 定期备份并演练恢复
 - 所有数据库变更通过 Flyway 执行
-- 当前数据库版本 V1-V29，升级时避免直接修改已执行迁移脚本
+- 当前数据库版本 V1-V33，升级时避免直接修改已执行迁移脚本
 - 多租户生产环境前确认租户标识传递、数据权限与备份粒度策略
 - 官网域名与后台域名分离，启用 HTTPS 后配置 CDN 与转化埋点
 

@@ -39,6 +39,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -68,8 +70,12 @@ public class WarmFlowWorkflowService {
         if (StringUtils.hasText(status)) {
             query.setFlowStatus(toWarmStatus(status));
         }
-        List<SysWorkflowDO> all = FlowEngine.insService().list(query).stream()
-                .map(this::toWorkflowVO)
+        List<Instance> instances = FlowEngine.insService().list(query);
+        // 批量回填业务数据与申请人信息，避免逐条 selectById 造成 N+1
+        Map<Long, SysWorkflowDO> workflowMap = batchLoadWorkflows(instances);
+        Map<Long, SysUserDO> userMap = batchLoadUsers(workflowMap.values());
+        List<SysWorkflowDO> all = instances.stream()
+                .map(instance -> toWorkflowVO(instance, workflowMap, userMap))
                 .filter(Objects::nonNull)
                 .filter(vo -> !StringUtils.hasText(processName) || contains(vo.getProcessName(), processName))
                 .filter(vo -> !StringUtils.hasText(bizType) || contains(vo.getBizType(), bizType))
@@ -97,20 +103,33 @@ public class WarmFlowWorkflowService {
         }
         List<Task> tasks = FlowEngine.taskService().getByIds(new ArrayList<>(taskIds)).stream()
                 .filter(task -> FlowStatus.APPROVAL.getKey().equals(task.getFlowStatus()))
+                .toList();
+        // 批量加载实例、业务数据与申请人信息，避免对每条 task 单独查询的 N+1
+        List<Long> instanceIds = tasks.stream()
+                .map(Task::getInstanceId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Instance> instanceMap = instanceIds.isEmpty() ? Map.of()
+                : FlowEngine.insService().getByIds(instanceIds).stream()
+                        .collect(Collectors.toMap(Instance::getId, instance -> instance));
+        Map<Long, SysWorkflowDO> workflowMap = batchLoadWorkflows(instanceMap.values());
+        Map<Long, SysUserDO> userMap = batchLoadUsers(workflowMap.values());
+        List<Task> filtered = tasks.stream()
                 .filter(task -> {
                     if (!StringUtils.hasText(processName)) {
                         return true;
                     }
-                    SysWorkflowDO vo = toWorkflowVO(FlowEngine.insService().getById(task.getInstanceId()));
+                    SysWorkflowDO vo = toWorkflowVO(instanceMap.get(task.getInstanceId()), workflowMap, userMap);
                     return vo != null && contains(vo.getProcessName(), processName);
                 })
                 .sorted(Comparator.comparing(Task::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-        int from = (int) Math.min((pageNum - 1) * pageSize, tasks.size());
-        int to = (int) Math.min(from + pageSize, tasks.size());
-        List<SysWorkflowDO> records = tasks.subList(from, to).stream()
+        int from = (int) Math.min((pageNum - 1) * pageSize, filtered.size());
+        int to = (int) Math.min(from + pageSize, filtered.size());
+        List<SysWorkflowDO> records = filtered.subList(from, to).stream()
                 .map(task -> {
-                    SysWorkflowDO vo = toWorkflowVO(FlowEngine.insService().getById(task.getInstanceId()));
+                    SysWorkflowDO vo = toWorkflowVO(instanceMap.get(task.getInstanceId()), workflowMap, userMap);
                     if (vo == null) {
                         return null;
                     }
@@ -120,7 +139,7 @@ public class WarmFlowWorkflowService {
                 })
                 .filter(Objects::nonNull)
                 .toList();
-        return new PageResult<>(records, tasks.size(), pageNum, pageSize);
+        return new PageResult<>(records, filtered.size(), pageNum, pageSize);
     }
 
     @Transactional
@@ -367,15 +386,14 @@ public class WarmFlowWorkflowService {
         messageService.sendSystemToUsers(List.of(userId), tenantId, title, content, MessageBizType.WORKFLOW, workflowId);
     }
 
-    private SysWorkflowDO toWorkflowVO(Instance instance) {
+    private SysWorkflowDO toWorkflowVO(Instance instance, Map<Long, SysWorkflowDO> workflowMap,
+                                       Map<Long, SysUserDO> userMap) {
         if (instance == null) {
             return null;
         }
         SysWorkflowDO workflow = null;
-        try {
-            workflow = workflowMapper.selectById(Long.valueOf(instance.getBusinessId()));
-        } catch (NumberFormatException ignored) {
-            // fallback to instance data
+        if (instance.getBusinessId() != null && instance.getBusinessId().matches("\\d+")) {
+            workflow = workflowMap.get(Long.valueOf(instance.getBusinessId()));
         }
         if (workflow == null) {
             workflow = new SysWorkflowDO();
@@ -392,7 +410,7 @@ public class WarmFlowWorkflowService {
             try {
                 Long applicantId = Long.valueOf(instance.getCreateBy());
                 workflow.setApplicantId(applicantId);
-                SysUserDO applicant = userMapper.selectById(applicantId);
+                SysUserDO applicant = userMap.get(applicantId);
                 if (applicant != null) {
                     workflow.setApplicantName(applicant.getUsername());
                 }
@@ -404,6 +422,35 @@ public class WarmFlowWorkflowService {
             workflow.setCreatedAt(LocalDateTime.ofInstant(instance.getCreateTime().toInstant(), ZoneId.systemDefault()));
         }
         return workflow;
+    }
+
+    /** 按 business_id 批量回填 sys_workflow 业务数据，避免逐条 selectById 的 N+1 */
+    private Map<Long, SysWorkflowDO> batchLoadWorkflows(Collection<Instance> instances) {
+        List<Long> businessIds = instances.stream()
+                .map(Instance::getBusinessId)
+                .filter(id -> id != null && id.matches("\\d+"))
+                .map(Long::valueOf)
+                .distinct()
+                .toList();
+        if (businessIds.isEmpty()) {
+            return Map.of();
+        }
+        return workflowMapper.selectBatchIds(businessIds).stream()
+                .collect(Collectors.toMap(SysWorkflowDO::getId, workflow -> workflow));
+    }
+
+    /** 批量加载申请人信息，避免逐条 selectById 的 N+1 */
+    private Map<Long, SysUserDO> batchLoadUsers(Collection<SysWorkflowDO> workflows) {
+        List<Long> userIds = workflows.stream()
+                .map(SysWorkflowDO::getApplicantId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(SysUserDO::getId, user -> user));
     }
 
     private Map<String, Object> parseForm(String formData) {

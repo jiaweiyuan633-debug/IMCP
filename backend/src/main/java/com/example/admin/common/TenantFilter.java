@@ -18,13 +18,10 @@ public class TenantFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String tenantId = request.getHeader("X-Tenant-Id");
+        // 租户上下文默认回落平台租户 1；已认证请求由 JwtAuthenticationFilter 依据用户所属租户覆盖。
+        // 不再信任客户端 X-Tenant-Id 请求头，防止伪造租户身份进行跨租户访问。
+        TenantContext.setTenantId(1L);
         try {
-            if (tenantId != null && tenantId.matches("\\d+")) {
-                TenantContext.setTenantId(Long.valueOf(tenantId));
-            } else {
-                TenantContext.setTenantId(1L);
-            }
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();

@@ -1,6 +1,7 @@
 package com.example.admin.module.monitor;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.admin.common.ScheduledTaskLock;
 import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import com.example.admin.module.monitor.manager.AlertWebhookManager;
 import com.example.admin.module.monitor.mapper.SysAlertRuleMapper;
@@ -36,15 +37,22 @@ public class AlertMonitorService {
     private final NoticeSseService noticeSseService;
     private final StringRedisTemplate redisTemplate;
     private final AlertWebhookManager alertWebhookManager;
+    private final ScheduledTaskLock scheduledTaskLock;
 
     @Scheduled(
             initialDelayString = "${app.alert-check-initial-delay-ms:15000}",
             fixedDelayString = "${app.alert-check-interval-ms:60000}")
     public void scheduledCheck() {
+        // 多副本部署下仅一个实例执行，防止重复产生告警通知
+        if (!scheduledTaskLock.tryLock("alert-monitor-check", Duration.ofSeconds(55))) {
+            return;
+        }
         try {
             checkNow();
         } catch (RuntimeException exception) {
             log.error("Alert monitor check failed", exception);
+        } finally {
+            scheduledTaskLock.unlock("alert-monitor-check");
         }
     }
 

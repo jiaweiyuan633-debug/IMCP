@@ -35,9 +35,12 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
-      - name: Frontend tests
+      - name: Frontend lint
         working-directory: frontend
-        run: pnpm test -- --coverage
+        run: pnpm lint
+      - name: Frontend tests (with coverage gate)
+        working-directory: frontend
+        run: pnpm exec vitest run --coverage
       - name: Frontend build
         working-directory: frontend
         run: pnpm build

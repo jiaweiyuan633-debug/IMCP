@@ -41,3 +41,9 @@ Thumbs.db
 .runtime/
 logs/
 uploads/
+
+# 测试覆盖率产物
+frontend/coverage/
+
+# Claude Code 本地配置
+.claude/

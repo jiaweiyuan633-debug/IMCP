@@ -17,7 +17,10 @@ public class FileAccessService {
 
     private final String secret;
 
-    public FileAccessService(@Value("${jwt.secret:admin-scaffold-jwt-secret-key-2026-change-me-in-production}") String secret) {
+    public FileAccessService(@Value("${jwt.secret:}") String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("文件访问签名密钥未配置（读取 jwt.secret），请检查 JWT_SECRET 配置");
+        }
         this.secret = secret;
     }
 

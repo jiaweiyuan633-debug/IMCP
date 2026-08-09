@@ -29,6 +29,8 @@ public class MybatisPlusConfig {
             "sys_file",
             "sys_notice",
             "sys_notice_read",
+            "sys_message",
+            "sys_message_read",
             "sys_job",
             "sys_job_log",
             "sys_workflow",

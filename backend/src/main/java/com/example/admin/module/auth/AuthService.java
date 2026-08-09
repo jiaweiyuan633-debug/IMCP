@@ -94,6 +94,9 @@ public class AuthService {
         }
         if (user.getTotpEnabled() != null && user.getTotpEnabled() == 1
                 && !totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getTotpCode())) {
+            // TOTP 校验失败计入失败锁定，防止对 6 位动态码实施分布式暴力破解
+            saveLoginLog(httpRequest, username, false, "动态验证码错误");
+            recordLoginFailure(username);
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
         redisTemplate.delete(LOGIN_FAIL_KEY_PREFIX + username);
