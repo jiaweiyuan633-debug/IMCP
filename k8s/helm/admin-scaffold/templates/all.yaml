@@ -35,11 +35,14 @@ spec:
       labels:
         app: {{ .Release.Name }}-backend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: backend
           image: {{ .Values.images.backend }}
           ports:
             - containerPort: 8080
+          securityContext:
+            {{- toYaml .Values.securityContext.backend | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.backend | nindent 12 }}
           readinessProbe:
@@ -74,11 +77,14 @@ spec:
       labels:
         app: {{ .Release.Name }}-ai
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: ai
           image: {{ .Values.images.ai }}
           ports:
             - containerPort: 8000
+          securityContext:
+            {{- toYaml .Values.securityContext.ai | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.ai | nindent 12 }}
           readinessProbe:
@@ -111,11 +117,14 @@ spec:
       labels:
         app: {{ .Release.Name }}-frontend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: frontend
           image: {{ .Values.images.frontend }}
           ports:
             - containerPort: 80
+          securityContext:
+            {{- toYaml .Values.securityContext.frontend | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.frontend | nindent 12 }}
           readinessProbe:
@@ -145,11 +154,14 @@ spec:
       labels:
         app: {{ .Release.Name }}-website
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: website
           image: {{ .Values.images.website }}
           ports:
             - containerPort: 80
+          securityContext:
+            {{- toYaml .Values.securityContext.website | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.website | nindent 12 }}
           readinessProbe:

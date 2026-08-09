@@ -10,24 +10,20 @@ import com.example.admin.module.system.entity.SysLoginLog;
 import com.example.admin.module.system.entity.SysMenu;
 import com.example.admin.module.system.entity.SysOperLog;
 import com.example.admin.module.system.entity.SysRole;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.ai.entity.AiTask;
+import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
-import com.example.admin.common.TenantContext;
 import com.example.admin.security.TokenService;
-import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.common.annotation.DataScope;
-import com.example.admin.module.system.entity.SysUser;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,8 +35,7 @@ public class MonitorService {
     private final SysRoleMapper roleMapper;
     private final SysMenuMapper menuMapper;
     private final TokenService tokenService;
-    private final JdbcTemplate jdbcTemplate;
-    private final DataScopeHelper dataScopeHelper;
+    private final AiTaskMapper aiTaskMapper;
 
     @DataScope(tables = {"sys_login_log"})
     public PageResult<SysLoginLog> loginLogPage(long pageNum, long pageSize, String username) {
@@ -76,68 +71,27 @@ public class MonitorService {
         tokenService.deleteCacheKey(key);
     }
 
+    @DataScope(tables = {"sys_user", "sys_login_log", "sys_oper_log", "ai_task"})
     public DashboardStatsVo stats() {
-        Map<String, Object> aiTaskStats = jdbcTemplate.queryForMap("""
-                SELECT COUNT(*) AS total,
-                       COALESCE(SUM(status = 'SUCCEEDED'), 0) AS succeeded,
-                       COALESCE(SUM(status = 'FAILED'), 0) AS failed,
-                       COALESCE(SUM(status IN ('PENDING', 'QUEUED', 'RUNNING')), 0) AS running
-                FROM ai_task
-                WHERE tenant_id = ?
-                """, TenantContext.getTenantId());
+        long aiTotal = aiTaskMapper.selectCount(null);
+        long aiSucceeded = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
+                .eq(AiTask::getStatus, "SUCCEEDED"));
+        long aiFailed = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
+                .eq(AiTask::getStatus, "FAILED"));
+        long aiRunning = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
+                .in(AiTask::getStatus, "PENDING", "QUEUED", "RUNNING"));
         return DashboardStatsVo.builder()
                 .userCount(userMapper.selectCount(null))
                 .roleCount(roleMapper.selectCount(null))
                 .menuCount(menuMapper.selectCount(null))
                 .loginLogCount(loginLogMapper.selectCount(null))
                 .operLogCount(operLogMapper.selectCount(null))
-                .aiTaskTotal(toLong(aiTaskStats.get("total")))
-                .aiTaskSucceeded(toLong(aiTaskStats.get("succeeded")))
-                .aiTaskFailed(toLong(aiTaskStats.get("failed")))
-                .aiTaskRunning(toLong(aiTaskStats.get("running")))
+                .aiTaskTotal(aiTotal)
+                .aiTaskSucceeded(aiSucceeded)
+                .aiTaskFailed(aiFailed)
+                .aiTaskRunning(aiRunning)
                 .build();
     }
 
-    private long toLong(Object value) {
-        if (value == null) {
-            return 0L;
-        }
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        return Long.parseLong(value.toString());
-    }
-
-    private void applyLoginLogScope(LambdaQueryWrapper<SysLoginLog> wrapper) {
-        if (dataScopeHelper.isAdmin()) {
-            return;
-        }
-        List<Long> userIds = dataScopeHelper.allowedUserIds();
-        if (userIds == null) {
-            return;
-        }
-        List<String> usernames = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                        .in(SysUser::getId, userIds)
-                        .eq(SysUser::getTenantId, TenantContext.getTenantId()))
-                .stream()
-                .map(SysUser::getUsername)
-                .toList();
-        wrapper.in(SysLoginLog::getUsername, usernames);
-    }
-
-    private void applyUserIdScope(LambdaQueryWrapper<SysOperLog> wrapper, com.baomidou.mybatisplus.core.toolkit.support.SFunction<SysOperLog, ?> column) {
-        if (dataScopeHelper.isAdmin()) {
-            return;
-        }
-        List<Long> userIds = dataScopeHelper.allowedUserIds();
-        if (userIds == null) {
-            return;
-        }
-        if (userIds.size() == 1) {
-            wrapper.eq(column, userIds.get(0));
-        } else {
-            wrapper.in(column, userIds);
-        }
-    }
 }
 

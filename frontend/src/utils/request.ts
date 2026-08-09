@@ -4,6 +4,7 @@ import router from '@/router'
 import type { Result } from '@/types'
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/utils/auth'
 import { API_BASE_URL } from '@/utils/env'
+import i18n from '@/locales'
 
 const service = axios.create({
   baseURL: API_BASE_URL,
@@ -65,7 +66,7 @@ service.interceptors.response.use(
         return service.request(response.config)
       }
     }
-    message.error(result.message || '请求失败')
+    message.error(localizedMessage(result.code, result.message))
     const error = new Error(result.message) as Error & { code?: number }
     error.code = result.code
     return Promise.reject(error)
@@ -87,10 +88,19 @@ service.interceptors.response.use(
         return service.request(error.config)
       }
     }
-    message.error(error.response?.data?.message || error.message || '网络异常')
+    message.error(localizedMessage(error.response?.data?.code, error.response?.data?.message || error.message || '网络异常'))
     return Promise.reject(error)
   },
 )
 
 export default service
+
+function localizedMessage(code: number | undefined, fallback: string): string {
+  if (code == null) {
+    return fallback
+  }
+  const key = `error.${code}`
+  const translated = i18n.global.t(key)
+  return translated === key ? fallback : translated
+}
 

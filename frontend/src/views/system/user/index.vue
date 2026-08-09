@@ -123,6 +123,7 @@ import {
 import type { UserSaveRequest } from '@/api/system'
 import type { DeptVo, PostOptionVo, RoleOptionVo, SearchField, UserVo } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { isStrongPassword } from '@/utils/validation'
 
 const { t } = useI18n()
 
@@ -251,6 +252,10 @@ function openEdit(record: UserVo) {
 async function onSubmit() {
   if (!form.username || (!editingId.value && !form.password)) {
     message.warning(t('page.userUsernameRequired'))
+    return
+  }
+  if (form.password && !isStrongPassword(form.password)) {
+    message.warning(t('page.passwordPolicy'))
     return
   }
   saving.value = true

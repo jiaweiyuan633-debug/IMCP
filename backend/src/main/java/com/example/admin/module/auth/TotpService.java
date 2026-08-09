@@ -25,7 +25,7 @@ public class TotpService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final byte[] encryptionKey;
 
-    public TotpService(@Value("${app.totp.encryption-key:change-me-totp-encryption-key-2026}") String key) {
+    public TotpService(@Value("${app.totp.encryption-key:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}") String key) {
         try {
             this.encryptionKey = MessageDigest.getInstance("SHA-256")
                     .digest(key.getBytes(StandardCharsets.UTF_8));
