@@ -55,5 +55,5 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 
 官网 `website/` 当前通过 Docker 独立交付；需要 K8s 部署时，可参照 `frontend` 的 Deployment/Service/Ingress 模板扩展。
 
-后端数据库迁移由 Flyway V1-V28 自动执行，发布前确认迁移脚本与镜像版本一致。
+后端数据库迁移由 Flyway V1-V29 自动执行，发布前确认迁移脚本与镜像版本一致。
 

@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V28。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V29。
 
 ## 版本记录
 
@@ -34,6 +34,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V26 | 关联表补齐 `created_at/updated_at` |
 | V27 | 登录日志、操作日志、工作流、AI 任务、公告、定时任务高频查询索引 |
 | V28 | 所有自增主键统一为 `BIGINT UNSIGNED` |
+| V29 | 普通用户角色移除看板权限，授权通知公告菜单 |
 
 ## 表清单
 

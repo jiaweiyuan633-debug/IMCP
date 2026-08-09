@@ -36,6 +36,7 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
+            <a v-permission="'system:user:edit'" @click="openAssign(record)">{{ t('page.userAssignRole') }}</a>
             <a v-permission="'system:user:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
             <a v-permission="'system:user:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
@@ -98,6 +99,17 @@
         </a-form-item>
       </a-form>
     </ModalForm>
+
+    <a-modal v-model:open="assignOpen" :title="t('page.userAssignRoleTitle')" :confirm-loading="assignSaving" @ok="onAssignSubmit">
+      <a-form layout="vertical">
+        <a-form-item :label="t('page.userRole')">
+          <a-select v-model:value="assignForm.roleIds" mode="multiple" :options="roleOptions" option-filter-prop="label" />
+        </a-form-item>
+        <a-form-item :label="t('page.userPost')">
+          <a-select v-model:value="assignForm.postIds" mode="multiple" :options="postOptions" option-filter-prop="label" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </a-card>
 </template>
 
@@ -117,6 +129,8 @@ import {
   getUserPage,
   exportUsers,
   importUsers,
+  assignUserRoles,
+  assignUserPosts,
   updateUser,
   updateUserStatus,
 } from '@/api/system'
@@ -169,7 +183,10 @@ const roleOptions = ref<RoleOptionVo[]>([])
 const postOptions = ref<PostOptionVo[]>([])
 const deptTree = ref<DeptVo[]>([])
 const modalOpen = ref(false)
+const assignOpen = ref(false)
+const assignSaving = ref(false)
 const editingId = ref<number | undefined>()
+const assignUserId = ref<number>()
 const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   avatar: '',
@@ -180,6 +197,10 @@ const form = reactive({
   phone: '',
   status: 1,
   deptId: undefined as number | undefined,
+  roleIds: [] as number[],
+  postIds: [] as number[],
+})
+const assignForm = reactive({
   roleIds: [] as number[],
   postIds: [] as number[],
 })
@@ -247,6 +268,29 @@ function openEdit(record: UserVo) {
     postIds: record.postIds || [],
   })
   modalOpen.value = true
+}
+
+function openAssign(record: UserVo) {
+  assignUserId.value = record.id
+  assignForm.roleIds = record.roleIds || []
+  assignForm.postIds = record.postIds || []
+  assignOpen.value = true
+}
+
+async function onAssignSubmit() {
+  if (!assignUserId.value) {
+    return
+  }
+  assignSaving.value = true
+  try {
+    await assignUserRoles(assignUserId.value, assignForm.roleIds)
+    await assignUserPosts(assignUserId.value, assignForm.postIds)
+    message.success(t('page.userAssigned'))
+    assignOpen.value = false
+    loadData()
+  } finally {
+    assignSaving.value = false
+  }
 }
 
 async function onSubmit() {

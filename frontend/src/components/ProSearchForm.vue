@@ -21,6 +21,9 @@
       <a-space>
         <a-button type="primary" :loading="loading" @click="emit('search', model)">{{ t('common.search') }}</a-button>
         <a-button @click="reset">{{ t('common.reset') }}</a-button>
+        <a-button type="text" :title="t('common.refresh')" @click="emit('search', model)">
+          <ReloadOutlined />
+        </a-button>
       </a-space>
     </a-form-item>
   </a-form>
@@ -30,6 +33,7 @@
 import { reactive, watch } from 'vue'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { ReloadOutlined } from '@ant-design/icons-vue'
 
 const props = defineProps<{
   fields: SearchField[]

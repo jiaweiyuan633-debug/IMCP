@@ -2,6 +2,7 @@
   <a-card :title="t('page.noticeTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
+      <a-button @click="onMarkAllRead">{{ t('page.noticeMarkAllRead') }}</a-button>
       <a-button v-permission="'system:notice:add'" type="primary" @click="openCreate">{{ t('page.noticeAdd') }}</a-button>
     </div>
     <ProTable
@@ -64,7 +65,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { createNotice, deleteNotice, getNoticePage, updateNotice } from '@/api/system'
+import { createNotice, deleteNotice, getNoticePage, markAllNoticeRead, updateNotice } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
@@ -183,6 +184,12 @@ async function onSubmit() {
   } finally {
     saving.value = false
   }
+}
+
+async function onMarkAllRead() {
+  await markAllNoticeRead()
+  message.success(t('page.noticeMarkAllRead'))
+  loadData()
 }
 
 function onDelete(record: NoticeVo) {

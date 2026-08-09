@@ -160,6 +160,14 @@ export function updateUserStatus(id: number, status: number): Promise<void> {
   return request.put(`/system/user/${id}/status`, { status })
 }
 
+export function assignUserRoles(id: number, roleIds: number[]): Promise<void> {
+  return request.put(`/system/user/${id}/roles`, { roleIds })
+}
+
+export function assignUserPosts(id: number, postIds: number[]): Promise<void> {
+  return request.put(`/system/user/${id}/posts`, { postIds })
+}
+
 export function getRolePage(params: RoleQuery): Promise<PageResult<RoleVo>> {
   return request.get('/system/role', { params })
 }
@@ -326,6 +334,14 @@ export function getLatestNotices(limit = 5): Promise<NoticeVo[]> {
 
 export function getUnreadNoticeCount(): Promise<number> {
   return request.get('/system/notice/unread-count')
+}
+
+export function markNoticeRead(id: number): Promise<void> {
+  return request.put(`/system/notice/read/${id}`)
+}
+
+export function markAllNoticeRead(): Promise<void> {
+  return request.put('/system/notice/read-all')
 }
 
 export function getNoticeSseTicket(): Promise<string> {

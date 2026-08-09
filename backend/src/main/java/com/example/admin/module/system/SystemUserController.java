@@ -75,6 +75,14 @@ public class SystemUserController {
         return Result.success();
     }
 
+    @PutMapping("/{id}/posts")
+    @PreAuthorize("hasAuthority('system:user:edit')")
+    @OperLog(module = "用户管理", action = "分配岗位")
+    public Result<Void> assignPosts(@PathVariable Long id, @RequestBody PostIdsRequest request) {
+        userService.assignPosts(id, request.getPostIds());
+        return Result.success();
+    }
+
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('system:user:list')")
     public void export(HttpServletResponse response) throws IOException {

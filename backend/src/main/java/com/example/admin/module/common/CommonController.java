@@ -14,21 +14,26 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/common")
 @RequiredArgsConstructor
 public class CommonController {
 
-    private static final long MAX_SIZE = 20L * 1024 * 1024;
-    private static final Set<String> ALLOWED_EXTENSIONS =
-            Set.of("jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip");
-
     private final FileStorage fileStorage;
     private final FileAccessService fileAccessService;
+
+    @Value("${app.upload.max-size-mb:20}")
+    private long maxSizeMb;
+
+    @Value("${app.upload.allowed-extensions:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}")
+    private String allowedExtensions;
 
     @GetMapping("/file-token")
     @PreAuthorize("isAuthenticated()")
@@ -44,14 +49,14 @@ public class CommonController {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
         }
-        if (file.getSize() > MAX_SIZE) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件大小不能超过 20MB");
+        if (file.getSize() > maxSizeMb * 1024 * 1024) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件大小不能超过 " + maxSizeMb + "MB");
         }
         String originalName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String extension = originalName.contains(".")
                 ? originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase()
                 : "";
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+        if (!allowedExtensionSet().contains(extension)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的文件类型");
         }
         byte[] head = file.getBytes();
@@ -88,6 +93,13 @@ public class CommonController {
                     && head[1] == 'K';
             default -> true;
         };
+    }
+
+    private Set<String> allowedExtensionSet() {
+        return Arrays.stream(allowedExtensions.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toSet());
     }
 }
 

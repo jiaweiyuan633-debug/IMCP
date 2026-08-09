@@ -19,8 +19,10 @@ import { message, Modal } from 'ant-design-vue'
 import { getOnlineUsers, kickOnlineUser } from '@/api/monitor'
 import type { OnlineUserVo } from '@/api/monitor'
 import { useI18n } from 'vue-i18n'
+import { useUserStore } from '@/stores/user'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 const columns = [
   { title: t('page.monitorUsername'), dataIndex: 'username', key: 'username' },
@@ -43,6 +45,10 @@ async function loadData() {
 }
 
 function onKick(record: OnlineUserVo) {
+  if (record.userId === userStore.userInfo?.id) {
+    message.warning(t('page.monitorCannotKickSelf'))
+    return
+  }
   Modal.confirm({
     title: t('page.monitorKick'),
     content: `${t('page.monitorKick')} ${record.username}?`,

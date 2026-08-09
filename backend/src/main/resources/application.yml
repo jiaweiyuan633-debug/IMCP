@@ -69,6 +69,12 @@ app:
   totp:
     encryption-key: ${TOTP_ENCRYPTION_KEY:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}
   sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
+  api-rate-limit-per-minute: ${API_RATE_LIMIT_PER_MINUTE:300}
+  upload:
+    max-size-mb: ${UPLOAD_MAX_SIZE_MB:20}
+    allowed-extensions: ${UPLOAD_ALLOWED_EXTENSIONS:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
 

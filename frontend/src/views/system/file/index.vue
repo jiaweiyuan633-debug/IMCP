@@ -25,14 +25,17 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
+            <a @click="onCopyLink(record)">{{ t('page.fileCopyLink') }}</a>
             <a v-if="isImage(record.url)" @click="openPreview(record)">{{ t('common.preview') }}</a>
+            <a v-else-if="isPdf(record.url)" @click="openPreview(record)">{{ t('common.preview') }}</a>
             <a v-permission="'system:file:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
     </ProTable>
     <a-modal v-model:open="previewOpen" :title="previewName" :footer="null" width="720">
-      <img :src="previewUrl" alt="preview" class="preview-image" />
+      <img v-if="isImage(previewUrl)" :src="previewUrl" alt="preview" class="preview-image" />
+      <iframe v-else-if="isPdf(previewUrl)" :src="previewUrl" class="preview-pdf" />
     </a-modal>
   </a-card>
 </template>
@@ -127,6 +130,10 @@ function isImage(url: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0])
 }
 
+function isPdf(url: string): boolean {
+  return /\.pdf$/i.test(url.split('?')[0])
+}
+
 function openPreview(record: FileVo) {
   previewUrl.value = withToken(record.url, record.accessToken)
   previewName.value = record.originalName || record.fileName
@@ -138,6 +145,11 @@ function withToken(url: string, token?: string): string {
     return url
   }
   return `${url}?token=${encodeURIComponent(token)}`
+}
+
+async function onCopyLink(record: FileVo) {
+  await navigator.clipboard.writeText(withToken(record.url, record.accessToken))
+  message.success(t('page.fileCopied'))
 }
 
 function onDelete(record: FileVo) {
@@ -164,5 +176,11 @@ loadData()
   width: 100%;
   max-height: 560px;
   object-fit: contain;
+}
+
+.preview-pdf {
+  width: 100%;
+  height: 560px;
+  border: 0;
 }
 </style>

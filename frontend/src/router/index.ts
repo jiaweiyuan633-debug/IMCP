@@ -3,6 +3,8 @@ import { usePermissionStore } from '@/stores/permission'
 import { useUserStore } from '@/stores/user'
 import { buildDynamicRouteChildren } from '@/router/dynamic'
 import BasicLayout from '@/layout/BasicLayout.vue'
+import type { MenuNode } from '@/types'
+import { useAppStore } from '@/stores/app'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,7 +19,6 @@ const router = createRouter({
       path: '/',
       name: 'Root',
       component: BasicLayout,
-      redirect: '/dashboard',
       children: [],
     },
     {
@@ -29,6 +30,38 @@ const router = createRouter({
 })
 
 let recoveringNotFound = false
+
+function lastSegment(path: string): string {
+  const parts = path.split('/').filter(Boolean)
+  return parts[parts.length - 1] || ''
+}
+
+function resolveMenuPath(menu: MenuNode, parentPath = '/'): string {
+  const path = menu.path || ''
+  if (path.startsWith('/')) {
+    return path
+  }
+  if (path === lastSegment(parentPath)) {
+    return parentPath
+  }
+  return `${parentPath.replace(/\/$/, '')}/${path}`
+}
+
+function firstMenuPath(menus: MenuNode[], parentPath = '/'): string {
+  for (const menu of menus) {
+    const fullPath = resolveMenuPath(menu, parentPath)
+    if (menu.type === 'dir') {
+      const childPath = firstMenuPath(menu.children || [], fullPath)
+      if (childPath) {
+        return childPath
+      }
+    }
+    if (menu.type === 'menu' && menu.status === 1 && menu.visible === 1) {
+      return fullPath
+    }
+  }
+  return '/profile'
+}
 
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
@@ -55,7 +88,10 @@ router.beforeEach(async (to) => {
 
   if (to.path === '/login') {
     removeDynamicRoutes()
-    return userStore.isLoggedIn ? { path: '/' } : true
+    if (!userStore.isLoggedIn) {
+      useAppStore().resetTabs()
+    }
+    return userStore.isLoggedIn ? { path: firstMenuPath(permissionStore.menus) } : true
   }
   if (!userStore.isLoggedIn) {
     removeDynamicRoutes()
@@ -78,6 +114,9 @@ router.beforeEach(async (to) => {
       userStore.reset()
       return { path: '/login' }
     }
+  }
+  if (to.path === '/') {
+    return { path: firstMenuPath(permissionStore.menus), replace: true }
   }
   return true
 })

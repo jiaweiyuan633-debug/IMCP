@@ -97,11 +97,17 @@
               </a-button>
             </a-badge>
             <template #overlay>
-              <a-menu @click="onNoticeClick">
-                <a-menu-item v-for="notice in latestNotices" :key="notice.id">
-                  {{ notice.noticeTitle }}
+              <a-menu class="notice-menu" @click="onNoticeClick">
+                <a-menu-item v-for="notice in latestNotices" :key="`notice-${notice.id}`">
+                  <div class="notice-item">
+                    <span class="notice-title">{{ notice.noticeTitle }}</span>
+                    <span class="notice-time">{{ formatTime(notice.createdAt) }}</span>
+                  </div>
                 </a-menu-item>
                 <a-menu-item v-if="latestNotices.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
+                <a-menu-divider v-if="latestNotices.length > 0" />
+                <a-menu-item key="mark-all">{{ t('page.noticeMarkAllRead') }}</a-menu-item>
+                <a-menu-item key="view-all">{{ t('page.noticeViewAll') }}</a-menu-item>
               </a-menu>
             </template>
           </a-dropdown>
@@ -137,6 +143,7 @@
         <router-view />
       </a-layout-content>
     </a-layout>
+    <GlobalSearch />
   </a-layout>
 </template>
 
@@ -186,9 +193,11 @@ import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getLatestNotices, getNoticeSseTicket, getUnreadNoticeCount } from '@/api/system'
+import { getLatestNotices, getNoticeSseTicket, getUnreadNoticeCount, markAllNoticeRead, markNoticeRead } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
 import { API_BASE_URL } from '@/utils/env'
+import dayjs from 'dayjs'
+import GlobalSearch from '@/components/GlobalSearch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -274,6 +283,7 @@ watch(
   () => route.path,
   () => {
     const title = route.meta.title as string | undefined
+    document.title = title ? `${title} - ${t('app.title')}` : t('app.title')
     if (title) {
       appStore.addTab({ path: route.path, title })
     }
@@ -332,6 +342,7 @@ async function onUserMenuClick({ key }: { key: string | number }) {
   }
   if (key === 'logout') {
     await userStore.logout()
+    appStore.resetTabs()
     message.success(t('layout.logout'))
     router.push('/login')
   }
@@ -342,8 +353,29 @@ function onLanguageClick({ key }: { key: string | number }) {
   locale.value = String(key)
 }
 
-function onNoticeClick() {
-  router.push('/system/notice')
+function formatTime(value?: string): string {
+  return value ? dayjs(value).format('MM-DD HH:mm') : ''
+}
+
+async function onNoticeClick({ key }: { key: string | number }) {
+  const value = String(key)
+  if (value.startsWith('notice-')) {
+    const id = Number(value.replace('notice-', ''))
+    await markNoticeRead(id)
+    unreadCount.value = Math.max(unreadCount.value - 1, 0)
+    latestNotices.value = await getLatestNotices()
+    router.push('/system/notice')
+    return
+  }
+  if (value === 'mark-all') {
+    await markAllNoticeRead()
+    unreadCount.value = 0
+    latestNotices.value = await getLatestNotices()
+    return
+  }
+  if (value === 'view-all') {
+    router.push('/system/notice')
+  }
 }
 
 function startNoticeStream() {
@@ -399,6 +431,30 @@ function startNoticeStream() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.notice-menu {
+  max-width: 320px;
+}
+
+.notice-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.notice-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-time {
+  color: #8c8c8c;
+  flex-shrink: 0;
+  font-size: 12px;
 }
 
 .app-content {
