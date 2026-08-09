@@ -1,10 +1,35 @@
 package com.example.admin.module.ai.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.example.admin.module.ai.entity.AiTask;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Mapper
 public interface AiTaskMapper extends BaseMapper<AiTask> {
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM ai_task WHERE task_no = #{taskNo}")
+    AiTask selectByTaskNoIgnoreTenant(@Param("taskNo") String taskNo);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT DISTINCT tenant_id FROM ai_task")
+    List<Long> selectTenantIds();
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            <script>
+            SELECT * FROM ai_task
+            WHERE status IN ('PENDING', 'QUEUED', 'RUNNING')
+              AND updated_at &lt; #{threshold}
+              AND tenant_id = #{tenantId}
+            </script>
+            """)
+    List<AiTask> selectTimeoutTasks(@Param("tenantId") Long tenantId, @Param("threshold") LocalDateTime threshold);
 }
 

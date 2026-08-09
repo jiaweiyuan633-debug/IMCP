@@ -10,5 +10,6 @@ public class UploadResponse {
     private String url;
     private String name;
     private long size;
+    private String accessToken;
 }
 

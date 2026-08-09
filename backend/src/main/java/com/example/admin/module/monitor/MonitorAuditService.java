@@ -41,6 +41,7 @@ public class MonitorAuditService {
                 .orderByDesc(SysAuditLog::getId)
                 .last("LIMIT 10000"));
         try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+            writer.write("\uFEFF");
             writer.write("id,module,action,userId,status,createdAt\n");
             for (SysAuditLog record : records) {
                 writer.write(String.join(",",

@@ -26,6 +26,7 @@ public enum ResultCode {
     TOO_MANY_REQUESTS(429, "请求过于频繁"),
     TENANT_LIMIT_EXCEEDED(1016, "租户用户数量已达上限"),
     AI_DAILY_LIMIT_EXCEEDED(1017, "AI 任务已达每日上限"),
+    STORAGE_LIMIT_EXCEEDED(1018, "租户存储空间不足"),
     UNAUTHORIZED(401, "未登录或登录已过期"),
     FORBIDDEN(403, "无权限访问"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");

@@ -498,6 +498,7 @@ export interface FileVo {
   url: string
   size: number
   storageType: string
+  accessToken?: string
   createdAt?: string
 }
 

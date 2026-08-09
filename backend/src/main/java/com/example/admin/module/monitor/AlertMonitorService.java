@@ -7,6 +7,7 @@ import com.example.admin.module.monitor.vo.ServerMonitorVo;
 import com.example.admin.module.system.NoticeSseService;
 import com.example.admin.module.system.SystemNoticeService;
 import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -46,22 +47,26 @@ public class AlertMonitorService {
 
     public int checkNow() {
         ServerMonitorVo monitor = serverMonitorService.get();
-        List<SysAlertRule> rules = ruleMapper.selectList(new LambdaQueryWrapper<SysAlertRule>()
-                .eq(SysAlertRule::getEnabled, 1));
+        List<SysAlertRule> rules = ruleMapper.selectAllEnabledIgnoreTenant();
         int triggered = 0;
         for (SysAlertRule rule : rules) {
-            double value = readMetric(monitor, rule.getMetric());
-            if (!isTriggered(value, rule.getOperator(), rule.getThreshold().doubleValue())) {
-                continue;
+            TenantContext.setTenantId(rule.getTenantId());
+            try {
+                double value = readMetric(monitor, rule.getMetric());
+                if (!isTriggered(value, rule.getOperator(), rule.getThreshold().doubleValue())) {
+                    continue;
+                }
+                String redisKey = ALERT_KEY_PREFIX + rule.getId();
+                int silenceMinutes = rule.getSilenceMinutes() == null ? 10 : Math.max(rule.getSilenceMinutes(), 1);
+                Boolean first = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(silenceMinutes));
+                if (!Boolean.TRUE.equals(first)) {
+                    continue;
+                }
+                sendNotice(rule, value);
+                triggered++;
+            } finally {
+                TenantContext.clear();
             }
-            String redisKey = ALERT_KEY_PREFIX + rule.getId();
-            int silenceMinutes = rule.getSilenceMinutes() == null ? 10 : Math.max(rule.getSilenceMinutes(), 1);
-            Boolean first = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(silenceMinutes));
-            if (!Boolean.TRUE.equals(first)) {
-                continue;
-            }
-            sendNotice(rule, value);
-            triggered++;
         }
         return triggered;
     }

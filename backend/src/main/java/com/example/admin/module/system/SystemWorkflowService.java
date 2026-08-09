@@ -162,6 +162,7 @@ public class SystemWorkflowService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "节点不在当前待办中");
         }
         SysProcessNode node = processNodeMapper.selectById(nodeId);
+        checkApprover(workflow, node);
         currentIds.remove(nodeId);
         saveLog(id, "APPROVED", (remark == null ? "审批通过" : remark) + "，节点：" + node.getNodeName());
         if (!currentIds.isEmpty()) {
@@ -191,6 +192,7 @@ public class SystemWorkflowService {
         if (!"PENDING".equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
+        checkCanOperate(workflow, currentIds(workflow));
         finishWorkflow(workflow, "REJECTED");
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
@@ -220,6 +222,7 @@ public class SystemWorkflowService {
         if (!"PENDING".equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
+        checkCanOperate(workflow, currentIds(workflow));
         SysUser target = userMapper.selectById(delegateUserId);
         if (target == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
@@ -244,28 +247,32 @@ public class SystemWorkflowService {
                 .eq(SysWorkflow::getStatus, "PENDING"));
         try {
             for (SysWorkflow workflow : pending) {
-                if (workflow.getCurrentNodeAssignedAt() == null
-                        || workflow.getTimeoutNotified() != null && workflow.getTimeoutNotified() == 1) {
-                    continue;
+                try {
+                    if (workflow.getCurrentNodeAssignedAt() == null
+                            || workflow.getTimeoutNotified() != null && workflow.getTimeoutNotified() == 1) {
+                        continue;
+                    }
+                    List<SysProcessNode> nodes = currentNodes(workflow.getId());
+                    int timeoutHours = nodes.stream()
+                            .map(SysProcessNode::getTimeoutHours)
+                            .filter(hours -> hours != null)
+                            .min(Integer::compareTo)
+                            .orElse(48);
+                    if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(LocalDateTime.now())) {
+                        continue;
+                    }
+                    TenantContext.setTenantId(workflow.getTenantId());
+                    SysNotice notice = new SysNotice();
+                    notice.setNoticeTitle("流程超时提醒");
+                    notice.setNoticeType(1);
+                    notice.setNoticeContent("流程「" + workflow.getProcessName() + "」在节点等待超过 " + timeoutHours + " 小时。");
+                    notice.setStatus(1);
+                    noticeService.create(notice);
+                    workflow.setTimeoutNotified(1);
+                    workflowMapper.updateById(workflow);
+                } catch (Exception exception) {
+                    log.warn("Workflow timeout reminder failed for id={}", workflow.getId(), exception);
                 }
-                List<SysProcessNode> nodes = currentNodes(workflow.getId());
-                int timeoutHours = nodes.stream()
-                        .map(SysProcessNode::getTimeoutHours)
-                        .filter(hours -> hours != null)
-                        .min(Integer::compareTo)
-                        .orElse(48);
-                if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(LocalDateTime.now())) {
-                    continue;
-                }
-                TenantContext.setTenantId(workflow.getTenantId());
-                SysNotice notice = new SysNotice();
-                notice.setNoticeTitle("流程超时提醒");
-                notice.setNoticeType(1);
-                notice.setNoticeContent("流程「" + workflow.getProcessName() + "」在节点等待超过 " + timeoutHours + " 小时。");
-                notice.setStatus(1);
-                noticeService.create(notice);
-                workflow.setTimeoutNotified(1);
-                workflowMapper.updateById(workflow);
             }
         } catch (Exception exception) {
             log.error("Workflow timeout check failed", exception);
@@ -365,6 +372,53 @@ public class SystemWorkflowService {
             }
         }
         return ids;
+    }
+
+    private List<Long> currentIds(SysWorkflow workflow) {
+        List<Long> ids = parseIds(workflow.getCurrentNodeIds());
+        if (ids.isEmpty() && workflow.getCurrentNodeId() != null) {
+            ids = new ArrayList<>(List.of(workflow.getCurrentNodeId()));
+        }
+        return ids;
+    }
+
+    private void checkApprover(SysWorkflow workflow, SysProcessNode node) {
+        LoginUser user = SecurityUtils.getLoginUser();
+        if (user.getRoles() != null && user.getRoles().contains("admin")) {
+            return;
+        }
+        if (workflow.getAssigneeUserId() != null) {
+            if (!workflow.getAssigneeUserId().equals(user.getUserId())) {
+                throw new BusinessException(ResultCode.FORBIDDEN);
+            }
+            return;
+        }
+        List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getUserId());
+        if (node.getApproverRoleId() == null || roleIds.contains(node.getApproverRoleId())) {
+            return;
+        }
+        throw new BusinessException(ResultCode.FORBIDDEN);
+    }
+
+    private void checkCanOperate(SysWorkflow workflow, List<Long> nodeIds) {
+        LoginUser user = SecurityUtils.getLoginUser();
+        if (user.getRoles() != null && user.getRoles().contains("admin")) {
+            return;
+        }
+        if (workflow.getAssigneeUserId() != null) {
+            if (!workflow.getAssigneeUserId().equals(user.getUserId())) {
+                throw new BusinessException(ResultCode.FORBIDDEN);
+            }
+            return;
+        }
+        List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getUserId());
+        boolean allowed = nodeIds.stream()
+                .map(processNodeMapper::selectById)
+                .filter(node -> node != null)
+                .anyMatch(node -> node.getApproverRoleId() == null || roleIds.contains(node.getApproverRoleId()));
+        if (!allowed) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
     }
 
     private String joinIds(List<Long> ids) {

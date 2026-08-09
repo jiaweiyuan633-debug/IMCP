@@ -1,0 +1,1 @@
+ALTER TABLE sys_file ADD COLUMN object_key VARCHAR(500) NULL AFTER url;

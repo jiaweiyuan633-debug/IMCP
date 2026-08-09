@@ -3,14 +3,17 @@ package com.example.admin.module.common;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.Result;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.FileAccessService;
 import com.example.admin.module.common.vo.UploadResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.io.IOException;
 import java.util.Set;
@@ -25,6 +28,16 @@ public class CommonController {
             Set.of("jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip");
 
     private final FileStorage fileStorage;
+    private final FileAccessService fileAccessService;
+
+    @GetMapping("/file-token")
+    @PreAuthorize("isAuthenticated()")
+    public Result<String> fileToken(@RequestParam String url) {
+        if (url == null || !url.startsWith("/uploads/")) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "非法文件地址");
+        }
+        return Result.success(fileAccessService.issue(url));
+    }
 
     @PostMapping("/upload")
     public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws Exception {

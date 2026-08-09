@@ -52,21 +52,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         tokenService.cachePermissions(userId, perms);
                     }
                     SysUser user = userMapper.selectById(userId);
-                    if (user != null && user.getTenantId() != null) {
-                        TenantContext.setTenantId(user.getTenantId());
+                    if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+                        SecurityContextHolder.clearContext();
+                    } else {
+                        if (user.getTenantId() != null) {
+                            TenantContext.setTenantId(user.getTenantId());
+                        }
+                        LoginUser loginUser = LoginUser.builder()
+                                .userId(userId)
+                                .deptId(user.getDeptId())
+                                .username(claims.get("username", String.class))
+                                .roles(roles)
+                                .perms(perms)
+                                .build();
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        loginUser, null, loginUser.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
-                    LoginUser loginUser = LoginUser.builder()
-                            .userId(userId)
-                            .deptId(user == null ? null : user.getDeptId())
-                            .username(claims.get("username", String.class))
-                            .roles(roles)
-                            .perms(perms)
-                            .build();
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    loginUser, null, loginUser.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (JwtException | IllegalArgumentException ignored) {
                 SecurityContextHolder.clearContext();

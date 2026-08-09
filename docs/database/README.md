@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V23。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V25。
 
 ## 版本记录
 
@@ -29,6 +29,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V21 | 租户用户/存储配额与管理员 |
 | V22 | AI 服务每日任务限额 |
 | V23 | 工作流条件/并行/表单与超时提醒 |
+| V24 | 文件对象存储 key |
+| V25 | TOTP 密钥列扩容以支持加密存储 |
 
 ## 表清单
 
@@ -105,5 +107,6 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - 工作流节点支持条件表达式、并行审批、表单数据和超时提醒。
 - 租户支持用户上限、存储配额与管理员绑定。
 - AI 服务支持每日任务限额，非管理员查看用户敏感字段自动脱敏。
+- 上传文件通过签名 Token 访问，TOTP 密钥加密存储。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
 

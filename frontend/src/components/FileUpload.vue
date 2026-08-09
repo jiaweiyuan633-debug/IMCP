@@ -6,9 +6,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { uploadFile } from '@/api/common'
+import { getFileAccessToken, uploadFile } from '@/api/common'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
@@ -20,7 +20,15 @@ const emit = defineEmits<{
 }>()
 const { t } = useI18n()
 
-const displayUrl = computed(() => resolveUrl(props.value || ''))
+const displayUrl = ref('')
+
+watch(
+  () => props.value,
+  async (value) => {
+    displayUrl.value = await resolveUrl(value || '')
+  },
+  { immediate: true },
+)
 
 async function doUpload({ file }: { file: File }) {
   try {
@@ -32,9 +40,15 @@ async function doUpload({ file }: { file: File }) {
   }
 }
 
-function resolveUrl(url: string): string {
+async function resolveUrl(url: string): Promise<string> {
   if (!url || url.startsWith('http')) {
     return url
+  }
+  try {
+    const token = await getFileAccessToken(url)
+    url = `${url}?token=${encodeURIComponent(token)}`
+  } catch {
+    // keep original url if token endpoint unavailable
   }
   const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
   if (base.startsWith('http')) {

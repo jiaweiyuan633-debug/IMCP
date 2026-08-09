@@ -103,6 +103,7 @@ Java 后端统一响应结构：
 | AI 推送 Ticket | `/api/ai/ticket` | 获取一次性 SSE Ticket |
 | AI 回调 | `/api/ai/callback/task` | Java 接收 Python 服务回调，带 Token 校验与幂等 |
 | 文件上传 | `/api/common/upload` | 本地或 MinIO 上传，20MB 上限 |
+| 文件访问 Token | `/api/common/file-token` | 获取上传文件签名访问 Token |
 
 Python 服务接口：
 
