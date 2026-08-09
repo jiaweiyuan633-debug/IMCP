@@ -75,7 +75,15 @@ public class MinioFileStorage implements FileStorage {
         sysFile.setSize(file.getSize());
         sysFile.setStorageType("minio");
         sysFile.setCreatedBy(tryGetUserId());
-        fileMapper.insert(sysFile);
+        try {
+            fileMapper.insert(sysFile);
+        } catch (Exception exception) {
+            client.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(fileName)
+                    .build());
+            throw exception;
+        }
         return UploadResponse.builder()
                 .url(url)
                 .name(file.getOriginalFilename())

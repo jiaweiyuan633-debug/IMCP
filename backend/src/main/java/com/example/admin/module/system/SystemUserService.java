@@ -315,6 +315,7 @@ public class SystemUserService {
         EasyExcel.write(response.getOutputStream(), UserExcelDTO.class).sheet("用户").doWrite(rows);
     }
 
+    @Transactional
     public int importUsers(MultipartFile file) throws IOException {
         List<UserExcelDTO> rows = EasyExcel.read(file.getInputStream())
                 .head(UserExcelDTO.class)
@@ -354,7 +355,9 @@ public class SystemUserService {
 
     private void checkTenantUserLimit() {
         Long tenantId = TenantContext.getTenantId();
-        SysTenant tenant = tenantMapper.selectById(tenantId);
+        SysTenant tenant = tenantMapper.selectOne(new LambdaQueryWrapper<SysTenant>()
+                .eq(SysTenant::getId, tenantId)
+                .last("FOR UPDATE"));
         if (tenant == null || tenant.getUserLimit() == null) {
             return;
         }

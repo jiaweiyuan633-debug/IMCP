@@ -115,4 +115,6 @@ CI 流水线见 `.github/workflows/ci.yml`。
 - 数据库设计：`docs/database/`
 - 部署教程：`docs/deploy/`
 - 演示与答辩材料：`docs/demo-outline.md`
+- 架构说明：`docs/architecture.md`
+- 运维手册：`docs/runbook.md`
 

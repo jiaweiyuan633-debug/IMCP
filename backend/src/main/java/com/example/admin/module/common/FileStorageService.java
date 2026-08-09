@@ -62,7 +62,12 @@ public class FileStorageService implements FileStorage {
         sysFile.setSize(file.getSize());
         sysFile.setStorageType("local");
         sysFile.setCreatedBy(tryGetUserId());
-        fileMapper.insert(sysFile);
+        try {
+            fileMapper.insert(sysFile);
+        } catch (Exception exception) {
+            Files.deleteIfExists(target);
+            throw exception;
+        }
 
         return UploadResponse.builder()
                 .url(url)

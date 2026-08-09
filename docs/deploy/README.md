@@ -73,6 +73,7 @@ docker compose -f docker-compose.yml -f observability.yml up -d
 - Grafana：`http://localhost:3000`（默认 `admin/admin123`）
 - Loki：`http://localhost:3100`
 - Tempo：`http://localhost:3200`
+- 后端链路追踪：通过 Brave 上报 Tempo，`ZIPKIN_ENDPOINT` 指向 Tempo 9411
 
 Docker Hub 拉取超时时，可先用 DaoCloud 镜像源拉取并打标准标签。
 

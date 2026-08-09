@@ -29,11 +29,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
@@ -56,6 +58,7 @@ public class AiTaskService {
     private final AiPythonClient pythonClient;
     private final ObjectMapper objectMapper;
     private final DataScopeHelper dataScopeHelper;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
@@ -71,11 +74,13 @@ public class AiTaskService {
             throw new BusinessException(ResultCode.AI_CONFIG_UNAVAILABLE);
         }
         if (config.getDailyLimit() != null) {
-            LocalDateTime start = LocalDate.now().atStartOfDay();
-            long todayCount = taskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                    .eq(AiTask::getServiceCode, config.getCode())
-                    .ge(AiTask::getCreatedAt, start));
-            if (todayCount >= config.getDailyLimit()) {
+            String key = "ai:limit:" + TenantContext.getTenantId() + ":" + config.getCode() + ":" + LocalDate.now();
+            Long todayCount = redisTemplate.opsForValue().increment(key);
+            if (todayCount != null && todayCount == 1) {
+                redisTemplate.expire(key, Duration.ofDays(1));
+            }
+            if (todayCount != null && todayCount > config.getDailyLimit()) {
+                redisTemplate.opsForValue().decrement(key);
                 throw new BusinessException(ResultCode.AI_DAILY_LIMIT_EXCEEDED);
             }
         }

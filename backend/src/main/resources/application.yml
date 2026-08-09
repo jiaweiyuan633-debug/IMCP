@@ -22,6 +22,12 @@ spring:
       org.quartz.jobStore.isClustered: false
 
 management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:}
   endpoints:
     web:
       exposure:
@@ -60,6 +66,8 @@ app:
       access-key: ${MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${MINIO_SECRET_KEY:minioadmin}
       bucket: ${MINIO_BUCKET:admin}
+  totp:
+    encryption-key: ${TOTP_ENCRYPTION_KEY:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}
   sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}

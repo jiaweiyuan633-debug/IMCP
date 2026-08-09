@@ -65,6 +65,7 @@ public class SystemWorkflowService {
         return PageResult.of(result, result.getRecords());
     }
 
+    @Transactional
     public Long create(SysWorkflow workflow) {
         if (workflow.getProcessDefId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请选择流程定义");

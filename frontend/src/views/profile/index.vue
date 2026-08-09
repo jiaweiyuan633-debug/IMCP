@@ -31,6 +31,7 @@
             :rules="[
               { required: true, message: t('page.newPasswordRequired') },
               { min: 8, message: t('page.passwordMin') },
+              { pattern: PASSWORD_PATTERN, message: t('page.passwordPolicy') },
             ]"
           >
             <a-input-password v-model:value="form.newPassword" />
@@ -74,6 +75,7 @@ import { useUserStore } from '@/stores/user'
 import FileUpload from '@/components/FileUpload.vue'
 import { disableTotp, enableTotp, getTotpStatus, setupTotp, updateProfile } from '@/api/auth'
 import { useI18n } from 'vue-i18n'
+import { PASSWORD_PATTERN } from '@/utils/validation'
 
 const userStore = useUserStore()
 const { t } = useI18n()
