@@ -9,6 +9,7 @@ export interface AiConfigVo {
   apiKey?: string
   timeoutSeconds: number
   enabled: number
+  dailyLimit?: number
 }
 
 export interface AiTaskResultVo {
@@ -52,6 +53,7 @@ export function updateAiConfig(
     apiKey?: string
     timeoutSeconds: number
     enabled: number
+    dailyLimit?: number
   },
 ): Promise<void> {
   return request.put(`/ai/config/${id}`, { ...data, id })

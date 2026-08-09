@@ -34,3 +34,25 @@ export function getCaptcha(): Promise<CaptchaResponse> {
   return request.get('/auth/captcha')
 }
 
+export interface TotpStatusVo {
+  enabled: boolean
+  secret?: string
+  otpauthUrl?: string
+}
+
+export function getTotpStatus(): Promise<TotpStatusVo> {
+  return request.get('/auth/totp/status')
+}
+
+export function setupTotp(): Promise<TotpStatusVo> {
+  return request.post('/auth/totp/setup')
+}
+
+export function enableTotp(code: string): Promise<void> {
+  return request.post('/auth/totp/enable', { code })
+}
+
+export function disableTotp(code: string): Promise<void> {
+  return request.post('/auth/totp/disable', { code })
+}
+

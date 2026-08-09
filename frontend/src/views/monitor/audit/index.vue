@@ -1,5 +1,8 @@
 <template>
   <a-card :title="t('page.monitorAuditTitle')">
+    <div class="toolbar">
+      <a-button @click="onExport">{{ t('page.monitorAuditExport') }}</a-button>
+    </div>
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <ProTable
       v-model:page-num="pageNum"
@@ -27,10 +30,11 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { getAuditLogPage } from '@/api/monitor'
+import { exportAuditLogs, getAuditLogPage } from '@/api/monitor'
 import type { AuditLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
@@ -56,6 +60,11 @@ const total = ref(0)
 const loading = ref(false)
 const records = ref<AuditLogVo[]>([])
 const searchModel = reactive<Record<string, unknown>>({})
+
+async function onExport() {
+  await exportAuditLogs()
+  message.success(t('page.monitorAuditExported'))
+}
 
 async function loadData() {
   loading.value = true
@@ -97,5 +106,9 @@ loadData()
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+.toolbar {
+  margin-bottom: 16px;
 }
 </style>

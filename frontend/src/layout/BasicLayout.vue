@@ -1,5 +1,7 @@
 <template>
   <a-layout class="app-layout" style="min-height: 100vh">
+    <a class="skip-link" href="#main-content">{{ t('layout.skip') }}</a>
+    <a-alert v-if="offline" banner type="warning" :message="t('layout.offline')" />
     <a-layout-sider class="desktop-sider" v-model:collapsed="appStore.collapsed" :width="220" theme="dark" collapsible :trigger="null">
       <div class="app-logo">
         <ApiOutlined v-if="appStore.collapsed" />
@@ -117,7 +119,7 @@
           </a-dropdown>
         </div>
       </a-layout-header>
-      <a-layout-content class="app-content">
+      <a-layout-content id="main-content" class="app-content">
         <a-tabs
           class="app-tabs"
           type="editable-card"
@@ -199,6 +201,7 @@ const unreadCount = ref(0)
 let noticeStream: EventSource | null = null
 const mobileDrawer = ref(false)
 const isMobile = ref(false)
+const offline = ref(false)
 
 function onResize() {
   isMobile.value = window.innerWidth < 768
@@ -207,9 +210,19 @@ function onResize() {
   }
 }
 
+function onOffline() {
+  offline.value = true
+}
+
+function onOnline() {
+  offline.value = false
+}
+
 onMounted(async () => {
   onResize()
   window.addEventListener('resize', onResize)
+  window.addEventListener('offline', onOffline)
+  window.addEventListener('online', onOnline)
   latestNotices.value = await getLatestNotices()
   unreadCount.value = await getUnreadNoticeCount()
   startNoticeStream()
@@ -217,6 +230,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('offline', onOffline)
+  window.removeEventListener('online', onOnline)
   noticeStream?.close()
   noticeStream = null
 })
@@ -415,5 +430,21 @@ function startNoticeStream() {
   .app-header {
     padding: 0 8px;
   }
+}
+
+.skip-link {
+  position: fixed;
+  top: -40px;
+  left: 12px;
+  z-index: 1000;
+  padding: 8px 14px;
+  background: var(--brand, #2563eb);
+  color: #fff;
+  border-radius: 0 0 8px 8px;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 0;
 }
 </style>

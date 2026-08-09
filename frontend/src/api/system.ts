@@ -363,6 +363,9 @@ export interface TenantVo {
   status: number
   contactName?: string
   contactPhone?: string
+  userLimit?: number
+  storageLimitMb?: number
+  adminUserId?: number
   createdAt?: string
 }
 

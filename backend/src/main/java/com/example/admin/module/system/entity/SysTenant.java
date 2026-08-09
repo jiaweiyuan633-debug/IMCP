@@ -19,6 +19,9 @@ public class SysTenant {
     private Integer status;
     private String contactName;
     private String contactPhone;
+    private Integer userLimit;
+    private Long storageLimitMb;
+    private Long adminUserId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long updatedBy;

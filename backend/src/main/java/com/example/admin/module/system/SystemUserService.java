@@ -20,6 +20,8 @@ import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserPostMapper;
+import com.example.admin.module.system.mapper.SysTenantMapper;
+import com.example.admin.module.system.entity.SysTenant;
 import com.example.admin.security.TokenService;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.vo.UserVo;
@@ -54,6 +56,7 @@ public class SystemUserService {
     private final SysPostMapper postMapper;
     private final DataScopeHelper dataScopeHelper;
     private final SysConfigMapper configMapper;
+    private final SysTenantMapper tenantMapper;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
@@ -110,6 +113,7 @@ public class SystemUserService {
         if (!StringUtils.hasText(request.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
         }
+        checkTenantUserLimit();
         SysUser user = new SysUser();
         user.setTenantId(TenantContext.getTenantId());
         user.setUsername(request.getUsername().trim());
@@ -219,6 +223,7 @@ public class SystemUserService {
                 .filter(post -> post != null)
                 .map(SysPost::getPostName)
                 .toList();
+        boolean mask = !dataScopeHelper.isAdmin();
         return UserVo.builder()
                 .id(user.getId())
                 .deptId(user.getDeptId())
@@ -226,8 +231,8 @@ public class SystemUserService {
                 .username(user.getUsername())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
-                .email(user.getEmail())
-                .phone(user.getPhone())
+                .email(mask ? maskEmail(user.getEmail()) : user.getEmail())
+                .phone(mask ? maskPhone(user.getPhone()) : user.getPhone())
                 .status(user.getStatus())
                 .lastLoginTime(user.getLastLoginTime())
                 .createdAt(user.getCreatedAt())
@@ -236,6 +241,21 @@ public class SystemUserService {
                 .postIds(postIds)
                 .postNames(postNames)
                 .build();
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return email;
+        }
+        int at = email.indexOf('@');
+        return email.substring(0, Math.min(2, at)) + "***" + email.substring(at);
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return phone;
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 2);
     }
 
     private Map<Long, List<Long>> groupByUser(List<Map<String, Object>> rows, String snakeKey, String camelKey) {
@@ -309,6 +329,7 @@ public class SystemUserService {
                 throw new BusinessException(ResultCode.USERNAME_EXISTS.getCode(), "导入失败，用户名已存在：" + row.getUsername());
             }
             SysUser user = new SysUser();
+            checkTenantUserLimit();
             user.setTenantId(TenantContext.getTenantId());
             user.setUsername(row.getUsername().trim());
             user.setPassword(passwordEncoder.encode(defaultPassword));
@@ -326,6 +347,19 @@ public class SystemUserService {
         SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
                 .eq(SysConfig::getConfigKey, "sys.user.initPassword"));
         return config == null ? "admin123" : config.getConfigValue();
+    }
+
+    private void checkTenantUserLimit() {
+        Long tenantId = TenantContext.getTenantId();
+        SysTenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null || tenant.getUserLimit() == null) {
+            return;
+        }
+        long current = userMapper.selectCount(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getTenantId, tenantId));
+        if (current >= tenant.getUserLimit()) {
+            throw new BusinessException(ResultCode.TENANT_LIMIT_EXCEEDED);
+        }
     }
 }
 

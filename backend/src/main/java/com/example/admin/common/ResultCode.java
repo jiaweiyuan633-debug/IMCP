@@ -22,6 +22,10 @@ public enum ResultCode {
     DICT_TYPE_EXISTS(1012, "字典类型已存在"),
     CONFIG_KEY_EXISTS(1013, "参数键名已存在"),
     LOGIN_TOO_MANY(1014, "登录过于频繁或账号已锁定"),
+    TOTP_REQUIRED(1015, "需要两步验证"),
+    TOO_MANY_REQUESTS(429, "请求过于频繁"),
+    TENANT_LIMIT_EXCEEDED(1016, "租户用户数量已达上限"),
+    AI_DAILY_LIMIT_EXCEEDED(1017, "AI 任务已达每日上限"),
     UNAUTHORIZED(401, "未登录或登录已过期"),
     FORBIDDEN(403, "无权限访问"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");

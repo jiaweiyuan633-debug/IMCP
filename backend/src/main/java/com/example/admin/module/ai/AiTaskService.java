@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
@@ -67,6 +68,15 @@ public class AiTaskService {
                 .eq(AiServiceConfig::getCode, request.getServiceCode()));
         if (config == null || config.getEnabled() == null || config.getEnabled() != 1) {
             throw new BusinessException(ResultCode.AI_CONFIG_UNAVAILABLE);
+        }
+        if (config.getDailyLimit() != null) {
+            LocalDateTime start = LocalDate.now().atStartOfDay();
+            long todayCount = taskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
+                    .eq(AiTask::getServiceCode, config.getCode())
+                    .ge(AiTask::getCreatedAt, start));
+            if (todayCount >= config.getDailyLimit()) {
+                throw new BusinessException(ResultCode.AI_DAILY_LIMIT_EXCEEDED);
+            }
         }
 
         String taskNo = "AI" + DateUtil.format(new Date(), "yyyyMMddHHmmssSSS") + RandomUtil.randomNumbers(4);

@@ -15,7 +15,7 @@
           <a href="#product">平台体验</a>
           <a href="#solutions">解决方案</a>
           <a href="#pricing">定价</a>
-          <a class="nav-cta" href="#contact">预约演示</a>
+          <a class="nav-cta" href="#contact" @click="trackEvent('nav_demo_click')">预约演示</a>
         </nav>
       </div>
     </header>
@@ -31,8 +31,8 @@
             一个平台覆盖组织权限、流程审批、AI 任务、实时监控与多租户管理，让企业管理从经验驱动升级为数据驱动。
           </p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="#contact">免费试用</a>
-            <a class="btn btn-ghost" href="#product">查看平台</a>
+            <a class="btn btn-primary" href="#contact" @click="trackEvent('hero_trial_click')">免费试用</a>
+            <a class="btn btn-ghost" href="#product" @click="trackEvent('hero_product_click')">查看平台</a>
           </div>
           <div class="hero-metrics">
             <div><strong>15+</strong><span>核心模块</span></div>
@@ -208,6 +208,7 @@ import {
   Workflow,
   X,
 } from 'lucide-vue-next'
+import { trackEvent } from './analytics'
 
 const navOpen = ref(false)
 const submitted = ref(false)
@@ -275,6 +276,7 @@ const pricing = [
 ]
 
 function submit() {
+  trackEvent('lead_submit', { company: form.company })
   submitted.value = true
 }
 </script>

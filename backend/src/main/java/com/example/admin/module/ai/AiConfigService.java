@@ -38,6 +38,7 @@ public class AiConfigService {
         }
         config.setTimeoutSeconds(request.getTimeoutSeconds() == null ? 60 : request.getTimeoutSeconds());
         config.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
+        config.setDailyLimit(request.getDailyLimit() == null ? 1000 : request.getDailyLimit());
         configMapper.updateById(config);
     }
 
@@ -50,6 +51,7 @@ public class AiConfigService {
                 .apiKey(config.getApiKey())
                 .timeoutSeconds(config.getTimeoutSeconds())
                 .enabled(config.getEnabled())
+                .dailyLimit(config.getDailyLimit())
                 .build();
     }
 }

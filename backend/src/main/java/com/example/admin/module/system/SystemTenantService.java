@@ -29,6 +29,8 @@ public class SystemTenantService {
 
     public Long create(SysTenant tenant) {
         tenant.setId(null);
+        tenant.setUserLimit(tenant.getUserLimit() == null ? 100 : tenant.getUserLimit());
+        tenant.setStorageLimitMb(tenant.getStorageLimitMb() == null ? 1024 : tenant.getStorageLimitMb());
         tenantMapper.insert(tenant);
         return tenant.getId();
     }
@@ -36,6 +38,12 @@ public class SystemTenantService {
     public void update(SysTenant tenant) {
         if (tenant.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "租户 ID 不能为空");
+        }
+        if (tenant.getUserLimit() == null) {
+            tenant.setUserLimit(100);
+        }
+        if (tenant.getStorageLimitMb() == null) {
+            tenant.setStorageLimitMb(1024);
         }
         tenantMapper.updateById(tenant);
     }

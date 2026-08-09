@@ -16,5 +16,5 @@ $passwordArg = if ($DbPassword) { "-p$DbPassword" } else { '' }
     --host $DbHost --port $DbPort --user $DbUser $passwordArg `
     --single-transaction --routines --triggers $DbName |
     Set-Content -Path $file -Encoding UTF8
-Write-Host "Backup saved: $file"
+Write-Output "Backup saved: $file"
 

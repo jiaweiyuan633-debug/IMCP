@@ -24,6 +24,8 @@ public class SysUser {
     private String email;
     private String phone;
     private Integer status;
+    private String totpSecret;
+    private Integer totpEnabled;
     private LocalDateTime lastLoginTime;
     private Long createdBy;
     private LocalDateTime createdAt;

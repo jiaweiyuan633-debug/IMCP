@@ -66,7 +66,9 @@ service.interceptors.response.use(
       }
     }
     message.error(result.message || '请求失败')
-    return Promise.reject(new Error(result.message))
+    const error = new Error(result.message) as Error & { code?: number }
+    error.code = result.code
+    return Promise.reject(error)
   },
   async (error) => {
     if (

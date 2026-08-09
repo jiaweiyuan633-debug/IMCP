@@ -32,6 +32,11 @@
         <a-form-item :label="t('page.tenantCode')" required><a-input v-model:value="form.tenantCode" /></a-form-item>
         <a-form-item :label="t('page.tenantContact')"><a-input v-model:value="form.contactName" /></a-form-item>
         <a-form-item :label="t('page.tenantPhone')"><a-input v-model:value="form.contactPhone" /></a-form-item>
+        <a-form-item :label="t('page.tenantUserLimit')"><a-input-number v-model:value="form.userLimit" :min="1" style="width: 100%" /></a-form-item>
+        <a-form-item :label="t('page.tenantStorageLimit')"><a-input-number v-model:value="form.storageLimitMb" :min="0" style="width: 100%" /></a-form-item>
+        <a-form-item :label="t('page.tenantAdmin')">
+          <a-select v-model:value="form.adminUserId" :options="userOptions" allow-clear show-search option-filter-prop="label" />
+        </a-form-item>
         <a-form-item :label="t('page.tenantStatus')"><a-select v-model:value="form.status" :options="statusOptions" /></a-form-item>
       </a-form>
     </ModalForm>
@@ -45,7 +50,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { createTenant, deleteTenant, getTenantPage, updateTenant } from '@/api/system'
+import { createTenant, deleteTenant, getTenantPage, getUserPage, updateTenant } from '@/api/system'
 import type { TenantVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
@@ -58,6 +63,8 @@ const columns = [
   { title: t('page.tenantCode'), dataIndex: 'tenantCode', key: 'tenantCode' },
   { title: t('page.tenantContact'), dataIndex: 'contactName', key: 'contactName' },
   { title: t('page.tenantPhone'), dataIndex: 'contactPhone', key: 'contactPhone' },
+  { title: t('page.tenantUserLimit'), dataIndex: 'userLimit', key: 'userLimit', width: 90 },
+  { title: t('page.tenantStorageLimit'), dataIndex: 'storageLimitMb', key: 'storageLimitMb', width: 110 },
   { title: t('page.tenantStatus'), key: 'status', width: 90 },
   { title: t('common.actions'), key: 'actions', width: 130 },
 ]
@@ -74,7 +81,17 @@ const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
 const records = ref<TenantVo[]>([])
 const searchModel = reactive<Record<string, unknown>>({})
-const form = reactive({ tenantName: '', tenantCode: '', contactName: '', contactPhone: '', status: 1 })
+const form = reactive({
+  tenantName: '',
+  tenantCode: '',
+  contactName: '',
+  contactPhone: '',
+  userLimit: 100,
+  storageLimitMb: 1024,
+  adminUserId: undefined as number | undefined,
+  status: 1,
+})
+const userOptions = ref<{ label: string; value: number }[]>([])
 
 async function loadData() {
   loading.value = true
@@ -102,7 +119,16 @@ function onReset() {
 }
 function openCreate() {
   editingId.value = undefined
-  Object.assign(form, { tenantName: '', tenantCode: '', contactName: '', contactPhone: '', status: 1 })
+  Object.assign(form, {
+    tenantName: '',
+    tenantCode: '',
+    contactName: '',
+    contactPhone: '',
+    userLimit: 100,
+    storageLimitMb: 1024,
+    adminUserId: undefined,
+    status: 1,
+  })
   modalOpen.value = true
 }
 function openEdit(record: TenantVo) {
@@ -112,6 +138,9 @@ function openEdit(record: TenantVo) {
     tenantCode: record.tenantCode,
     contactName: record.contactName || '',
     contactPhone: record.contactPhone || '',
+    userLimit: record.userLimit || 100,
+    storageLimitMb: record.storageLimitMb || 1024,
+    adminUserId: record.adminUserId,
     status: record.status,
   })
   modalOpen.value = true
@@ -143,6 +172,13 @@ function onDelete(record: TenantVo) {
   })
 }
 loadData()
+
+async function loadUserOptions() {
+  const users = await getUserPage({ pageNum: 1, pageSize: 100 })
+  userOptions.value = users.records.map((user) => ({ label: `${user.username}${user.nickname ? ` (${user.nickname})` : ''}`, value: user.id }))
+}
+
+loadUserOptions()
 </script>
 
 <style scoped>
