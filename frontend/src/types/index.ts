@@ -52,9 +52,9 @@ export interface UserVo {
   id: number
   deptId?: number
   deptName?: string
+  avatar?: string
   username: string
   nickname?: string
-  avatar?: string
   email?: string
   phone?: string
   status: number
@@ -72,9 +72,11 @@ export interface RoleVo {
   name: string
   description?: string
   status: number
+  dataScope: number
   sort: number
   createdAt?: string
   menuIds: number[]
+  deptIds: number[]
 }
 
 export interface RoleOptionVo {

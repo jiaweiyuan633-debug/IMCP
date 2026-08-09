@@ -73,3 +73,46 @@ export function getDashboardStats(): Promise<DashboardStatsVo> {
   return request.get('/monitor/stats')
 }
 
+export interface JobVo {
+  id: number
+  jobName: string
+  jobGroup: string
+  invokeTarget: string
+  cronExpression: string
+  misfirePolicy?: string
+  concurrent: number
+  status: number
+  remark?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function getJobPage(params: Record<string, unknown>): Promise<PageResult<JobVo>> {
+  return request.get('/monitor/job', { params })
+}
+
+export function createJob(data: Record<string, unknown>): Promise<number> {
+  return request.post('/monitor/job', data)
+}
+
+export function updateJob(data: Record<string, unknown>): Promise<void> {
+  return request.put('/monitor/job', data)
+}
+
+export function deleteJob(id: number): Promise<void> {
+  return request.delete(`/monitor/job/${id}`)
+}
+
+export function changeJobStatus(id: number, status: number): Promise<void> {
+  return request.put(`/monitor/job/${id}/status`, { status })
+}
+
+export function runJob(id: number): Promise<void> {
+  return request.post(`/monitor/job/${id}/run`)
+}
+
+export function getJobLogPage(params: Record<string, unknown>): Promise<PageResult<unknown>> {
+  return request.get('/monitor/job/log', { params })
+}
+
+

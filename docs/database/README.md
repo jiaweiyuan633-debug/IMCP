@@ -23,6 +23,9 @@ backend/src/main/resources/db/migration/
 | `sys_dict_type` | 字典类型 |
 | `sys_dict_data` | 字典数据 |
 | `sys_config` | 参数配置 |
+| `sys_job` | 定时任务 |
+| `sys_job_log` | 定时任务日志 |
+| `sys_role_dept` | 角色数据权限部门关联 |
 | `ai_service_config` | AI 服务配置 |
 | `ai_task` | AI 任务 |
 | `ai_task_result` | AI 任务结果 |

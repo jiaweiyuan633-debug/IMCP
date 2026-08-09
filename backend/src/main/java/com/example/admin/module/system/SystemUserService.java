@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.module.system.dto.UserExcelDTO;
 import com.example.admin.module.system.dto.UserQuery;
 import com.example.admin.module.system.dto.UserSaveRequest;
 import com.example.admin.module.system.entity.SysRole;
@@ -16,9 +17,13 @@ import com.example.admin.module.system.mapper.SysDeptMapper;
 import com.example.admin.module.system.mapper.SysPostMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserPostMapper;
 import com.example.admin.module.system.vo.UserVo;
+import com.alibaba.excel.EasyExcel;
+import com.example.admin.module.system.entity.SysConfig;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +50,8 @@ public class SystemUserService {
     private final SysUserPostMapper userPostMapper;
     private final SysDeptMapper deptMapper;
     private final SysPostMapper postMapper;
+    private final DataScopeHelper dataScopeHelper;
+    private final SysConfigMapper configMapper;
     private final PasswordEncoder passwordEncoder;
 
     public PageResult<UserVo> page(UserQuery query) {
@@ -50,6 +61,7 @@ public class SystemUserService {
                 .like(StringUtils.hasText(query.getNickname()), SysUser::getNickname, query.getNickname())
                 .eq(query.getStatus() != null, SysUser::getStatus, query.getStatus())
                 .orderByDesc(SysUser::getId);
+        dataScopeHelper.apply(wrapper);
         IPage<SysUser> result = userMapper.selectPage(page, wrapper);
         List<UserVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
@@ -195,6 +207,62 @@ public class SystemUserService {
                 .postIds(postIds)
                 .postNames(postNames)
                 .build();
+    }
+
+    public void exportUsers(HttpServletResponse response) throws IOException {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .orderByDesc(SysUser::getId);
+        dataScopeHelper.apply(wrapper);
+        List<UserExcelDTO> rows = userMapper.selectList(wrapper).stream().map(user -> {
+            UserExcelDTO dto = new UserExcelDTO();
+            dto.setUsername(user.getUsername());
+            dto.setNickname(user.getNickname());
+            dto.setEmail(user.getEmail());
+            dto.setPhone(user.getPhone());
+            dto.setStatus(user.getStatus());
+            return dto;
+        }).toList();
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        String fileName = URLEncoder.encode("用户数据", StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+        EasyExcel.write(response.getOutputStream(), UserExcelDTO.class).sheet("用户").doWrite(rows);
+    }
+
+    public int importUsers(MultipartFile file) throws IOException {
+        List<UserExcelDTO> rows = EasyExcel.read(file.getInputStream())
+                .head(UserExcelDTO.class)
+                .sheet()
+                .doReadSync();
+        String defaultPassword = defaultPassword();
+        int count = 0;
+        for (UserExcelDTO row : rows) {
+            if (row.getUsername() == null || row.getUsername().isBlank()) {
+                continue;
+            }
+            boolean exists = userMapper.exists(new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getUsername, row.getUsername().trim()));
+            if (exists) {
+                throw new BusinessException(1006, "导入失败，用户名已存在：" + row.getUsername());
+            }
+            SysUser user = new SysUser();
+            user.setUsername(row.getUsername().trim());
+            user.setPassword(passwordEncoder.encode(defaultPassword));
+            user.setNickname(row.getNickname());
+            user.setEmail(row.getEmail());
+            user.setPhone(row.getPhone());
+            user.setStatus(row.getStatus() == null ? 1 : row.getStatus());
+            userMapper.insert(user);
+            count++;
+        }
+        return count;
+    }
+
+    private String defaultPassword() {
+        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
+                .eq(SysConfig::getConfigKey, "sys.user.initPassword"));
+        return config == null ? "admin123" : config.getConfigValue();
     }
 }
 

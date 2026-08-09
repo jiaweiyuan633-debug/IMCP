@@ -20,5 +20,15 @@ public interface SysRoleMapper extends BaseMapper<SysRole> {
               AND r.deleted = 0
             """)
     List<String> selectRoleCodesByUserId(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT r.data_scope
+            FROM sys_role r
+            JOIN sys_user_role ur ON r.id = ur.role_id
+            WHERE ur.user_id = #{userId}
+              AND r.status = 1
+              AND r.deleted = 0
+            """)
+    List<Integer> selectDataScopesByUserId(@Param("userId") Long userId);
 }
 

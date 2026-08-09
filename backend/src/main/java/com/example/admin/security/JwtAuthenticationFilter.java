@@ -2,6 +2,8 @@ package com.example.admin.security;
 
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
+import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.module.system.entity.SysUser;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -30,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
     private final SysRoleMapper roleMapper;
     private final SysMenuMapper menuMapper;
+    private final SysUserMapper userMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -43,8 +46,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     Long userId = Long.valueOf(claims.getSubject());
                     List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
                     List<String> perms = menuMapper.selectPermsByUserId(userId);
+                    SysUser user = userMapper.selectById(userId);
                     LoginUser loginUser = LoginUser.builder()
                             .userId(userId)
+                            .deptId(user == null ? null : user.getDeptId())
                             .username(claims.get("username", String.class))
                             .roles(roles)
                             .perms(perms)

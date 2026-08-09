@@ -16,6 +16,7 @@ import java.util.List;
 public class LoginUser implements UserDetails {
 
     private Long userId;
+    private Long deptId;
     private String username;
     private String nickname;
     private List<String> roles;

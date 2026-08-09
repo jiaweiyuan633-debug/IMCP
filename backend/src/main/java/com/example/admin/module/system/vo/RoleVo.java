@@ -15,8 +15,10 @@ public class RoleVo {
     private String name;
     private String description;
     private Integer status;
+    private Integer dataScope;
     private Integer sort;
     private LocalDateTime createdAt;
     private List<Long> menuIds;
+    private List<Long> deptIds;
 }
 
