@@ -1,7 +1,6 @@
 package com.example.admin.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
-import com.example.admin.common.BusinessException;
 import com.example.admin.security.SecurityUtils;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;
@@ -16,22 +15,14 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         LocalDateTime now = LocalDateTime.now();
         strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
         strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
-        strictInsertFill(metaObject, "createdBy", Long.class, tryGetUserId());
-        strictInsertFill(metaObject, "updatedBy", Long.class, tryGetUserId());
+        strictInsertFill(metaObject, "createdBy", Long.class, SecurityUtils.tryGetUserId());
+        strictInsertFill(metaObject, "updatedBy", Long.class, SecurityUtils.tryGetUserId());
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
         strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
-        strictUpdateFill(metaObject, "updatedBy", Long.class, tryGetUserId());
-    }
-
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
+        strictUpdateFill(metaObject, "updatedBy", Long.class, SecurityUtils.tryGetUserId());
     }
 }
 

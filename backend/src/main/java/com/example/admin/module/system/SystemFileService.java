@@ -27,7 +27,7 @@ import java.security.NoSuchAlgorithmException;
 
 @Service
 @RequiredArgsConstructor
-public class SysFileService {
+public class SystemFileService {
 
     private final SysFileMapper fileMapper;
     private final FileAccessService fileAccessService;

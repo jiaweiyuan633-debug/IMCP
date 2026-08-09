@@ -94,41 +94,6 @@ public class DataScopeHelper {
                 .toList();
     }
 
-    public LambdaQueryWrapper<SysUserDO> apply(LambdaQueryWrapper<SysUserDO> wrapper) {
-        LoginUser loginUser = SecurityUtils.getLoginUser();
-        if (loginUser.getRoles() != null && loginUser.getRoles().contains("admin")) {
-            return wrapper;
-        }
-        List<Integer> scopes = roleMapper.selectDataScopesByUserId(loginUser.getUserId());
-        if (scopes.contains(SCOPE_ALL)) {
-            return wrapper;
-        }
-        if (scopes.contains(SCOPE_CUSTOM)) {
-            List<Long> deptIds = customDeptIds(loginUser.getUserId());
-            if (!deptIds.isEmpty()) {
-                wrapper.in(SysUserDO::getDeptId, deptIds);
-            } else {
-                wrapper.eq(SysUserDO::getId, -1L);
-            }
-            return wrapper;
-        }
-        if (scopes.contains(SCOPE_DEPT_AND_CHILD)) {
-            List<Long> deptIds = deptAndChildIds(loginUser.getDeptId());
-            if (!deptIds.isEmpty()) {
-                wrapper.in(SysUserDO::getDeptId, deptIds);
-            } else {
-                wrapper.eq(SysUserDO::getId, -1L);
-            }
-            return wrapper;
-        }
-        if (scopes.contains(SCOPE_DEPT)) {
-            wrapper.eq(SysUserDO::getDeptId, loginUser.getDeptId());
-            return wrapper;
-        }
-        wrapper.eq(SysUserDO::getId, loginUser.getUserId());
-        return wrapper;
-    }
-
     private List<Long> customDeptIds(Long userId) {
         Set<Long> deptIds = new HashSet<>();
         List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(userId);

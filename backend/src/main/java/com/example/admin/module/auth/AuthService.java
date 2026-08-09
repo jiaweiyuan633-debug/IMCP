@@ -47,7 +47,6 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final String BEARER_PREFIX = "Bearer ";
     private static final String CAPTCHA_CONFIG_KEY = "sys.account.captchaEnabled";
     private static final String LOGIN_RATE_KEY_PREFIX = "login:rate:";
     private static final String LOGIN_FAIL_KEY_PREFIX = "login:fail:";
@@ -303,8 +302,8 @@ public class AuthService {
 
     private String resolveToken(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
-        if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
-            return header.substring(BEARER_PREFIX.length());
+        if (StringUtils.hasText(header) && header.startsWith(SecurityUtils.BEARER_PREFIX)) {
+            return header.substring(SecurityUtils.BEARER_PREFIX.length());
         }
         return null;
     }

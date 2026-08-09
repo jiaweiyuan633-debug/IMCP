@@ -49,7 +49,7 @@ public class SystemNoticeService {
 
     public Long create(SysNoticeDO notice) {
         notice.setId(null);
-        notice.setCreatedBy(tryGetUserId());
+        notice.setCreatedBy(SecurityUtils.tryGetUserId());
         noticeMapper.insert(notice);
         noticeSseService.publishAll(notice);
         return notice.getId();
@@ -83,12 +83,5 @@ public class SystemNoticeService {
         noticeReadMapper.markAllRead(TenantContext.getTenantId(), userId);
     }
 
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
-    }
 }
 

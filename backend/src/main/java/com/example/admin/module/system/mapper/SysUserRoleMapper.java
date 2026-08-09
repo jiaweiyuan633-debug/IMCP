@@ -20,9 +20,6 @@ public interface SysUserRoleMapper {
     @Delete("DELETE FROM sys_user_role WHERE user_id = #{userId}")
     int deleteByUserId(@Param("userId") Long userId);
 
-    @Delete("DELETE FROM sys_user_role WHERE user_id = #{userId} AND role_id = #{roleId}")
-    int delete(@Param("userId") Long userId, @Param("roleId") Long roleId);
-
     @Select("SELECT role_id FROM sys_user_role WHERE user_id = #{userId}")
     List<Long> selectRoleIdsByUserId(@Param("userId") Long userId);
 

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SystemFileController {
 
-    private final SysFileService fileService;
+    private final SystemFileService fileService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:file:list')")

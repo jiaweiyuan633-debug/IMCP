@@ -64,7 +64,7 @@ public class ProcessDefService {
         def.setDefKey(request.getDefKey());
         def.setDescription(request.getDescription());
         def.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
-        def.setCreatedBy(tryGetUserId());
+        def.setCreatedBy(SecurityUtils.tryGetUserId());
         defMapper.insert(def);
         saveNodes(def.getId(), request.getNodes());
         return def.getId();
@@ -84,7 +84,7 @@ public class ProcessDefService {
         def.setDefKey(request.getDefKey());
         def.setDescription(request.getDescription());
         def.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
-        def.setUpdatedBy(tryGetUserId());
+        def.setUpdatedBy(SecurityUtils.tryGetUserId());
         defMapper.updateById(def);
         nodeMapper.delete(new LambdaQueryWrapper<SysProcessNodeDO>()
                 .eq(SysProcessNodeDO::getProcessDefId, def.getId()));
@@ -128,11 +128,4 @@ public class ProcessDefService {
         }
     }
 
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
-    }
 }

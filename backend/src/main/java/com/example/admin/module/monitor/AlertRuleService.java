@@ -14,8 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 public class AlertRuleService {
@@ -25,11 +23,6 @@ public class AlertRuleService {
     private static final int DEFAULT_SILENCE_MINUTES = 10;
 
     private final SysAlertRuleMapper ruleMapper;
-
-    public List<SysAlertRuleDO> listAll() {
-        return ruleMapper.selectList(new LambdaQueryWrapper<SysAlertRuleDO>()
-                .orderByAsc(SysAlertRuleDO::getId));
-    }
 
     public PageResult<SysAlertRuleDO> page(long pageNum, long pageSize, String ruleName, Integer enabled) {
         Page<SysAlertRuleDO> page = new Page<>(pageNum, pageSize);
@@ -43,7 +36,7 @@ public class AlertRuleService {
 
     public Long create(AlertRuleSaveRequest request) {
         SysAlertRuleDO rule = toEntity(request);
-        rule.setCreatedBy(tryGetUserId());
+        rule.setCreatedBy(SecurityUtils.tryGetUserId());
         ruleMapper.insert(rule);
         return rule.getId();
     }
@@ -53,7 +46,7 @@ public class AlertRuleService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "规则 ID 不能为空");
         }
         SysAlertRuleDO rule = toEntity(request);
-        rule.setUpdatedBy(tryGetUserId());
+        rule.setUpdatedBy(SecurityUtils.tryGetUserId());
         ruleMapper.updateById(rule);
     }
 
@@ -78,11 +71,4 @@ public class AlertRuleService {
         return rule;
     }
 
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
-    }
 }

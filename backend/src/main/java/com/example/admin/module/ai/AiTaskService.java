@@ -106,7 +106,7 @@ public class AiTaskService {
                 ? DEFAULT_TIMEOUT_SECONDS
                 : config.getTimeoutSeconds());
         task.setCallbackUrl(callbackBaseUrl + "/api/ai/callback/task");
-        task.setCreatedBy(tryGetUserId());
+        task.setCreatedBy(SecurityUtils.tryGetUserId());
         taskMapper.insert(task);
 
         try {
@@ -256,14 +256,6 @@ public class AiTaskService {
         } catch (JsonProcessingException exception) {
             log.warn("Failed to serialize AI data", exception);
             return String.valueOf(value);
-        }
-    }
-
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
         }
     }
 

@@ -71,22 +71,6 @@ public class SysJobSchedulerService {
         }
     }
 
-    public void pauseJob(SysJobDO job) {
-        try {
-            scheduler.pauseJob(jobKey(job));
-        } catch (SchedulerException | RuntimeException exception) {
-            log.error("Failed to pause job {}", job.getId(), exception);
-        }
-    }
-
-    public void resumeJob(SysJobDO job) {
-        try {
-            scheduler.resumeJob(jobKey(job));
-        } catch (SchedulerException | RuntimeException exception) {
-            log.error("Failed to resume job {}", job.getId(), exception);
-        }
-    }
-
     public void deleteJob(SysJobDO job) {
         try {
             scheduler.deleteJob(jobKey(job));

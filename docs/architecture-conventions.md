@@ -11,7 +11,7 @@
 | Manager | 跨服务、第三方 API、外部系统封装 | 外部调用统一收敛到 Manager，便于替换与测试 |
 | DAO/Mapper | 数据库访问 | 不包含业务逻辑，SQL 显式列出字段 |
 
-现有 `AiTaskManager`、`AlertWebhookManager` 是外部能力封装的示例。文件存储通过 `FileStorage` 接口隔离本地/MinIO 实现。
+现有 `AiTaskManager`、`AlertWebhookManager` 是外部能力封装的示例。文件存储通过 `FileStorage` 接口隔离本地/MinIO 实现，配额校验统一走 `StorageQuotaService`，当前用户提取统一走 `SecurityUtils.tryGetUserId()`。
 
 ## 命名与领域模型
 

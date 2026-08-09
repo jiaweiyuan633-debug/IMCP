@@ -7,7 +7,6 @@ import com.example.admin.module.system.entity.SysAuditLogDO;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
-import com.example.admin.common.BusinessException;
 import com.example.admin.common.LogMaskUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletRequest;
@@ -62,7 +61,7 @@ public class OperLogAspect {
         try {
             SysOperLogDO operLogEntity = new SysOperLogDO();
             operLogEntity.setTenantId(TenantContext.getTenantId());
-            operLogEntity.setUserId(tryGetUserId());
+            operLogEntity.setUserId(SecurityUtils.tryGetUserId());
             operLogEntity.setModule(operLog.module());
             operLogEntity.setAction(operLog.action());
             operLogEntity.setMethod(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
@@ -114,14 +113,6 @@ public class OperLogAspect {
             return null;
         }
         return truncate(LogMaskUtils.toMaskedJson(value, objectMapper), MAX_RESULT_LENGTH);
-    }
-
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
     }
 
     private String truncate(String value, int maxLength) {

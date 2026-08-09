@@ -160,10 +160,6 @@ export function updateUserStatus(id: number, status: number): Promise<void> {
   return request.put(`/system/user/${id}/status`, { status })
 }
 
-export function assignUserRoles(id: number, roleIds: number[]): Promise<void> {
-  return request.put(`/system/user/${id}/roles`, { roleIds })
-}
-
 export function getRolePage(params: RoleQuery): Promise<PageResult<RoleVo>> {
   return request.get('/system/role', { params })
 }
@@ -260,10 +256,6 @@ export function getDictDataPage(params: Record<string, unknown>): Promise<PageRe
   return request.get('/system/dict/data', { params })
 }
 
-export function getDictDataByType(dictType: string): Promise<DictDataVo[]> {
-  return request.get(`/system/dict/data/type/${dictType}`)
-}
-
 export function createDictData(data: Record<string, unknown>): Promise<number> {
   return request.post('/system/dict/data', data)
 }
@@ -338,10 +330,6 @@ export function getUnreadNoticeCount(): Promise<number> {
 
 export function getNoticeSseTicket(): Promise<string> {
   return request.get('/system/notice/ticket')
-}
-
-export function markNoticeRead(id: number): Promise<void> {
-  return request.put(`/system/notice/read/${id}`)
 }
 
 export function createNotice(data: Record<string, unknown>): Promise<number> {

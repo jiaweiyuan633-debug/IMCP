@@ -20,14 +20,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-    private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
     private final TokenService tokenService;
@@ -79,18 +76,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    @SuppressWarnings("unchecked")
-    private List<String> toStringList(Object value) {
-        if (value instanceof List<?> list) {
-            return (List<String>) list;
-        }
-        return Collections.emptyList();
-    }
-
     private String resolveToken(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
-        if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
-            return header.substring(BEARER_PREFIX.length());
+        if (StringUtils.hasText(header) && header.startsWith(SecurityUtils.BEARER_PREFIX)) {
+            return header.substring(SecurityUtils.BEARER_PREFIX.length());
         }
         return null;
     }

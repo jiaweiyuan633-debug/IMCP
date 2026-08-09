@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -55,11 +54,6 @@ public class TokenService {
         Boolean exists = redisTemplate.hasKey(ACCESS_KEY + accessJti);
         Boolean blacklisted = redisTemplate.hasKey(BLACKLIST_KEY + accessJti);
         return Boolean.TRUE.equals(exists) && !Boolean.TRUE.equals(blacklisted);
-    }
-
-    public Optional<String> getAccessTokenValue(String accessJti) {
-        String value = redisTemplate.opsForValue().get(ACCESS_KEY + accessJti);
-        return Optional.ofNullable(value);
     }
 
     public boolean hasRefreshToken(String refreshJti) {

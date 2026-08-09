@@ -7,6 +7,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 public final class SecurityUtils {
 
+    public static final String BEARER_PREFIX = "Bearer ";
+
     private SecurityUtils() {
     }
 
@@ -20,6 +22,14 @@ public final class SecurityUtils {
 
     public static Long getUserId() {
         return getLoginUser().getUserId();
+    }
+
+    public static Long tryGetUserId() {
+        try {
+            return getUserId();
+        } catch (BusinessException exception) {
+            return null;
+        }
     }
 }
 

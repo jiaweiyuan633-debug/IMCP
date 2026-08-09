@@ -20,9 +20,6 @@ public interface SysUserPostMapper {
     @Delete("DELETE FROM sys_user_post WHERE user_id = #{userId}")
     int deleteByUserId(@Param("userId") Long userId);
 
-    @Select("SELECT post_id FROM sys_user_post WHERE user_id = #{userId}")
-    List<Long> selectPostIdsByUserId(@Param("userId") Long userId);
-
     @Select("""
             <script>
             SELECT user_id, post_id FROM sys_user_post

@@ -47,7 +47,7 @@ public class MonitorJobService {
 
     public Long create(JobSaveRequest request) {
         SysJobDO job = toEntity(request);
-        job.setCreatedBy(tryGetUserId());
+        job.setCreatedBy(SecurityUtils.tryGetUserId());
         jobMapper.insert(job);
         if (job.getStatus() != null && job.getStatus() == ENABLED) {
             schedulerService.scheduleJob(job);
@@ -125,12 +125,5 @@ public class MonitorJobService {
         return job;
     }
 
-    private Long tryGetUserId() {
-        try {
-            return SecurityUtils.getUserId();
-        } catch (BusinessException exception) {
-            return null;
-        }
-    }
 }
 
