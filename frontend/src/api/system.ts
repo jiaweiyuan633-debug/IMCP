@@ -348,6 +348,46 @@ export function getNoticeSseTicket(): Promise<string> {
   return request.get('/system/notice/ticket')
 }
 
+export interface MessageVo {
+  id: number
+  messageType: string
+  title: string
+  content?: string
+  bizType?: string
+  bizId?: number
+  priority?: string
+  readFlag: number
+  createdAt?: string
+}
+
+export function getMessagePage(params: Record<string, unknown>): Promise<PageResult<MessageVo>> {
+  return request.get('/system/message', { params })
+}
+
+export function getLatestMessages(limit = 5): Promise<MessageVo[]> {
+  return request.get('/system/message/latest', { params: { limit } })
+}
+
+export function getUnreadMessageCount(): Promise<number> {
+  return request.get('/system/message/unread-count')
+}
+
+export function markMessageRead(id: number): Promise<void> {
+  return request.put(`/system/message/read/${id}`)
+}
+
+export function markAllMessageRead(): Promise<void> {
+  return request.put('/system/message/read-all')
+}
+
+export function sendMessage(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/message', data)
+}
+
+export function getMessageTodos(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/message/todos', { params })
+}
+
 export function createNotice(data: Record<string, unknown>): Promise<number> {
   return request.post('/system/notice', data)
 }
@@ -503,6 +543,11 @@ export interface FileVo {
   size: number
   storageType: string
   accessToken?: string
+  contentType?: string
+  category?: string
+  sha256?: string
+  scanStatus?: string
+  contentUrl?: string
   createdAt?: string
 }
 
@@ -512,5 +557,15 @@ export function getFilePage(params: Record<string, unknown>): Promise<PageResult
 
 export function deleteFile(id: number): Promise<void> {
   return request.delete(`/system/file/${id}`)
+}
+
+export async function downloadFile(id: number): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/system/file/${id}/download`, {
+    headers: { Authorization: `Bearer ${getAccessToken() || ''}` },
+  })
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`)
+  }
+  return response.blob()
 }
 

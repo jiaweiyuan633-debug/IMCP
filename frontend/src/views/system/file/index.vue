@@ -1,5 +1,16 @@
 <template>
   <a-card :title="t('page.fileTitle')">
+    <div v-if="quota" class="quota-bar">
+      <span class="quota-label">{{ t('page.fileQuota') }}</span>
+      <a-progress
+        v-if="!quota.unlimited"
+        :percent="quota.percent || 0"
+        size="small"
+        :status="quota.percent !== null && quota.percent >= 90 ? 'exception' : 'normal'"
+        class="quota-progress"
+      />
+      <span v-else class="quota-unlimited">{{ t('page.fileQuotaUnlimited') }}</span>
+    </div>
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <ProTable
       v-model:page-num="pageNum"
@@ -13,7 +24,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'originalName'">
-          <a :href="withToken(record.url, record.accessToken)" target="_blank" rel="noopener">{{ record.originalName || record.fileName }}</a>
+          <a :href="withToken(record)" target="_blank" rel="noopener">{{ record.originalName || record.fileName }}</a>
         </template>
         <template v-else-if="column.key === 'size'">
           {{ formatSize(record.size) }}
@@ -23,19 +34,30 @@
             {{ record.storageType === 'minio' ? 'MinIO' : t('page.fileLocal') }}
           </a-tag>
         </template>
+        <template v-else-if="column.key === 'category'">
+          <a-tag :color="categoryMeta[record.category || 'other']?.color || 'default'">
+            {{ categoryMeta[record.category || 'other']?.label || record.category || t('page.fileCategoryOther') }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'scanStatus'">
+          <a-tag :color="scanStatusMeta(record.scanStatus).color">
+            {{ scanStatusMeta(record.scanStatus).text }}
+          </a-tag>
+        </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
+            <a @click="onDownload(record)">{{ t('page.fileDownload') }}</a>
             <a @click="onCopyLink(record)">{{ t('page.fileCopyLink') }}</a>
-            <a v-if="isImage(record.url)" @click="openPreview(record)">{{ t('common.preview') }}</a>
-            <a v-else-if="isPdf(record.url)" @click="openPreview(record)">{{ t('common.preview') }}</a>
+            <a v-if="isImage(record)" @click="openPreview(record)">{{ t('common.preview') }}</a>
+            <a v-else-if="isPdf(record)" @click="openPreview(record)">{{ t('common.preview') }}</a>
             <a v-permission="'system:file:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
     </ProTable>
     <a-modal v-model:open="previewOpen" :title="previewName" :footer="null" width="720">
-      <img v-if="isImage(previewUrl)" :src="previewUrl" alt="preview" class="preview-image" />
-      <iframe v-else-if="isPdf(previewUrl)" :src="previewUrl" class="preview-pdf" />
+      <img v-if="isImage(previewRecord)" :src="previewUrl" alt="preview" class="preview-image" />
+      <iframe v-else-if="isPdf(previewRecord)" :src="previewUrl" class="preview-pdf" />
     </a-modal>
   </a-card>
 </template>
@@ -45,16 +67,34 @@ import { reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
-import { deleteFile, getFilePage } from '@/api/system'
+import { deleteFile, downloadFile, getFilePage } from '@/api/system'
+import { getStorageQuota, type StorageQuota } from '@/api/common'
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
+const categoryMeta: Record<string, { color: string; label: string }> = {
+  image: { color: 'green', label: t('page.fileCategoryImage') },
+  pdf: { color: 'volcano', label: t('page.fileCategoryPdf') },
+  office: { color: 'blue', label: t('page.fileCategoryOffice') },
+  archive: { color: 'orange', label: t('page.fileCategoryArchive') },
+  text: { color: 'cyan', label: t('page.fileCategoryText') },
+  audio: { color: 'purple', label: t('page.fileCategoryAudio') },
+  video: { color: 'magenta', label: t('page.fileCategoryVideo') },
+  other: { color: 'default', label: t('page.fileCategoryOther') },
+}
+
 const searchFields: SearchField[] = [
   { label: t('page.fileStoredName'), prop: 'fileName', placeholder: `${t('common.inputPlaceholder')}${t('page.fileStoredName')}` },
   { label: t('page.fileOriginalName'), prop: 'originalName', placeholder: `${t('common.inputPlaceholder')}${t('page.fileOriginalName')}` },
+  {
+    label: t('page.fileCategory'),
+    prop: 'category',
+    type: 'select',
+    options: Object.entries(categoryMeta).map(([value, meta]) => ({ label: meta.label, value })),
+  },
   {
     label: t('page.fileStorageType'),
     prop: 'storageType',
@@ -70,9 +110,11 @@ const columns = [
   { title: t('page.fileOriginalName'), key: 'originalName', ellipsis: true },
   { title: t('page.fileStoredName'), dataIndex: 'fileName', key: 'fileName', ellipsis: true },
   { title: t('page.fileSize'), key: 'size', width: 100 },
-  { title: t('page.fileStorageType'), key: 'storageType', width: 100 },
+  { title: t('page.fileCategory'), key: 'category', width: 90 },
+  { title: t('page.fileStorageType'), key: 'storageType', width: 90 },
+  { title: t('page.fileScanStatus'), key: 'scanStatus', width: 100 },
   { title: t('page.fileUploadTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
-  { title: t('common.actions'), key: 'actions', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 170 },
 ]
 
 const pageNum = ref(1)
@@ -84,6 +126,8 @@ const searchModel = reactive<Record<string, unknown>>({})
 const previewOpen = ref(false)
 const previewUrl = ref('')
 const previewName = ref('')
+const previewRecord = ref<FileVo | null>(null)
+const quota = ref<StorageQuota | null>(null)
 
 async function loadData() {
   loading.value = true
@@ -93,12 +137,21 @@ async function loadData() {
       pageSize: pageSize.value,
       fileName: (searchModel.fileName as string) || undefined,
       originalName: (searchModel.originalName as string) || undefined,
+      category: searchModel.category as string | undefined,
       storageType: searchModel.storageType as string | undefined,
     })
     records.value = data.records
     total.value = data.total
   } finally {
     loading.value = false
+  }
+}
+
+async function loadQuota() {
+  try {
+    quota.value = await getStorageQuota()
+  } catch {
+    quota.value = null
   }
 }
 
@@ -126,30 +179,60 @@ function formatSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function isImage(url: string): boolean {
-  return /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0])
+function contentUrl(record: FileVo): string {
+  return record.contentUrl || record.url
 }
 
-function isPdf(url: string): boolean {
-  return /\.pdf$/i.test(url.split('?')[0])
+function isImage(record: FileVo | null): boolean {
+  return !!record && (record.category === 'image' || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(record.url.split('?')[0]))
+}
+
+function isPdf(record: FileVo | null): boolean {
+  return !!record && (record.category === 'pdf' || /\.pdf$/i.test(record.url.split('?')[0]))
+}
+
+function scanStatusMeta(status?: string): { text: string; color: string } {
+  if (status === 'SCANNED') {
+    return { text: t('page.fileScanPassed'), color: 'green' }
+  }
+  if (status === 'SCANNED_WARN') {
+    return { text: t('page.fileScanWarn'), color: 'orange' }
+  }
+  return { text: t('page.fileScanSkipped'), color: 'default' }
 }
 
 function openPreview(record: FileVo) {
-  previewUrl.value = withToken(record.url, record.accessToken)
+  previewRecord.value = record
+  previewUrl.value = withToken(record)
   previewName.value = record.originalName || record.fileName
   previewOpen.value = true
 }
 
-function withToken(url: string, token?: string): string {
-  if (!token) {
+function withToken(record: FileVo): string {
+  const url = contentUrl(record)
+  if (!record.accessToken) {
     return url
   }
-  return `${url}?token=${encodeURIComponent(token)}`
+  return `${url}?token=${encodeURIComponent(record.accessToken)}`
 }
 
 async function onCopyLink(record: FileVo) {
-  await navigator.clipboard.writeText(withToken(record.url, record.accessToken))
+  await navigator.clipboard.writeText(withToken(record))
   message.success(t('page.fileCopied'))
+}
+
+async function onDownload(record: FileVo) {
+  try {
+    const blob = await downloadFile(record.id)
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = record.originalName || record.fileName
+    link.click()
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    message.error(t('page.fileDownloadFailed'))
+  }
 }
 
 function onDelete(record: FileVo) {
@@ -160,16 +243,37 @@ function onDelete(record: FileVo) {
       await deleteFile(record.id)
       message.success(t('page.fileDeleted'))
       loadData()
+      loadQuota()
     },
   })
 }
 
 loadData()
+loadQuota()
 </script>
 
 <style scoped>
-.toolbar {
+.quota-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.quota-label {
+  flex: none;
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.65));
+  font-size: 14px;
+}
+
+.quota-progress {
+  flex: 1;
+  max-width: 320px;
+}
+
+.quota-unlimited {
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.65));
+  font-size: 14px;
 }
 
 .preview-image {

@@ -1,11 +1,15 @@
 package com.example.admin.module.common;
 
-import com.example.admin.module.common.vo.UploadResponse;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
+import java.io.InputStream;
 
 public interface FileStorage {
 
-    UploadResponse store(MultipartFile file) throws Exception;
+    String type();
+
+    StoredObject store(byte[] content, String originalName, String contentType, String extension, String category)
+            throws Exception;
+
+    InputStream open(String objectKey) throws Exception;
+
+    void delete(String objectKey) throws Exception;
 }

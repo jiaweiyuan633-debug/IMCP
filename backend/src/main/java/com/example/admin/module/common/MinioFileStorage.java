@@ -1,49 +1,46 @@
 package com.example.admin.module.common;
 
 import cn.hutool.core.util.IdUtil;
-import com.example.admin.module.common.vo.UploadResponse;
-import com.example.admin.module.system.entity.SysFileDO;
-import com.example.admin.module.system.mapper.SysFileMapper;
-import com.example.admin.security.SecurityUtils;
-import com.example.admin.common.FileAccessService;
 import com.example.admin.common.TenantContext;
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @Service
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.storage.type", havingValue = "minio")
 public class MinioFileStorage implements FileStorage {
 
-    private final SysFileMapper fileMapper;
-    private final FileAccessService fileAccessService;
-    private final StorageQuotaService storageQuotaService;
-
-    @Value("${app.storage.minio.endpoint}")
+    @Value("${app.storage.minio.endpoint:http://localhost:9000}")
     private String endpoint;
 
-    @Value("${app.storage.minio.access-key}")
+    @Value("${app.storage.minio.access-key:minioadmin}")
     private String accessKey;
 
-    @Value("${app.storage.minio.secret-key}")
+    @Value("${app.storage.minio.secret-key:minioadmin}")
     private String secretKey;
 
-    @Value("${app.storage.minio.bucket}")
+    @Value("${app.storage.minio.bucket:admin}")
     private String bucket;
 
     @Override
-    public UploadResponse store(MultipartFile file) throws Exception {
-        storageQuotaService.check(file.getSize());
+    public String type() {
+        return "minio";
+    }
+
+    @Override
+    public StoredObject store(byte[] content, String originalName, String contentType, String extension,
+                              String category) throws Exception {
         MinioClient client = MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
@@ -51,41 +48,45 @@ public class MinioFileStorage implements FileStorage {
         if (!client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build())) {
             client.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
         }
-        String fileName = IdUtil.fastSimpleUUID() + "-" + (file.getOriginalFilename() == null ? "file" : file.getOriginalFilename());
-        try (InputStream inputStream = file.getInputStream()) {
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String fileName = IdUtil.fastSimpleUUID() + (extension.isBlank() ? "" : "." + extension);
+        String objectKey = TenantContext.getTenantId() + "/" + datePath + "/" + fileName;
+        try (InputStream inputStream = new ByteArrayInputStream(content)) {
             client.putObject(PutObjectArgs.builder()
                     .bucket(bucket)
-                    .object(fileName)
-                    .stream(inputStream, file.getSize(), -1)
-                    .contentType(file.getContentType())
+                    .object(objectKey)
+                    .stream(inputStream, content.length, -1)
+                    .contentType(contentType)
                     .build());
         }
-        String url = endpoint + "/" + bucket + "/" + fileName;
-        SysFileDO sysFile = new SysFileDO();
-        sysFile.setTenantId(TenantContext.getTenantId());
-        sysFile.setFileName(fileName);
-        sysFile.setOriginalName(file.getOriginalFilename());
-        sysFile.setUrl(url);
-        sysFile.setObjectKey(fileName);
-        sysFile.setSize(file.getSize());
-        sysFile.setStorageType("minio");
-        sysFile.setCreatedBy(SecurityUtils.tryGetUserId());
-        try {
-            fileMapper.insert(sysFile);
-        } catch (RuntimeException exception) {
-            client.removeObject(RemoveObjectArgs.builder()
-                    .bucket(bucket)
-                    .object(fileName)
-                    .build());
-            throw exception;
-        }
-        return UploadResponse.builder()
-                .url(url)
-                .name(file.getOriginalFilename())
-                .size(file.getSize())
-                .accessToken(fileAccessService.issue(url))
-                .build();
+        return new StoredObject(objectKey, type(), null);
     }
 
+    @Override
+    public InputStream open(String objectKey) throws Exception {
+        MinioClient client = client();
+        return client.getObject(GetObjectArgs.builder()
+                .bucket(bucket)
+                .object(objectKey)
+                .build());
+    }
+
+    @Override
+    public void delete(String objectKey) throws Exception {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+        client().removeObject(RemoveObjectArgs.builder()
+                .bucket(bucket)
+                .object(objectKey)
+                .build());
+    }
+
+    private MinioClient client() {
+        return MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(accessKey, secretKey)
+                .build();
+    }
 }
 

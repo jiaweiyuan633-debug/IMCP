@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -61,6 +62,7 @@ public class SystemWorkflowService {
     private final SysUserRoleMapper userRoleMapper;
     private final SysUserMapper userMapper;
     private final SystemNoticeService noticeService;
+    private final SystemMessageService messageService;
     private final ObjectMapper objectMapper;
     private final SpelExpressionParser spelParser = new SpelExpressionParser();
 
@@ -105,6 +107,7 @@ public class SystemWorkflowService {
         workflow.setTimeoutNotified(TIMEOUT_NOT_NOTIFIED);
         workflowMapper.insert(workflow);
         saveLog(workflow.getId(), "STARTED", "发起流程：" + def.getDefName());
+        notifyApprovers(startNodes, def.getDefName(), workflow.getId());
         return workflow.getId();
     }
 
@@ -186,6 +189,12 @@ public class SystemWorkflowService {
         if (next.isEmpty()) {
             finishWorkflow(workflow, WorkflowStatus.APPROVED.name());
             workflowMapper.updateById(workflow);
+            notifyUser(
+                    workflow.getApplicantId(),
+                    workflow.getTenantId(),
+                    "流程审批通过",
+                    "流程「" + workflow.getProcessName() + "」已全部审批通过。",
+                    workflow.getId());
             return;
         }
         applyCurrentNodes(workflow, next);
@@ -193,6 +202,7 @@ public class SystemWorkflowService {
         workflow.setTimeoutNotified(TIMEOUT_NOT_NOTIFIED);
         workflowMapper.updateById(workflow);
         saveLog(id, "ADVANCED", "进入下一审批环节");
+        notifyApprovers(next, workflow.getProcessName(), workflow.getId());
     }
 
     @Transactional
@@ -206,6 +216,12 @@ public class SystemWorkflowService {
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "REJECTED", remark == null ? "审批拒绝" : remark);
+        notifyUser(
+                workflow.getApplicantId(),
+                workflow.getTenantId(),
+                "流程审批拒绝",
+                "流程「" + workflow.getProcessName() + "」已被拒绝。",
+                workflow.getId());
     }
 
     @Transactional
@@ -240,6 +256,13 @@ public class SystemWorkflowService {
         workflow.setAssigneeName(target.getUsername());
         workflowMapper.updateById(workflow);
         saveLog(id, "DELEGATED", "转办给 " + target.getUsername());
+        messageService.sendTodoToUsers(
+                List.of(target.getId()),
+                workflow.getTenantId(),
+                "流程转办待办",
+                "流程「" + workflow.getProcessName() + "」已转办给您，请及时处理。",
+                "workflow",
+                workflow.getId());
     }
 
     public List<SysWorkflowLogDO> logs(Long id) {
@@ -433,6 +456,38 @@ public class SystemWorkflowService {
 
     private String joinIds(List<Long> ids) {
         return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    private void notifyApprovers(List<SysProcessNodeDO> nodes, String processName, Long workflowId) {
+        List<Long> roleIds = nodes.stream()
+                .map(SysProcessNodeDO::getApproverRoleId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (roleIds.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = userRoleMapper.selectUserIdsByRoleIds(roleIds);
+        messageService.sendTodoToUsers(
+                userIds,
+                TenantContext.getTenantId(),
+                "流程待办",
+                "您有一条流程待办：「" + processName + "」等待审批。",
+                "workflow",
+                workflowId);
+    }
+
+    private void notifyUser(Long userId, Long tenantId, String title, String content, Long workflowId) {
+        if (userId == null) {
+            return;
+        }
+        messageService.sendSystemToUsers(
+                List.of(userId),
+                tenantId,
+                title,
+                content,
+                "workflow",
+                workflowId);
     }
 
     private void finishWorkflow(SysWorkflowDO workflow, String status) {

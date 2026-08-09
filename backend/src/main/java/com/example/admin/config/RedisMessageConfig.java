@@ -1,6 +1,7 @@
 package com.example.admin.config;
 
 import com.example.admin.module.system.NoticeSseRedisListener;
+import com.example.admin.module.system.MessagePushRedisListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,12 +14,14 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 public class RedisMessageConfig {
 
     private final NoticeSseRedisListener noticeSseRedisListener;
+    private final MessagePushRedisListener messagePushRedisListener;
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(noticeSseRedisListener, new ChannelTopic("notice:sse"));
+        container.addMessageListener(messagePushRedisListener, new ChannelTopic("message:push"));
         return container;
     }
 }

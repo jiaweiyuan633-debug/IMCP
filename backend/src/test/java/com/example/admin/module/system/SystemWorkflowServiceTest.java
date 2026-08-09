@@ -55,6 +55,9 @@ class SystemWorkflowServiceTest {
     private SystemNoticeService noticeService;
 
     @Mock
+    private SystemMessageService messageService;
+
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks

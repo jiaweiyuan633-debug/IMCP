@@ -34,5 +34,17 @@ public interface SysUserRoleMapper {
             """)
     @InterceptorIgnore(tenantLine = "true")
     List<Map<String, Object>> selectByUserIds(@Param("userIds") Collection<Long> userIds);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            <script>
+            SELECT DISTINCT user_id FROM sys_user_role
+            WHERE role_id IN
+            <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+                #{roleId}
+            </foreach>
+            </script>
+            """)
+    List<Long> selectUserIdsByRoleIds(@Param("roleIds") Collection<Long> roleIds);
 }
 

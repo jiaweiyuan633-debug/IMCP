@@ -60,6 +60,8 @@ public class SecurityConfig {
                                 "/api/auth/login-config",
                                 "/api/ai/callback/**",
                                 "/uploads/**",
+                                "/files/**",
+                                "/ws/**",
                                 "/actuator/health/**",
                                 "/actuator/prometheus",
                                 "/doc.html",

@@ -1,6 +1,6 @@
 package com.example.admin.module.common;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
@@ -10,8 +10,6 @@ import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.module.system.mapper.SysTenantMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,17 +21,42 @@ public class StorageQuotaService {
     private final SysTenantMapper tenantMapper;
 
     public void check(long size) {
-        Long tenantId = TenantContext.getTenantId();
-        SysTenantDO tenant = tenantMapper.selectById(tenantId);
-        if (tenant == null || tenant.getStorageLimitMb() == null) {
+        StorageQuotaVo quota = usage();
+        if (quota.getLimitBytes() == null || quota.getUsedBytes() + size <= quota.getLimitBytes()) {
             return;
         }
-        List<SysFileDO> files = fileMapper.selectList(new LambdaQueryWrapper<SysFileDO>()
-                .eq(SysFileDO::getTenantId, tenantId));
-        long used = files.stream().mapToLong(SysFileDO::getSize).sum();
-        long limit = tenant.getStorageLimitMb() * BYTES_PER_MB;
-        if (used + size > limit) {
-            throw new BusinessException(ResultCode.STORAGE_LIMIT_EXCEEDED);
+        throw new BusinessException(ResultCode.STORAGE_LIMIT_EXCEEDED);
+    }
+
+    public StorageQuotaVo usage() {
+        Long tenantId = TenantContext.getTenantId();
+        SysTenantDO tenant = tenantId == null ? null : tenantMapper.selectById(tenantId);
+        long used = usedBytes(tenantId);
+        if (tenant == null || tenant.getStorageLimitMb() == null) {
+            return StorageQuotaVo.builder()
+                    .usedBytes(used)
+                    .limitBytes(null)
+                    .percent(null)
+                    .unlimited(true)
+                    .build();
         }
+        long limit = tenant.getStorageLimitMb() * BYTES_PER_MB;
+        int percent = limit == 0 ? 0 : (int) Math.min(100, used * 100 / limit);
+        return StorageQuotaVo.builder()
+                .usedBytes(used)
+                .limitBytes(limit)
+                .percent(percent)
+                .unlimited(false)
+                .build();
+    }
+
+    private long usedBytes(Long tenantId) {
+        if (tenantId == null) {
+            return 0L;
+        }
+        Object value = fileMapper.selectObjs(new QueryWrapper<SysFileDO>()
+                .select("COALESCE(SUM(size), 0)")
+                .eq("tenant_id", tenantId)).stream().findFirst().orElse(null);
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 }

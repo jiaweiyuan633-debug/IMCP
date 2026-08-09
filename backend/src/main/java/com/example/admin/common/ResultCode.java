@@ -34,6 +34,8 @@ public enum ResultCode {
     WORKFLOW_FINISHED(1023, "当前流程已结束"),
     WORKFLOW_DEF_INVALID(1024, "流程定义不可用"),
     WORKFLOW_NO_START_NODE(1025, "流程定义没有可进入的起始节点"),
+    FILE_SCAN_BLOCKED(1026, "文件未通过安全检查"),
+    FILE_SCAN_ERROR(1027, "病毒扫描服务不可用"),
     UNAUTHORIZED(401, "未登录或登录已过期"),
     FORBIDDEN(403, "无权限访问"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");

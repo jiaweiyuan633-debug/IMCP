@@ -2,7 +2,6 @@ package com.example.admin.module.common;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.TenantContext;
-import com.example.admin.module.system.entity.SysFileDO;
 import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.module.system.mapper.SysTenantMapper;
@@ -44,9 +43,7 @@ class StorageQuotaServiceTest {
         tenant.setStorageLimitMb(1L);
         when(tenantMapper.selectById(1L)).thenReturn(tenant);
 
-        SysFileDO file = new SysFileDO();
-        file.setSize(2L * 1024 * 1024);
-        when(fileMapper.selectList(any())).thenReturn(List.of(file));
+        when(fileMapper.selectObjs(any())).thenReturn(List.of(2L * 1024 * 1024));
 
         assertThrows(BusinessException.class, () -> storageQuotaService.check(1));
     }

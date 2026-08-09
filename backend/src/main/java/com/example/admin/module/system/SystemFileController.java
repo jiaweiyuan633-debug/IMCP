@@ -27,8 +27,9 @@ public class SystemFileController {
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String fileName,
             @RequestParam(required = false) String originalName,
+            @RequestParam(required = false) String category,
             @RequestParam(required = false) String storageType) {
-        return Result.success(fileService.page(pageNum, pageSize, fileName, originalName, storageType));
+        return Result.success(fileService.page(pageNum, pageSize, fileName, originalName, category, storageType));
     }
 
     @DeleteMapping("/{id}")

@@ -20,10 +20,19 @@ public class SysFileDO {
     private String url;
     private String objectKey;
     private Long size;
+    private String contentType;
+    private String category;
+    private String sha256;
+    private String scanStatus;
+    private String scanMessage;
     private String storageType;
     private Long createdBy;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Integer deleted;
     @TableField(exist = false)
     private String accessToken;
+    @TableField(exist = false)
+    private String contentUrl;
 }
 

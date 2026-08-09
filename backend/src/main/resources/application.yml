@@ -66,6 +66,13 @@ app:
       access-key: ${MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${MINIO_SECRET_KEY:minioadmin}
       bucket: ${MINIO_BUCKET:admin}
+    scan:
+      enabled: ${FILE_SCAN_ENABLED:false}
+      fail-open: ${FILE_SCAN_FAIL_OPEN:false}
+      clamav:
+        host: ${CLAMAV_HOST:localhost}
+        port: ${CLAMAV_PORT:3310}
+        timeout-seconds: ${CLAMAV_TIMEOUT_SECONDS:10}
   totp:
     encryption-key: ${TOTP_ENCRYPTION_KEY:${JWT_SECRET:admin-scaffold-jwt-secret-key-2026-change-me-in-production}}
   sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}

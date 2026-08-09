@@ -97,15 +97,15 @@
               </a-button>
             </a-badge>
             <template #overlay>
-              <a-menu class="notice-menu" @click="onNoticeClick">
-                <a-menu-item v-for="notice in latestNotices" :key="`notice-${notice.id}`">
+              <a-menu class="notice-menu" @click="onMessageClick">
+                <a-menu-item v-for="item in latestMessages" :key="`message-${item.id}`">
                   <div class="notice-item">
-                    <span class="notice-title">{{ notice.noticeTitle }}</span>
-                    <span class="notice-time">{{ formatTime(notice.createdAt) }}</span>
+                    <span class="notice-title">{{ item.title }}</span>
+                    <span class="notice-time">{{ formatTime(item.createdAt) }}</span>
                   </div>
                 </a-menu-item>
-                <a-menu-item v-if="latestNotices.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
-                <a-menu-divider v-if="latestNotices.length > 0" />
+                <a-menu-item v-if="latestMessages.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
+                <a-menu-divider v-if="latestMessages.length > 0" />
                 <a-menu-item key="mark-all">{{ t('page.noticeMarkAllRead') }}</a-menu-item>
                 <a-menu-item key="view-all">{{ t('page.noticeViewAll') }}</a-menu-item>
               </a-menu>
@@ -193,8 +193,16 @@ import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getLatestNotices, getNoticeSseTicket, getUnreadNoticeCount, markAllNoticeRead, markNoticeRead } from '@/api/system'
-import type { NoticeVo } from '@/api/system'
+import { getAccessToken } from '@/utils/auth'
+import {
+  getLatestMessages,
+  getNoticeSseTicket,
+  getUnreadMessageCount,
+  getUnreadNoticeCount,
+  markAllMessageRead,
+  markMessageRead,
+} from '@/api/system'
+import type { MessageVo } from '@/api/system'
 import { API_BASE_URL } from '@/utils/env'
 import dayjs from 'dayjs'
 import GlobalSearch from '@/components/GlobalSearch.vue'
@@ -205,9 +213,10 @@ const appStore = useAppStore()
 const permissionStore = usePermissionStore()
 const userStore = useUserStore()
 const { t, locale } = useI18n()
-const latestNotices = ref<NoticeVo[]>([])
+const latestMessages = ref<MessageVo[]>([])
 const unreadCount = ref(0)
 let noticeStream: EventSource | null = null
+let messageSocket: WebSocket | null = null
 const mobileDrawer = ref(false)
 const isMobile = ref(false)
 const offline = ref(false)
@@ -232,9 +241,10 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('offline', onOffline)
   window.addEventListener('online', onOnline)
-  latestNotices.value = await getLatestNotices()
-  unreadCount.value = await getUnreadNoticeCount()
+  latestMessages.value = await getLatestMessages()
+  unreadCount.value = await getUnreadTotal()
   startNoticeStream()
+  startMessageSocket()
 })
 
 onUnmounted(() => {
@@ -243,6 +253,8 @@ onUnmounted(() => {
   window.removeEventListener('online', onOnline)
   noticeStream?.close()
   noticeStream = null
+  messageSocket?.close()
+  messageSocket = null
 })
 
 const iconMap: Record<string, Component> = {
@@ -357,25 +369,33 @@ function formatTime(value?: string): string {
   return value ? dayjs(value).format('MM-DD HH:mm') : ''
 }
 
-async function onNoticeClick({ key }: { key: string | number }) {
+async function onMessageClick({ key }: { key: string | number }) {
   const value = String(key)
-  if (value.startsWith('notice-')) {
-    const id = Number(value.replace('notice-', ''))
-    await markNoticeRead(id)
+  if (value.startsWith('message-')) {
+    const id = Number(value.replace('message-', ''))
+    await markMessageRead(id)
     unreadCount.value = Math.max(unreadCount.value - 1, 0)
-    latestNotices.value = await getLatestNotices()
-    router.push('/system/notice')
+    latestMessages.value = await getLatestMessages()
+    router.push('/system/message')
     return
   }
   if (value === 'mark-all') {
-    await markAllNoticeRead()
+    await markAllMessageRead()
     unreadCount.value = 0
-    latestNotices.value = await getLatestNotices()
+    latestMessages.value = await getLatestMessages()
     return
   }
   if (value === 'view-all') {
-    router.push('/system/notice')
+    router.push('/system/message')
   }
+}
+
+async function getUnreadTotal(): Promise<number> {
+  const [notices, messages] = await Promise.all([
+    getUnreadNoticeCount(),
+    getUnreadMessageCount(),
+  ])
+  return notices + messages
 }
 
 function startNoticeStream() {
@@ -386,8 +406,8 @@ function startNoticeStream() {
     .then((ticket) => {
       const source = new EventSource(`${API_BASE_URL}/system/notice/stream?ticket=${encodeURIComponent(ticket)}`)
       source.addEventListener('notice', async () => {
-        latestNotices.value = await getLatestNotices()
-        unreadCount.value = await getUnreadNoticeCount()
+        latestMessages.value = await getLatestMessages()
+        unreadCount.value = await getUnreadTotal()
       })
       source.onerror = () => {
         source.close()
@@ -398,6 +418,31 @@ function startNoticeStream() {
     .catch(() => {
       noticeStream = null
     })
+}
+
+function startMessageSocket() {
+  const token = getAccessToken()
+  if (!token) {
+    return
+  }
+  try {
+    const wsBase = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
+    const socket = new WebSocket(`${wsBase}/ws/messages?token=${encodeURIComponent(token)}`)
+    socket.onmessage = async () => {
+      latestMessages.value = await getLatestMessages()
+      unreadCount.value = await getUnreadTotal()
+    }
+    socket.onclose = () => {
+      messageSocket = null
+    }
+    socket.onerror = () => {
+      socket.close()
+      messageSocket = null
+    }
+    messageSocket = socket
+  } catch {
+    messageSocket = null
+  }
 }
 </script>
 
