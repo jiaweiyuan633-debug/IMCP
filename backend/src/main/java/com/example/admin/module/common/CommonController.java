@@ -24,10 +24,10 @@ public class CommonController {
     private static final Set<String> ALLOWED_EXTENSIONS =
             Set.of("jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip");
 
-    private final FileStorageService fileStorageService;
+    private final FileStorage fileStorage;
 
     @PostMapping("/upload")
-    public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
+    public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws Exception {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
         }
@@ -46,7 +46,7 @@ public class CommonController {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容与扩展名不匹配");
         }
 
-        return Result.success(fileStorageService.store(file));
+        return Result.success(fileStorage.store(file));
     }
 
     private boolean isAllowedContent(byte[] head, String extension) {

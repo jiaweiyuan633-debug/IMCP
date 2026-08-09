@@ -17,6 +17,8 @@ import com.example.admin.module.system.mapper.SysOperLogMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.security.TokenService;
+import com.example.admin.module.system.DataScopeHelper;
+import com.example.admin.module.system.entity.SysUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -36,12 +38,14 @@ public class MonitorService {
     private final SysMenuMapper menuMapper;
     private final TokenService tokenService;
     private final JdbcTemplate jdbcTemplate;
+    private final DataScopeHelper dataScopeHelper;
 
     public PageResult<SysLoginLog> loginLogPage(long pageNum, long pageSize, String username) {
         Page<SysLoginLog> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<SysLoginLog> wrapper = new LambdaQueryWrapper<SysLoginLog>()
                 .like(StringUtils.hasText(username), SysLoginLog::getUsername, username)
                 .orderByDesc(SysLoginLog::getId);
+        applyLoginLogScope(wrapper);
         IPage<SysLoginLog> result = loginLogMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
@@ -51,6 +55,7 @@ public class MonitorService {
         LambdaQueryWrapper<SysOperLog> wrapper = new LambdaQueryWrapper<SysOperLog>()
                 .like(StringUtils.hasText(module), SysOperLog::getModule, module)
                 .orderByDesc(SysOperLog::getId);
+        applyUserIdScope(wrapper, SysOperLog::getUserId);
         IPage<SysOperLog> result = operLogMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
@@ -96,6 +101,35 @@ public class MonitorService {
             return number.longValue();
         }
         return Long.parseLong(value.toString());
+    }
+
+    private void applyLoginLogScope(LambdaQueryWrapper<SysLoginLog> wrapper) {
+        if (dataScopeHelper.isAdmin()) {
+            return;
+        }
+        List<Long> userIds = dataScopeHelper.allowedUserIds();
+        if (userIds == null) {
+            return;
+        }
+        List<String> usernames = userMapper.selectBatchIds(userIds).stream()
+                .map(SysUser::getUsername)
+                .toList();
+        wrapper.in(SysLoginLog::getUsername, usernames);
+    }
+
+    private void applyUserIdScope(LambdaQueryWrapper<SysOperLog> wrapper, com.baomidou.mybatisplus.core.toolkit.support.SFunction<SysOperLog, ?> column) {
+        if (dataScopeHelper.isAdmin()) {
+            return;
+        }
+        List<Long> userIds = dataScopeHelper.allowedUserIds();
+        if (userIds == null) {
+            return;
+        }
+        if (userIds.size() == 1) {
+            wrapper.eq(column, userIds.get(0));
+        } else {
+            wrapper.in(column, userIds);
+        }
     }
 }
 

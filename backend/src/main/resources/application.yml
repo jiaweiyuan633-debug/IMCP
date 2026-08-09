@@ -53,6 +53,13 @@ app:
   callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
   ai-base-url: ${AI_BASE_URL:}
   upload-path: ${UPLOAD_PATH:uploads}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin}
+      bucket: ${MINIO_BUCKET:admin}
   sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
