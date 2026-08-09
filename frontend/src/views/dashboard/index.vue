@@ -26,12 +26,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
+import { useQuery } from '@tanstack/vue-query'
 import { getDashboardStats } from '@/api/monitor'
 import type { DashboardStatsVo } from '@/api/monitor'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
-const stats = ref<DashboardStatsVo | null>(null)
+const { data: stats } = useQuery({
+  queryKey: ['dashboard-stats'],
+  queryFn: getDashboardStats,
+})
 const pieRef = ref<HTMLDivElement>()
 const barRef = ref<HTMLDivElement>()
 let pieChart: echarts.ECharts | null = null
@@ -100,11 +104,12 @@ function resize() {
   barChart?.resize()
 }
 
-onMounted(async () => {
-  stats.value = await getDashboardStats()
+onMounted(() => {
   renderCharts()
   window.addEventListener('resize', resize)
 })
+
+watch(stats, () => renderCharts())
 
 watch(() => appStore.darkTheme, renderCharts)
 

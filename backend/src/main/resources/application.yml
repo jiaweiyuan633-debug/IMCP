@@ -13,6 +13,13 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org.quartz.scheduler.instanceName: adminScheduler
+      org.quartz.jobStore.isClustered: false
 
 management:
   endpoints:
