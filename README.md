@@ -18,7 +18,7 @@
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式、PWA 离线缓存
 - 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
-- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、覆盖率门槛、Playwright E2E、CodeQL，冒烟与压测脚本
+- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、覆盖率门槛、CodeQL，冒烟与压测脚本
 
 ## 扩展进度
 
@@ -55,7 +55,7 @@
 | 官网 | Vue 3、Vite 7、lucide-vue-next |
 | Java 后端 | Spring Boot 3.3、Spring Security 6、MyBatis-Plus、Flyway、Quartz、Redis、JWT、EasyExcel、MinIO、Micrometer、Knife4j |
 | AI 服务 | FastAPI、Redis、httpx、pytest、Prometheus Client |
-| 基础设施 | MySQL 8、Redis 7、Docker Compose、Kubernetes、Helm |
+| 基础设施 | MySQL 8、Redis 7、Kubernetes、Helm |
 
 ## 仓库结构
 
@@ -65,7 +65,6 @@ website/     Y15智能管理平台官网
 backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V32）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
-docker/      Docker Compose、Nginx 与各端 Dockerfile
 k8s/         Kubernetes 清单与 Helm Chart
 scripts/     启动、停止、冒烟、备份、恢复、压测、OpenAPI 脚本
 ```
@@ -96,15 +95,6 @@ cd website && pnpm install && pnpm dev --port 5174
 - 后端接口文档：http://localhost:8080/doc.html
 
 MySQL/Redis 启动后，后端通过 Flyway 自动完成建表与基础数据初始化。
-
-## Docker Compose
-
-```bash
-cd docker
-docker compose up -d --build
-```
-
-Compose 编排 MySQL、Redis、Java 后端、AI 服务、管理端、官网六个服务。可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT`、`WEBSITE_PORT` 覆盖主机端口，配置示例见 [docker/.env.example](docker/.env.example)。
 
 ## Kubernetes 与 Helm
 

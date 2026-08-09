@@ -24,14 +24,7 @@ scripts/load-test-multi.ps1
 - 后端指标：`/actuator/prometheus`
 - 健康检查：`/actuator/health`
 - AI 指标：`/api/v1/metrics`
-- 启用可观测性：
-
-```bash
-cd docker
-docker compose -f docker-compose.yml -f observability.yml up -d
-```
-
-- Grafana 默认地址：`http://localhost:3000`
+- Prometheus/Grafana 按部署环境配置，Grafana 默认地址：`http://localhost:3000`
 
 ## 常见问题
 

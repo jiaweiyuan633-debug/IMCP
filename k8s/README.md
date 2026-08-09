@@ -53,7 +53,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 - 日志采集到 Loki/ELK，指标接入 Prometheus + Grafana
 - 定期执行 `scripts/backup.ps1` 并演练恢复
 
-官网 `website/` 当前通过 Docker 独立交付；需要 K8s 部署时，可参照 `frontend` 的 Deployment/Service/Ingress 模板扩展。
+官网 `website/` 如需 K8s 部署，可参照 `frontend` 的 Deployment/Service/Ingress 模板扩展。
 
 后端数据库迁移由 Flyway V1-V29 自动执行，发布前确认迁移脚本与镜像版本一致。
 

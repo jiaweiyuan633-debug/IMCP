@@ -246,7 +246,7 @@ const solutions = [
     index: '03',
     title: '服务商交付',
     desc: '开放接口与文档齐全，适合作为 Vibe Coding 和二次开发脚手架。',
-    items: ['OpenAPI 契约', 'Docker/Helm 交付', '冒烟与压测脚本'],
+    items: ['OpenAPI 契约', 'Helm 交付', '冒烟与压测脚本'],
   },
 ]
 

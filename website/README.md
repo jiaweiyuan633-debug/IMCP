@@ -16,7 +16,7 @@ pnpm dev --port 5174
 pnpm build
 ```
 
-构建产物输出到 `website/dist/`，Docker 镜像通过 `docker/Dockerfile.website` 构建，Nginx 配置见 `docker/nginx-website.conf`。
+构建产物输出到 `website/dist/`，可直接由任意静态服务器托管。
 
 ## 页面结构
 
