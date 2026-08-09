@@ -56,7 +56,7 @@
             </template>
           </a-dropdown>
           <a-dropdown>
-            <a-badge :count="latestNotices.length">
+            <a-badge :count="unreadCount">
               <a-button type="text">
                 <BellOutlined />
               </a-button>
@@ -108,20 +108,30 @@
 <script setup lang="ts">
 import {
   ApiOutlined,
+  ApartmentOutlined,
   BarChartOutlined,
   BellOutlined,
+  BookOutlined,
   BulbFilled,
   BulbOutlined,
   CarryOutOutlined,
+  ClusterOutlined,
+  CodeOutlined,
+  ControlOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  DeploymentUnitOutlined,
+  FieldTimeOutlined,
   FileTextOutlined,
+  FundOutlined,
   GlobalOutlined,
   HistoryOutlined,
+  IdcardOutlined,
   MenuFoldOutlined,
   MenuOutlined,
   MenuUnfoldOutlined,
   MonitorOutlined,
+  NotificationOutlined,
   RobotOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -138,7 +148,7 @@ import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, ref } from 'vue'
-import { getLatestNotices } from '@/api/system'
+import { getLatestNotices, getUnreadNoticeCount } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
 
 const route = useRoute()
@@ -148,21 +158,33 @@ const permissionStore = usePermissionStore()
 const userStore = useUserStore()
 const { t, locale } = useI18n()
 const latestNotices = ref<NoticeVo[]>([])
+const unreadCount = ref(0)
 
 onMounted(async () => {
   latestNotices.value = await getLatestNotices()
+  unreadCount.value = await getUnreadNoticeCount()
 })
 
 const iconMap: Record<string, Component> = {
   ApiOutlined,
+  ApartmentOutlined,
   BarChartOutlined,
+  BookOutlined,
   CarryOutOutlined,
+  ClusterOutlined,
+  CodeOutlined,
+  ControlOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  DeploymentUnitOutlined,
+  FieldTimeOutlined,
   FileTextOutlined,
+  FundOutlined,
   HistoryOutlined,
+  IdcardOutlined,
   MenuOutlined,
   MonitorOutlined,
+  NotificationOutlined,
   RobotOutlined,
   SettingOutlined,
   TeamOutlined,

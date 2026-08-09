@@ -5,6 +5,7 @@ import com.example.admin.module.auth.vo.CaptchaResponse;
 import com.example.admin.module.auth.vo.LoginConfigVo;
 import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
+import com.example.admin.module.auth.dto.ProfileUpdateRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.UserInfoVo;
@@ -60,6 +61,12 @@ public class AuthController {
     @PutMapping("/password")
     public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(request);
+        return Result.success();
+    }
+
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
+        authService.updateProfile(request);
         return Result.success();
     }
 }

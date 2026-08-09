@@ -332,6 +332,14 @@ export function getLatestNotices(limit = 5): Promise<NoticeVo[]> {
   return request.get('/system/notice/latest', { params: { limit } })
 }
 
+export function getUnreadNoticeCount(): Promise<number> {
+  return request.get('/system/notice/unread-count')
+}
+
+export function markNoticeRead(id: number): Promise<void> {
+  return request.put(`/system/notice/read/${id}`)
+}
+
 export function createNotice(data: Record<string, unknown>): Promise<number> {
   return request.post('/system/notice', data)
 }

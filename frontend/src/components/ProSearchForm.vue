@@ -19,8 +19,8 @@
     </a-form-item>
     <a-form-item>
       <a-space>
-        <a-button type="primary" :loading="loading" @click="emit('search', model)">查询</a-button>
-        <a-button @click="reset">重置</a-button>
+        <a-button type="primary" :loading="loading" @click="emit('search', model)">{{ t('common.search') }}</a-button>
+        <a-button @click="reset">{{ t('common.reset') }}</a-button>
       </a-space>
     </a-form-item>
   </a-form>
@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   fields: SearchField[]
@@ -39,6 +40,8 @@ const emit = defineEmits<{
   search: [model: Record<string, unknown>]
   reset: []
 }>()
+
+const { t } = useI18n()
 
 const model = reactive<Record<string, unknown>>({})
 

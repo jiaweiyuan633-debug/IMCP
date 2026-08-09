@@ -2,9 +2,15 @@
   <a-row :gutter="16">
     <a-col :xs="24" :lg="10">
       <a-card title="个人信息">
+        <FileUpload v-model:value="profileForm.avatar" />
+        <a-form layout="vertical" :model="profileForm" style="margin-top: 16px">
+          <a-form-item label="昵称"><a-input v-model:value="profileForm.nickname" /></a-form-item>
+          <a-form-item label="邮箱"><a-input v-model:value="profileForm.email" /></a-form-item>
+          <a-form-item label="手机号"><a-input v-model:value="profileForm.phone" /></a-form-item>
+          <a-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</a-button>
+        </a-form>
         <a-descriptions :column="1" bordered>
           <a-descriptions-item label="账号">{{ userStore.userInfo?.username }}</a-descriptions-item>
-          <a-descriptions-item label="昵称">{{ userStore.userInfo?.nickname || '-' }}</a-descriptions-item>
           <a-descriptions-item label="角色">{{ rolesText }}</a-descriptions-item>
         </a-descriptions>
       </a-card>
@@ -40,13 +46,29 @@
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
+import FileUpload from '@/components/FileUpload.vue'
+import { updateProfile } from '@/api/auth'
 
 const userStore = useUserStore()
 const loading = ref(false)
+const savingProfile = ref(false)
 const form = reactive({
   oldPassword: '',
   newPassword: '',
 })
+const profileForm = reactive({
+  nickname: '',
+  avatar: '',
+  email: '',
+  phone: '',
+})
+
+if (userStore.userInfo) {
+  profileForm.nickname = userStore.userInfo.nickname || ''
+  profileForm.avatar = userStore.userInfo.avatar || ''
+  profileForm.email = ''
+  profileForm.phone = ''
+}
 
 const rolesText = computed(() => (userStore.userInfo?.roles || []).join(', ') || '-')
 
@@ -61,6 +83,17 @@ async function onSubmit() {
     // error message handled by request layer
   } finally {
     loading.value = false
+  }
+}
+
+async function saveProfile() {
+  savingProfile.value = true
+  try {
+    await updateProfile(profileForm)
+    await userStore.fetchMe()
+    message.success('资料已保存')
+  } finally {
+    savingProfile.value = false
   }
 }
 </script>

@@ -52,9 +52,17 @@ public class SysJobSchedulerService {
                     .withIdentity(jobKey)
                     .usingJobData(dataMap)
                     .build();
+            CronScheduleBuilder cronSchedule = CronScheduleBuilder.cronSchedule(job.getCronExpression());
+            if ("2".equals(job.getMisfirePolicy())) {
+                cronSchedule.withMisfireHandlingInstructionFireAndProceed();
+            } else if ("3".equals(job.getMisfirePolicy())) {
+                cronSchedule.withMisfireHandlingInstructionIgnoreMisfires();
+            } else {
+                cronSchedule.withMisfireHandlingInstructionDoNothing();
+            }
             CronTrigger trigger = TriggerBuilder.newTrigger()
                     .withIdentity(jobKey.getName() + "-trigger", job.getJobGroup())
-                    .withSchedule(CronScheduleBuilder.cronSchedule(job.getCronExpression()))
+                    .withSchedule(cronSchedule)
                     .build();
             scheduler.scheduleJob(jobDetail, trigger);
         } catch (Exception exception) {
