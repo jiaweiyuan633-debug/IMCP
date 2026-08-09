@@ -118,4 +118,5 @@ GitOps 交付见 [gitops/README.md](gitops/README.md)。
 - 演示与答辩材料：`docs/demo-outline.md`
 - 架构说明：`docs/architecture.md`
 - 运维手册：`docs/runbook.md`
+- 阿里规约合规说明：`docs/alibaba-compliance.md`
 

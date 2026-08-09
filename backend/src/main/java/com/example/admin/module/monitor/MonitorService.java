@@ -11,6 +11,7 @@ import com.example.admin.module.system.entity.SysMenu;
 import com.example.admin.module.system.entity.SysOperLog;
 import com.example.admin.module.system.entity.SysRole;
 import com.example.admin.module.ai.entity.AiTask;
+import com.example.admin.module.ai.AiTaskStatus;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
 import com.example.admin.module.system.mapper.SysMenuMapper;
@@ -79,7 +80,10 @@ public class MonitorService {
         long aiFailed = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
                 .eq(AiTask::getStatus, "FAILED"));
         long aiRunning = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .in(AiTask::getStatus, "PENDING", "QUEUED", "RUNNING"));
+                .in(AiTask::getStatus,
+                        AiTaskStatus.PENDING.name(),
+                        AiTaskStatus.QUEUED.name(),
+                        AiTaskStatus.RUNNING.name()));
         return DashboardStatsVo.builder()
                 .userCount(userMapper.selectCount(null))
                 .roleCount(roleMapper.selectCount(null))

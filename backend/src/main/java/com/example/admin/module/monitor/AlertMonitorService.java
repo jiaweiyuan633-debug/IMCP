@@ -91,7 +91,7 @@ public class AlertMonitorService {
             return;
         }
         try {
-            Map<String, Object> payload = new HashMap<>();
+            Map<String, Object> payload = new HashMap<>(8);
             payload.put("ruleName", rule.getRuleName());
             payload.put("metric", rule.getMetric());
             payload.put("severity", severity);

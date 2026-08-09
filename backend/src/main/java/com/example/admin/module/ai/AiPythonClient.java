@@ -28,7 +28,7 @@ public class AiPythonClient {
             String bizType,
             Map<String, Object> params,
             String callbackUrl) {
-        Map<String, Object> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>(8);
         body.put("task_no", taskNo);
         body.put("biz_type", bizType);
         body.put("params", params == null ? Map.of() : params);

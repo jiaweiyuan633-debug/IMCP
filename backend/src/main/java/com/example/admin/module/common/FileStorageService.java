@@ -1,6 +1,5 @@
 package com.example.admin.module.common;
 
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.IdUtil;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
@@ -26,7 +25,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
@@ -46,7 +46,7 @@ public class FileStorageService implements FileStorage {
         String extension = originalName.contains(".")
                 ? originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase()
                 : "";
-        String datePath = DateUtil.format(new Date(), "yyyy/MM/dd");
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String fileName = IdUtil.fastSimpleUUID() + "." + extension;
         Path dir = Paths.get(uploadPath, datePath);
         Files.createDirectories(dir);

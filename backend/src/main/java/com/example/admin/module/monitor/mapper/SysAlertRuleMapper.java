@@ -12,6 +12,11 @@ import java.util.List;
 public interface SysAlertRuleMapper extends BaseMapper<SysAlertRule> {
 
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM sys_alert_rule WHERE enabled = 1")
+    @Select("""
+            SELECT id, tenant_id, rule_name, metric, operator, threshold, enabled,
+                   severity, silence_minutes, webhook_url, remark,
+                   created_by, created_at, updated_at, updated_by, version
+            FROM sys_alert_rule WHERE enabled = 1
+            """)
     List<SysAlertRule> selectAllEnabledIgnoreTenant();
 }
