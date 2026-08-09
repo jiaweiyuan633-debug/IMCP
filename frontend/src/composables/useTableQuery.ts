@@ -17,7 +17,7 @@ export type TableQueryFetcher<T, P extends Record<string, unknown>> = (
   params: P & { pageNum: number; pageSize: number },
 ) => Promise<PageResult<T>>
 
-export interface UseTableQueryOptions<T, P extends Record<string, unknown>> {
+export interface UseTableQueryOptions<P extends Record<string, unknown>> {
   pageNum?: number
   pageSize?: number
   /** 默认 true，在 onMounted 时自动加载 */
@@ -28,7 +28,7 @@ export interface UseTableQueryOptions<T, P extends Record<string, unknown>> {
 
 export function useTableQuery<T, P extends Record<string, unknown> = Record<string, unknown>>(
   fetcher: TableQueryFetcher<T, P>,
-  options: UseTableQueryOptions<T, P> = {},
+  options: UseTableQueryOptions<P> = {},
 ) {
   const pageNum = ref(options.pageNum ?? 1)
   const pageSize = ref(options.pageSize ?? 10)

@@ -1,6 +1,11 @@
 <template>
   <a-card :title="t('page.monitorSqlTitle')">
-    <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
+    <ProSearchForm
+      :fields="searchFields"
+      :loading="loading"
+      @search="onSearch"
+      @reset="onReset"
+    />
     <ProTable
       v-model:page-num="pageNum"
       v-model:page-size="pageSize"
