@@ -1,0 +1,67 @@
+package com.example.admin.module.system;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.PageResult;
+import com.example.admin.common.ResultCode;
+import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.module.system.mapper.SysNoticeMapper;
+import com.example.admin.security.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class SystemNoticeService {
+
+    private final SysNoticeMapper noticeMapper;
+
+    public PageResult<SysNotice> page(long pageNum, long pageSize, String title, Integer type) {
+        Page<SysNotice> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysNotice> wrapper = new LambdaQueryWrapper<SysNotice>()
+                .like(StringUtils.hasText(title), SysNotice::getNoticeTitle, title)
+                .eq(type != null, SysNotice::getNoticeType, type)
+                .orderByDesc(SysNotice::getId);
+        IPage<SysNotice> result = noticeMapper.selectPage(page, wrapper);
+        return PageResult.of(result, result.getRecords());
+    }
+
+    public List<SysNotice> latest(int limit) {
+        return noticeMapper.selectList(new LambdaQueryWrapper<SysNotice>()
+                .eq(SysNotice::getStatus, 1)
+                .orderByDesc(SysNotice::getId)
+                .last("LIMIT " + Math.min(Math.max(limit, 1), 20)));
+    }
+
+    public Long create(SysNotice notice) {
+        notice.setId(null);
+        notice.setCreatedBy(tryGetUserId());
+        noticeMapper.insert(notice);
+        return notice.getId();
+    }
+
+    public void update(SysNotice notice) {
+        if (notice.getId() == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "公告 ID 不能为空");
+        }
+        noticeMapper.updateById(notice);
+    }
+
+    public void delete(Long id) {
+        noticeMapper.deleteById(id);
+    }
+
+    private Long tryGetUserId() {
+        try {
+            return SecurityUtils.getUserId();
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+}
+

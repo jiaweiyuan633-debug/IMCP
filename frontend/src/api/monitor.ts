@@ -115,4 +115,28 @@ export function getJobLogPage(params: Record<string, unknown>): Promise<PageResu
   return request.get('/monitor/job/log', { params })
 }
 
+export interface ServerMonitorVo {
+  osName: string
+  osArch: string
+  hostName: string
+  cpuCores: number
+  cpuLoad: number
+  memTotal: number
+  memUsed: number
+  memUsagePercent: number
+  jvmMax: number
+  jvmUsed: number
+  jvmUsagePercent: number
+  uptimeSeconds: number
+  disks: { name: string; total: number; used: number; usagePercent: number }[]
+}
+
+export function getServerMonitor(): Promise<ServerMonitorVo> {
+  return request.get('/monitor/server')
+}
+
+export function getSqlLogPage(params: Record<string, unknown>): Promise<PageResult<unknown>> {
+  return request.get('/monitor/sql-log', { params })
+}
+
 

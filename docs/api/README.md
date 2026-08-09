@@ -48,6 +48,7 @@
 | GET/POST/PUT/DELETE | `/api/system/config` | 参数配置 |
 | GET/POST | `/api/system/user/export`、`/api/system/user/import` | 用户 Excel 导入导出 |
 | POST | `/api/common/upload` | 文件上传 |
+| GET/POST/PUT/DELETE | `/api/system/notice`、`/api/system/notice/latest` | 通知公告 |
 
 ## 监控接口
 
@@ -60,6 +61,8 @@
 | GET | `/api/monitor/stats` | 看板统计 |
 | GET/POST/PUT/DELETE | `/api/monitor/job`、`/api/monitor/job/{id}` | 定时任务管理 |
 | GET | `/api/monitor/job/log` | 定时任务日志 |
+| GET | `/api/monitor/server` | 服务器监控 |
+| GET | `/api/monitor/sql-log` | SQL 监控 |
 
 ## AI 接口
 

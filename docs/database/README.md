@@ -26,6 +26,8 @@ backend/src/main/resources/db/migration/
 | `sys_job` | 定时任务 |
 | `sys_job_log` | 定时任务日志 |
 | `sys_role_dept` | 角色数据权限部门关联 |
+| `sys_sql_log` | SQL 监控日志 |
+| `sys_notice` | 通知公告 |
 | `ai_service_config` | AI 服务配置 |
 | `ai_task` | AI 任务 |
 | `ai_task_result` | AI 任务结果 |

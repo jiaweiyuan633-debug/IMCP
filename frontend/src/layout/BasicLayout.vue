@@ -3,7 +3,7 @@
     <a-layout-sider v-model:collapsed="appStore.collapsed" :width="220" theme="dark" collapsible :trigger="null">
       <div class="app-logo">
         <ApiOutlined v-if="appStore.collapsed" />
-        <template v-else>双端管理脚手架</template>
+        <template v-else>{{ t('app.title') }}</template>
       </div>
       <a-menu :selected-keys="[route.path]" theme="dark" mode="inline">
         <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
@@ -45,14 +45,40 @@
             <BulbFilled v-else />
           </a-button>
           <a-dropdown>
+            <a-button type="text">
+              <GlobalOutlined />
+            </a-button>
+            <template #overlay>
+              <a-menu @click="onLanguageClick">
+                <a-menu-item key="zh-CN">中文</a-menu-item>
+                <a-menu-item key="en-US">English</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-dropdown>
+            <a-badge :count="latestNotices.length">
+              <a-button type="text">
+                <BellOutlined />
+              </a-button>
+            </a-badge>
+            <template #overlay>
+              <a-menu @click="onNoticeClick">
+                <a-menu-item v-for="notice in latestNotices" :key="notice.id">
+                  {{ notice.noticeTitle }}
+                </a-menu-item>
+                <a-menu-item v-if="latestNotices.length === 0" disabled>暂无通知</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-dropdown>
             <span class="user-entry">
               <UserOutlined />
               {{ userStore.userInfo?.nickname || userStore.userInfo?.username }}
             </span>
             <template #overlay>
               <a-menu @click="onUserMenuClick">
-                <a-menu-item key="profile">个人中心</a-menu-item>
-                <a-menu-item key="logout">退出登录</a-menu-item>
+                <a-menu-item key="profile">{{ t('layout.profile') }}</a-menu-item>
+                <a-menu-item key="logout">{{ t('layout.logout') }}</a-menu-item>
               </a-menu>
             </template>
           </a-dropdown>
@@ -83,12 +109,14 @@
 import {
   ApiOutlined,
   BarChartOutlined,
+  BellOutlined,
   BulbFilled,
   BulbOutlined,
   CarryOutOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  GlobalOutlined,
   HistoryOutlined,
   MenuFoldOutlined,
   MenuOutlined,
@@ -108,12 +136,22 @@ import { useAppStore } from '@/stores/app'
 import { usePermissionStore } from '@/stores/permission'
 import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
+import { useI18n } from 'vue-i18n'
+import { onMounted, ref } from 'vue'
+import { getLatestNotices } from '@/api/system'
+import type { NoticeVo } from '@/api/system'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const permissionStore = usePermissionStore()
 const userStore = useUserStore()
+const { t, locale } = useI18n()
+const latestNotices = ref<NoticeVo[]>([])
+
+onMounted(async () => {
+  latestNotices.value = await getLatestNotices()
+})
 
 const iconMap: Record<string, Component> = {
   ApiOutlined,
@@ -193,9 +231,18 @@ async function onUserMenuClick({ key }: { key: string | number }) {
   }
   if (key === 'logout') {
     await userStore.logout()
-    message.success('已退出登录')
+    message.success(t('layout.logout'))
     router.push('/login')
   }
+}
+
+function onLanguageClick({ key }: { key: string | number }) {
+  appStore.setLocale(String(key))
+  locale.value = String(key)
+}
+
+function onNoticeClick() {
+  router.push('/system/notice')
 }
 </script>
 
