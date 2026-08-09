@@ -21,6 +21,7 @@ import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserPostMapper;
 import com.example.admin.security.TokenService;
+import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.vo.UserVo;
 import com.alibaba.excel.EasyExcel;
 import com.example.admin.module.system.entity.SysConfig;
@@ -64,9 +65,13 @@ public class SystemUserService {
                 .eq(query.getStatus() != null, SysUser::getStatus, query.getStatus())
                 .orderByDesc(SysUser::getId);
         dataScopeHelper.apply(wrapper);
+        wrapper.eq(SysUser::getTenantId, TenantContext.getTenantId());
         IPage<SysUser> result = userMapper.selectPage(page, wrapper);
         List<SysUser> users = result.getRecords();
         List<Long> userIds = users.stream().map(SysUser::getId).toList();
+        if (userIds.isEmpty()) {
+            return PageResult.of(result, List.of());
+        }
         Map<Long, SysDept> deptMap = users.stream()
                 .map(SysUser::getDeptId)
                 .filter(id -> id != null)
@@ -106,6 +111,7 @@ public class SystemUserService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
         }
         SysUser user = new SysUser();
+        user.setTenantId(TenantContext.getTenantId());
         user.setUsername(request.getUsername().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
@@ -303,6 +309,7 @@ public class SystemUserService {
                 throw new BusinessException(1006, "导入失败，用户名已存在：" + row.getUsername());
             }
             SysUser user = new SysUser();
+            user.setTenantId(TenantContext.getTenantId());
             user.setUsername(row.getUsername().trim());
             user.setPassword(passwordEncoder.encode(defaultPassword));
             user.setNickname(row.getNickname());

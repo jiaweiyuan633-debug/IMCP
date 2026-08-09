@@ -5,6 +5,7 @@ import com.example.admin.module.system.entity.SysMenu;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 
 import java.util.List;
 
@@ -43,6 +44,7 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
             SELECT DISTINCT * FROM user_menu_tree
             ORDER BY sort, id
             """)
+    @InterceptorIgnore(tenantLine = "true")
     List<SysMenu> selectMenusByUserId(@Param("userId") Long userId);
 }
 

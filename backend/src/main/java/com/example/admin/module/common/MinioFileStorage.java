@@ -5,6 +5,7 @@ import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.security.SecurityUtils;
+import com.example.admin.common.TenantContext;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -56,6 +57,7 @@ public class MinioFileStorage implements FileStorage {
         }
         String url = endpoint + "/" + bucket + "/" + fileName;
         SysFile sysFile = new SysFile();
+        sysFile.setTenantId(TenantContext.getTenantId());
         sysFile.setFileName(fileName);
         sysFile.setOriginalName(file.getOriginalFilename());
         sysFile.setUrl(url);

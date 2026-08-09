@@ -4,6 +4,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysWorkflow;
+import com.example.admin.module.system.entity.SysWorkflowLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/system/workflow")
@@ -51,6 +54,12 @@ public class SystemWorkflowController {
     public Result<Void> reject(@PathVariable Long id, @RequestBody WorkflowRemarkRequest request) {
         workflowService.reject(id, request.getRemark());
         return Result.success();
+    }
+
+    @GetMapping("/{id}/logs")
+    @PreAuthorize("hasAuthority('system:workflow:list')")
+    public Result<List<SysWorkflowLog>> logs(@PathVariable Long id) {
+        return Result.success(workflowService.logs(id));
     }
 }
 

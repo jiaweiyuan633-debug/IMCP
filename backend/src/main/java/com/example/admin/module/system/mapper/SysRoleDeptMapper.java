@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public interface SysRoleDeptMapper {
             </foreach>
             </script>
             """)
+    @InterceptorIgnore(tenantLine = "true")
     int insertBatch(@Param("roleId") Long roleId, @Param("deptIds") List<Long> deptIds);
 
     @Delete("DELETE FROM sys_role_dept WHERE role_id = #{roleId}")

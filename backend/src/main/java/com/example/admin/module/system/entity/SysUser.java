@@ -15,6 +15,7 @@ public class SysUser {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long deptId;
     private String username;
     private String password;
