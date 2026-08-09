@@ -61,7 +61,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String ip = httpRequest.getRemoteAddr();
         if (isRateLimited(ip)) {
-            throw new BusinessException(1014, "登录过于频繁，请稍后再试");
+            throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
         }
         checkLoginLockout(request.getUsername());
         if (captchaEnabled() && !captchaService.verify(request.getCaptchaId(), request.getCaptchaCode())) {
@@ -272,7 +272,7 @@ public class AuthService {
     private void checkLoginLockout(String username) {
         String value = redisTemplate.opsForValue().get("login:fail:" + username);
         if (value != null && Integer.parseInt(value) >= 5) {
-            throw new BusinessException(1014, "登录失败次数过多，账号已锁定，请稍后再试");
+            throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
         }
     }
 

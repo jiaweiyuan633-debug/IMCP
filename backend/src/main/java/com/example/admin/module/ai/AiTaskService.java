@@ -65,7 +65,7 @@ public class AiTaskService {
         AiServiceConfig config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfig>()
                 .eq(AiServiceConfig::getCode, request.getServiceCode()));
         if (config == null || config.getEnabled() == null || config.getEnabled() != 1) {
-            throw new BusinessException(1011, "AI 服务未启用或不存在");
+            throw new BusinessException(ResultCode.AI_CONFIG_UNAVAILABLE);
         }
 
         String taskNo = "AI" + DateUtil.format(new Date(), "yyyyMMddHHmmssSSS") + RandomUtil.randomNumbers(4);

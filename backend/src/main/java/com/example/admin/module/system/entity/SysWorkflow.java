@@ -20,6 +20,8 @@ public class SysWorkflow {
     private Long processDefId;
     private Long currentNodeId;
     private String currentNodeName;
+    private Long assigneeUserId;
+    private String assigneeName;
     private Long bizId;
     private Long applicantId;
     private String applicantName;

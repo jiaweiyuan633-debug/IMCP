@@ -1,6 +1,7 @@
 package com.example.admin.module.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.example.admin.module.system.entity.SysRole;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -11,6 +12,7 @@ import java.util.List;
 @Mapper
 public interface SysRoleMapper extends BaseMapper<SysRole> {
 
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT r.code
             FROM sys_role r
@@ -21,6 +23,7 @@ public interface SysRoleMapper extends BaseMapper<SysRole> {
             """)
     List<String> selectRoleCodesByUserId(@Param("userId") Long userId);
 
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT r.data_scope
             FROM sys_role r

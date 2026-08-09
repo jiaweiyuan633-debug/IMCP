@@ -25,6 +25,15 @@ Java 后端统一响应结构：
 | `1003` | 用户名或密码错误 |
 | `1004` | 账号已被禁用 |
 | `1005` | 原密码错误 |
+| `1006` | 用户名已存在 |
+| `1007` | 角色编码已存在 |
+| `1008` | 存在下级部门，不能删除 |
+| `1009` | 岗位编码已存在 |
+| `1010` | AI 服务不可用 |
+| `1011` | AI 服务未启用或不存在 |
+| `1012` | 字典类型已存在 |
+| `1013` | 参数键名已存在 |
+| `1014` | 登录过于频繁或账号已锁定 |
 | `500` | 系统繁忙，请稍后重试 |
 
 分页接口统一返回 `PageResult`，包含 `list/total/pageNum/pageSize`。除登录等公开接口外，请求头需携带 `Authorization: Bearer <accessToken>`。
@@ -56,9 +65,10 @@ Java 后端统一响应结构：
 | 参数 | `/api/system/config` | 参数配置 CRUD |
 | 通知公告 | `/api/system/notice` | 公告 CRUD、最新公告、未读数、单条已读、全部已读 |
 | 通知实时推送 | `/api/system/notice/stream` | SSE 实时通知流 |
+| 通知推送 Ticket | `/api/system/notice/ticket` | 获取一次性 SSE Ticket |
 | 租户 | `/api/system/tenant` | 租户 CRUD |
 | 文件管理 | `/api/system/file` | 文件分页、删除 |
-| 工作流 | `/api/system/workflow` | 发起、分页、待办任务、通过、拒绝、审批日志 |
+| 工作流 | `/api/system/workflow` | 发起、分页、待办、通过、拒绝、撤回、转办、审批日志 |
 | 流程定义 | `/api/system/workflow/def` | 流程定义 CRUD、节点查询 |
 
 ## 监控
@@ -75,6 +85,7 @@ Java 后端统一响应结构：
 | 服务器监控 | `/api/monitor/server` | CPU、内存、磁盘、JVM 等指标 |
 | SQL 监控 | `/api/monitor/sql-log` | 慢 SQL 与 SQL 执行日志 |
 | 告警规则 | `/api/monitor/alert-rule` | 告警规则 CRUD、立即检查 |
+| 审计日志 | `/api/monitor/audit-log` | 审计日志分页查询 |
 
 ## AI 与通用
 
@@ -82,6 +93,8 @@ Java 后端统一响应结构：
 | --- | --- | --- |
 | AI 配置 | `/api/ai/config` | 查询、编辑 AI 服务配置 |
 | AI 任务 | `/api/ai/tasks` | 创建、分页查询、详情、取消 |
+| AI 实时推送 | `/api/ai/tasks/{id}/stream` | SSE 实时任务状态推送 |
+| AI 推送 Ticket | `/api/ai/ticket` | 获取一次性 SSE Ticket |
 | AI 回调 | `/api/ai/callback/task` | Java 接收 Python 服务回调，带 Token 校验与幂等 |
 | 文件上传 | `/api/common/upload` | 本地或 MinIO 上传，20MB 上限 |
 

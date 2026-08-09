@@ -26,5 +26,8 @@ public class AlertRuleSaveRequest {
     private BigDecimal threshold;
 
     private Integer enabled;
+    private String severity;
+    private Integer silenceMinutes;
+    private String webhookUrl;
     private String remark;
 }

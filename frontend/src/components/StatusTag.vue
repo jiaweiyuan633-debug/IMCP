@@ -41,6 +41,7 @@ const text = computed(() => {
     CANCELLED: t('common.cancelled'),
     APPROVED: t('common.approved'),
     REJECTED: t('common.rejected'),
+    WITHDRAWN: t('common.withdrawn'),
   }
   return map[value] || value
 })

@@ -56,7 +56,7 @@ public class SystemDeptService {
         Long children = deptMapper.selectCount(new LambdaQueryWrapper<SysDept>()
                 .eq(SysDept::getParentId, id));
         if (children > 0) {
-            throw new BusinessException(1008, "存在下级部门，不能删除");
+            throw new BusinessException(ResultCode.DEPT_HAS_CHILDREN);
         }
         deptMapper.deleteById(id);
     }

@@ -63,7 +63,7 @@ public class SystemRoleService {
         boolean exists = roleMapper.exists(
                 new LambdaQueryWrapper<SysRole>().eq(SysRole::getCode, request.getCode().trim()));
         if (exists) {
-            throw new BusinessException(1007, "角色编码已存在");
+            throw new BusinessException(ResultCode.ROLE_CODE_EXISTS);
         }
         SysRole role = toEntity(request);
         roleMapper.insert(role);
@@ -88,7 +88,7 @@ public class SystemRoleService {
         SysRole sameCode = roleMapper.selectOne(
                 new LambdaQueryWrapper<SysRole>().eq(SysRole::getCode, request.getCode().trim()));
         if (sameCode != null && !sameCode.getId().equals(request.getId())) {
-            throw new BusinessException(1007, "角色编码已存在");
+            throw new BusinessException(ResultCode.ROLE_CODE_EXISTS);
         }
         role.setCode(request.getCode().trim());
         role.setName(request.getName());

@@ -1,6 +1,7 @@
 package com.example.admin.module.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -11,7 +12,9 @@ public class ChangePasswordRequest {
     private String oldPassword;
 
     @NotBlank(message = "新密码不能为空")
-    @Size(min = 6, max = 32, message = "新密码长度需为 6-32 位")
+    @Pattern(
+            regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,32}$",
+            message = "新密码需 8-32 位，且同时包含字母和数字")
     private String newPassword;
 }
 

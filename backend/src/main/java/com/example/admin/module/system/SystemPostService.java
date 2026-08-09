@@ -73,7 +73,7 @@ public class SystemPostService {
         SysPost exists = postMapper.selectOne(new LambdaQueryWrapper<SysPost>()
                 .eq(SysPost::getPostCode, postCode.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
-            throw new BusinessException(1009, "岗位编码已存在");
+            throw new BusinessException(ResultCode.POST_CODE_EXISTS);
         }
     }
 

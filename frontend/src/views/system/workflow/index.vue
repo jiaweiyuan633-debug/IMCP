@@ -24,6 +24,8 @@
                 <a @click="openLogs(record)">{{ t('page.workflowLogs') }}</a>
                 <a v-if="record.status === 'PENDING'" v-permission="'system:workflow:approve'" @click="openApprove(record)">{{ t('page.workflowApprove') }}</a>
                 <a v-if="record.status === 'PENDING'" v-permission="'system:workflow:reject'" @click="openReject(record)">{{ t('page.workflowReject') }}</a>
+                <a v-if="record.status === 'PENDING'" @click="openDelegate(record)">{{ t('page.workflowDelegate') }}</a>
+                <a v-if="record.status === 'PENDING'" @click="onWithdraw(record)">{{ t('page.workflowWithdraw') }}</a>
               </a-space>
             </template>
           </template>
@@ -50,6 +52,7 @@
                 <a @click="openLogs(record)">{{ t('page.workflowLogs') }}</a>
                 <a v-permission="'system:workflow:approve'" @click="openApprove(record)">{{ t('page.workflowApprove') }}</a>
                 <a v-permission="'system:workflow:reject'" @click="openReject(record)">{{ t('page.workflowReject') }}</a>
+                <a @click="openDelegate(record)">{{ t('page.workflowDelegate') }}</a>
               </a-space>
             </template>
           </template>
@@ -146,6 +149,14 @@
       </a-form>
     </a-modal>
 
+    <a-modal v-model:open="delegateModalOpen" :title="t('page.workflowDelegate')" :confirm-loading="delegateSaving" @ok="onDelegateSubmit">
+      <a-form layout="vertical">
+        <a-form-item :label="t('page.workflowDelegateTo')" required>
+          <a-select v-model:value="delegateUserId" :options="userOptions" show-search option-filter-prop="label" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <a-modal v-model:open="logsModalOpen" :title="t('page.workflowLogs')" :footer="null" width="720">
       <a-table :columns="logColumns" :data-source="logRecords" :loading="logLoading" row-key="id" :pagination="false" size="small" />
     </a-modal>
@@ -167,16 +178,19 @@ import {
   approveWorkflow,
   createProcessDef,
   createWorkflow,
+  delegateWorkflow,
   deleteProcessDef,
   getProcessDefNodes,
   getProcessDefOptions,
   getProcessDefPage,
   getRoleOptions,
+  getUserPage,
   getWorkflowLogs,
   getWorkflowPage,
   getWorkflowTasks,
   rejectWorkflow,
   updateProcessDef,
+  withdrawWorkflow,
 } from '@/api/system'
 import type { ProcessDefVo, ProcessNodeVo, WorkflowLogVo, WorkflowVo } from '@/api/system'
 import type { RoleOptionVo } from '@/types'
@@ -245,6 +259,7 @@ const defRecords = ref<ProcessDefVo[]>([])
 
 const processDefOptions = ref<ProcessDefVo[]>([])
 const roleOptions = ref<RoleOptionVo[]>([])
+const userOptions = ref<{ label: string; value: number }[]>([])
 
 const workflowModalOpen = ref(false)
 const workflowSaving = ref(false)
@@ -266,6 +281,10 @@ const approvalSaving = ref(false)
 const approvalAction = ref<'approve' | 'reject'>('approve')
 const approvalRemark = ref('')
 const approvalTarget = ref<WorkflowVo | null>(null)
+const delegateModalOpen = ref(false)
+const delegateSaving = ref(false)
+const delegateUserId = ref<number | undefined>()
+const delegateTarget = ref<WorkflowVo | null>(null)
 
 const logsModalOpen = ref(false)
 const logLoading = ref(false)
@@ -311,6 +330,8 @@ async function loadDefs() {
 async function loadOptions() {
   processDefOptions.value = await getProcessDefOptions()
   roleOptions.value = await getRoleOptions()
+  const users = await getUserPage({ pageNum: 1, pageSize: 100 })
+  userOptions.value = users.records.map((user) => ({ label: `${user.username}${user.nickname ? ` (${user.nickname})` : ''}`, value: user.id }))
 }
 
 function openWorkflowCreate() {
@@ -432,6 +453,42 @@ async function onApprovalSubmit() {
   } finally {
     approvalSaving.value = false
   }
+}
+
+function openDelegate(record: WorkflowVo) {
+  delegateTarget.value = record
+  delegateUserId.value = undefined
+  delegateModalOpen.value = true
+}
+
+async function onDelegateSubmit() {
+  if (!delegateTarget.value || !delegateUserId.value) {
+    message.warning(`${t('common.inputPlaceholder')}${t('page.workflowDelegateTo')}`)
+    return
+  }
+  delegateSaving.value = true
+  try {
+    await delegateWorkflow(delegateTarget.value.id, delegateUserId.value)
+    message.success(t('page.workflowOperationSuccess'))
+    delegateModalOpen.value = false
+    loadInstances()
+    loadTasks()
+  } finally {
+    delegateSaving.value = false
+  }
+}
+
+function onWithdraw(record: WorkflowVo) {
+  Modal.confirm({
+    title: t('page.workflowWithdrawTitle'),
+    content: t('page.workflowWithdrawConfirm', { name: record.processName }),
+    onOk: async () => {
+      await withdrawWorkflow(record.id)
+      message.success(t('page.workflowOperationSuccess'))
+      loadInstances()
+      loadTasks()
+    },
+  })
 }
 
 async function openLogs(record: WorkflowVo) {

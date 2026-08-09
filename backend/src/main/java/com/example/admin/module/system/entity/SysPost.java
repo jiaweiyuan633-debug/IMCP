@@ -15,6 +15,7 @@ public class SysPost {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String postCode;
     private String postName;
     private Integer sort;

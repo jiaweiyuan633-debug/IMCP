@@ -3,6 +3,8 @@ package com.example.admin.module.system;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
+import com.example.admin.module.system.dto.WorkflowDelegateRequest;
+import jakarta.validation.Valid;
 import com.example.admin.module.system.entity.SysWorkflow;
 import com.example.admin.module.system.entity.SysWorkflowLog;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +63,22 @@ public class SystemWorkflowController {
     @OperLog(module = "工作流", action = "审批拒绝")
     public Result<Void> reject(@PathVariable Long id, @RequestBody WorkflowRemarkRequest request) {
         workflowService.reject(id, request.getRemark());
+        return Result.success();
+    }
+
+    @PutMapping("/{id}/withdraw")
+    @PreAuthorize("hasAuthority('system:workflow:list')")
+    @OperLog(module = "工作流", action = "撤回流程")
+    public Result<Void> withdraw(@PathVariable Long id, @RequestBody(required = false) WorkflowRemarkRequest request) {
+        workflowService.withdraw(id, request == null ? null : request.getRemark());
+        return Result.success();
+    }
+
+    @PutMapping("/{id}/delegate")
+    @PreAuthorize("hasAuthority('system:workflow:approve')")
+    @OperLog(module = "工作流", action = "转办流程")
+    public Result<Void> delegate(@PathVariable Long id, @Valid @RequestBody WorkflowDelegateRequest request) {
+        workflowService.delegate(id, request.getDelegateUserId());
         return Result.success();
     }
 

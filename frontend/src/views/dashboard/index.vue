@@ -25,12 +25,17 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as echarts from 'echarts'
+import { init, use } from 'echarts/core'
+import { BarChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { useQuery } from '@tanstack/vue-query'
 import { getDashboardStats } from '@/api/monitor'
 import type { DashboardStatsVo } from '@/api/monitor'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
+
+use([BarChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
 const appStore = useAppStore()
 const { t } = useI18n()
@@ -40,8 +45,8 @@ const { data: stats } = useQuery({
 })
 const pieRef = ref<HTMLDivElement>()
 const barRef = ref<HTMLDivElement>()
-let pieChart: echarts.ECharts | null = null
-let barChart: echarts.ECharts | null = null
+let pieChart: ReturnType<typeof init> | null = null
+let barChart: ReturnType<typeof init> | null = null
 
 const statCards = computed(() => {
   const s = stats.value
@@ -61,8 +66,8 @@ function renderCharts() {
   }
   pieChart?.dispose()
   barChart?.dispose()
-  pieChart = echarts.init(pieRef.value, appStore.darkTheme ? 'dark' : undefined)
-  barChart = echarts.init(barRef.value, appStore.darkTheme ? 'dark' : undefined)
+  pieChart = init(pieRef.value, appStore.darkTheme ? 'dark' : undefined)
+  barChart = init(barRef.value, appStore.darkTheme ? 'dark' : undefined)
 
   pieChart.setOption({
     tooltip: { trigger: 'item' },

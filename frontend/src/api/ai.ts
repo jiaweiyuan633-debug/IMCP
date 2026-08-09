@@ -77,3 +77,7 @@ export function cancelAiTask(id: number): Promise<void> {
   return request.delete(`/ai/tasks/${id}`)
 }
 
+export function getAiSseTicket(): Promise<string> {
+  return request.get('/ai/ticket')
+}
+

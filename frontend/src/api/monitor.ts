@@ -146,6 +146,9 @@ export interface AlertRuleVo {
   operator: string
   threshold: number
   enabled: number
+  severity?: string
+  silenceMinutes?: number
+  webhookUrl?: string
   remark?: string
   createdAt?: string
   updatedAt?: string
@@ -169,6 +172,21 @@ export function deleteAlertRule(id: number): Promise<void> {
 
 export function runAlertRuleCheck(): Promise<number> {
   return request.post('/monitor/alert-rule/run')
+}
+
+export interface AuditLogVo {
+  id: number
+  userId?: number
+  module?: string
+  action?: string
+  params?: string
+  result?: string
+  status: number
+  createdAt?: string
+}
+
+export function getAuditLogPage(params: Record<string, unknown>): Promise<PageResult<AuditLogVo>> {
+  return request.get('/monitor/audit-log', { params })
 }
 
 
