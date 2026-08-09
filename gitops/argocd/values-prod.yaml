@@ -1,0 +1,22 @@
+images:
+  backend: registry.example.com/admin-backend:1.0.0
+  ai: registry.example.com/ai-service:1.0.0
+  frontend: registry.example.com/admin-frontend:1.0.0
+  website: registry.example.com/website:1.0.0
+
+config:
+  dbHost: mysql.example.internal
+  dbPort: "3306"
+  dbName: admin_scaffold
+  dbUser: admin
+  redisHost: redis.example.internal
+  redisPort: "6379"
+  callbackBaseUrl: http://admin-backend:8080
+  aiBaseUrl: http://ai-service:8000
+
+secret:
+  dbPassword: change-me
+  jwtSecret: change-me
+
+ingress:
+  host: admin.example.com

@@ -18,7 +18,7 @@ jobs:
           cache: maven
       - name: Backend tests
         working-directory: backend
-        run: mvn -q test
+        run: mvn -q verify
 
   frontend:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Frontend tests
         working-directory: frontend
-        run: pnpm test
+        run: pnpm test -- --coverage
       - name: Frontend build
         working-directory: frontend
         run: pnpm build
@@ -146,6 +146,17 @@ jobs:
           exit 1
       - name: Run smoke E2E
         run: pwsh -ExecutionPolicy Bypass -File scripts/smoke.ps1
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          pnpm install
+          pnpm exec playwright install --with-deps chromium
+      - name: Run browser E2E
+        working-directory: e2e
+        env:
+          ADMIN_URL: http://127.0.0.1:80
+          WEBSITE_URL: http://127.0.0.1:8081
+        run: pnpm test:e2e
       - name: Stop stack
         if: always()
         working-directory: docker
