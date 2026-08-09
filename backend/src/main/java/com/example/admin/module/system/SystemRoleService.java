@@ -97,8 +97,8 @@ public class SystemRoleService {
         role.setCode(request.getCode().trim());
         role.setName(request.getName());
         role.setDescription(request.getDescription());
-        role.setStatus(request.getStatus());
-        role.setDataScope(request.getDataScope());
+        role.setStatus(request.getStatus() == null ? role.getStatus() : request.getStatus());
+        role.setDataScope(request.getDataScope() == null ? role.getDataScope() : request.getDataScope());
         role.setSort(request.getSort() == null ? DEFAULT_SORT : request.getSort());
         roleMapper.updateById(role);
         if (request.getMenuIds() != null) {

@@ -93,15 +93,27 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
         String column;
         List<Expression> values;
         if ("sys_user".equals(tableName)) {
+            if (filter.userIds() == null) {
+                return null;
+            }
             column = "id";
             values = filter.userIds().stream().map(LongValue::new).map(expression -> (Expression) expression).toList();
         } else if ("ai_task".equals(tableName)) {
+            if (filter.userIds() == null) {
+                return null;
+            }
             column = "created_by";
             values = filter.userIds().stream().map(LongValue::new).map(expression -> (Expression) expression).toList();
         } else if ("sys_oper_log".equals(tableName)) {
+            if (filter.userIds() == null) {
+                return null;
+            }
             column = "user_id";
             values = filter.userIds().stream().map(LongValue::new).map(expression -> (Expression) expression).toList();
         } else if ("sys_login_log".equals(tableName)) {
+            if (filter.usernames() == null) {
+                return null;
+            }
             column = "username";
             values = filter.usernames().stream().map(StringValue::new).map(expression -> (Expression) expression).toList();
         } else {

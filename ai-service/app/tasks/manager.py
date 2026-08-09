@@ -24,6 +24,7 @@ class TaskManager:
     def __init__(self, redis: Redis, settings: Settings) -> None:
         self.redis = redis
         self.settings = settings
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def create_task(self, request: TaskCreateRequest, request_id: str | None = None) -> TaskStatusResponse:
         if request.biz_type not in SERVICE_REGISTRY:
@@ -45,7 +46,7 @@ class TaskManager:
             "updated_at": now,
         }
         await self._save(request.task_no, data)
-        asyncio.create_task(self._execute(request.task_no))
+        self._spawn(request.task_no)
         return TaskStatusResponse(**data)
 
     async def get_task(self, task_no: str) -> TaskStatusResponse | None:
@@ -62,8 +63,13 @@ class TaskManager:
         data["error"] = None
         data["updated_at"] = _now()
         await self._save(task_no, data)
-        asyncio.create_task(self._execute(task_no))
+        self._spawn(task_no)
         return TaskStatusResponse(**data)
+
+    def _spawn(self, task_no: str) -> None:
+        task = asyncio.create_task(self._execute(task_no))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def _execute(self, task_no: str) -> None:
         data = await self._get(task_no)
@@ -92,7 +98,7 @@ class TaskManager:
                 data["status"] = "QUEUED"
                 await self._save(task_no, data)
                 await asyncio.sleep(0)
-                asyncio.create_task(self._execute(task_no))
+                self._spawn(task_no)
             else:
                 data["status"] = "FAILED"
                 await self._save(task_no, data)
@@ -119,6 +125,7 @@ class TaskManager:
             try:
                 async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
                     response = await client.post(callback_url, json=payload, headers=headers)
+                    response.raise_for_status()
                 logger.info("AI callback for %s returned status %s", task_no, response.status_code)
                 return
             except httpx.HTTPError as exception:

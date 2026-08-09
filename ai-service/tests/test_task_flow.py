@@ -76,7 +76,9 @@ async def test_callback_sends_service_token() -> None:
             captured["url"] = url
             captured["headers"] = headers
             captured["json"] = json
-            return SimpleNamespace(status_code=200)
+            response = SimpleNamespace(status_code=200)
+            response.raise_for_status = lambda: None
+            return response
 
     with patch("app.tasks.manager.httpx.AsyncClient", FakeAsyncClient):
         await manager._callback("task-callback", {

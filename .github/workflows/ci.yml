@@ -149,7 +149,8 @@ jobs:
       - name: Install Playwright
         working-directory: e2e
         run: |
-          pnpm install
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
           pnpm exec playwright install --with-deps chromium
       - name: Run browser E2E
         working-directory: e2e
