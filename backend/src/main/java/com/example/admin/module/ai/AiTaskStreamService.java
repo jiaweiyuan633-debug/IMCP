@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Set;
+import java.util.EnumSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -17,10 +18,10 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class AiTaskStreamService {
 
-    private static final Set<String> TERMINAL_STATUS = Set.of(
-            AiTaskStatus.SUCCEEDED.name(),
-            AiTaskStatus.FAILED.name(),
-            AiTaskStatus.CANCELLED.name());
+    private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
+            AiTaskStatus.SUCCEEDED,
+            AiTaskStatus.FAILED,
+            AiTaskStatus.CANCELLED);
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final AiTaskService taskService;
@@ -38,7 +39,7 @@ public class AiTaskStreamService {
         try {
             AiTaskVo task = taskService.detail(taskId);
             emitter.send(SseEmitter.event().name("task").data(task));
-            if (TERMINAL_STATUS.contains(task.getStatus())) {
+            if (isTerminal(task.getStatus())) {
                 emitter.complete();
             }
         } catch (Exception exception) {
@@ -47,6 +48,14 @@ public class AiTaskStreamService {
             } catch (IllegalStateException ignored) {
                 // emitter already closed
             }
+        }
+    }
+
+    private boolean isTerminal(String status) {
+        try {
+            return TERMINAL_STATUS.contains(AiTaskStatus.valueOf(status));
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 }

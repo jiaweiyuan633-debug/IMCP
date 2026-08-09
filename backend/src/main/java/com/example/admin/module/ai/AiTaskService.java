@@ -33,6 +33,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,10 +43,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AiTaskService {
 
-    private static final Set<String> TERMINAL_STATUS = Set.of(
-            AiTaskStatus.SUCCEEDED.name(),
-            AiTaskStatus.FAILED.name(),
-            AiTaskStatus.CANCELLED.name());
+    private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
+            AiTaskStatus.SUCCEEDED,
+            AiTaskStatus.FAILED,
+            AiTaskStatus.CANCELLED);
 
     private final AiTaskMapper taskMapper;
     private final AiTaskResultMapper resultMapper;
@@ -147,7 +148,7 @@ public class AiTaskService {
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        if (TERMINAL_STATUS.contains(task.getStatus())) {
+        if (isTerminal(task.getStatus())) {
             return;
         }
         task.setStatus(AiTaskStatus.CANCELLED.name());
@@ -168,7 +169,7 @@ public class AiTaskService {
                 || !config.getApiKey().equals(token)) {
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "AI 回调签名无效");
         }
-        if (TERMINAL_STATUS.contains(task.getStatus())) {
+        if (isTerminal(task.getStatus())) {
             return;
         }
         String status = request.getStatus();
@@ -245,6 +246,14 @@ public class AiTaskService {
             return SecurityUtils.getUserId();
         } catch (Exception exception) {
             return null;
+        }
+    }
+
+    private boolean isTerminal(String status) {
+        try {
+            return TERMINAL_STATUS.contains(AiTaskStatus.valueOf(status));
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 }
