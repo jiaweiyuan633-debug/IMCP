@@ -114,13 +114,18 @@ class TaskManager:
         headers = {"X-Ai-Service-Token": self.settings.callback_token}
         if data.get("request_id"):
             headers["X-Request-Id"] = data["request_id"]
-        try:
-            async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
-                response = await client.post(callback_url, json=payload, headers=headers)
-            logger.info("AI callback for %s returned status %s", task_no, response.status_code)
-        except httpx.HTTPError as exception:
-            logger.warning("AI callback for %s failed: %s", task_no, exception)
-            return
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
+                    response = await client.post(callback_url, json=payload, headers=headers)
+                logger.info("AI callback for %s returned status %s", task_no, response.status_code)
+                return
+            except httpx.HTTPError as exception:
+                last_error = exception
+                logger.warning("AI callback for %s failed attempt %s: %s", task_no, attempt + 1, exception)
+                await asyncio.sleep(1 + attempt)
+        logger.error("AI callback for %s failed after retries: %s", task_no, last_error)
 
     async def _save(self, task_no: str, data: dict[str, Any]) -> None:
         await self.redis.set(KEY_PREFIX + task_no, json.dumps(data, ensure_ascii=False))

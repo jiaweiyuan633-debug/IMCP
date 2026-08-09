@@ -1,11 +1,10 @@
 package com.example.admin.module.common;
 
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.IdUtil;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.Result;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.common.vo.UploadResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,22 +13,18 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Date;
 import java.util.Set;
 
 @RestController
 @RequestMapping("/api/common")
+@RequiredArgsConstructor
 public class CommonController {
 
     private static final long MAX_SIZE = 20L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS =
             Set.of("jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip");
 
-    @Value("${app.upload-path:uploads}")
-    private String uploadPath;
+    private final FileStorageService fileStorageService;
 
     @PostMapping("/upload")
     public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
@@ -51,19 +46,7 @@ public class CommonController {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容与扩展名不匹配");
         }
 
-        String datePath = DateUtil.format(new Date(), "yyyy/MM/dd");
-        String filename = IdUtil.fastSimpleUUID() + "." + extension;
-        Path dir = Paths.get(uploadPath, datePath);
-        Files.createDirectories(dir);
-        Path target = dir.resolve(filename);
-        file.transferTo(target.toAbsolutePath().toFile());
-
-        String url = "/uploads/" + datePath + "/" + filename;
-        return Result.success(UploadResponse.builder()
-                .url(url)
-                .name(originalName)
-                .size(file.getSize())
-                .build());
+        return Result.success(fileStorageService.store(file));
     }
 
     private boolean isAllowedContent(byte[] head, String extension) {

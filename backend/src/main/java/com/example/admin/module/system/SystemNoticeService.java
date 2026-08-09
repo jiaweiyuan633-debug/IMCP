@@ -8,6 +8,8 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.entity.SysNotice;
 import com.example.admin.module.system.mapper.SysNoticeMapper;
+import com.example.admin.module.system.mapper.SysNoticeReadMapper;
+import com.example.admin.module.system.entity.SysNoticeRead;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.util.List;
 public class SystemNoticeService {
 
     private final SysNoticeMapper noticeMapper;
+    private final SysNoticeReadMapper noticeReadMapper;
 
     public PageResult<SysNotice> page(long pageNum, long pageSize, String title, Integer type) {
         Page<SysNotice> page = new Page<>(pageNum, pageSize);
@@ -54,6 +57,25 @@ public class SystemNoticeService {
 
     public void delete(Long id) {
         noticeMapper.deleteById(id);
+    }
+
+    public long unreadCount(Long userId) {
+        long total = noticeMapper.selectCount(new LambdaQueryWrapper<SysNotice>()
+                .eq(SysNotice::getStatus, 1));
+        long read = noticeReadMapper.selectCount(new LambdaQueryWrapper<SysNoticeRead>()
+                .eq(SysNoticeRead::getUserId, userId));
+        return Math.max(total - read, 0);
+    }
+
+    public void markRead(Long userId, Long noticeId) {
+        noticeReadMapper.markRead(userId, noticeId);
+    }
+
+    public void markAllRead(Long userId) {
+        List<SysNotice> notices = latest(100);
+        for (SysNotice notice : notices) {
+            noticeReadMapper.markRead(userId, notice.getId());
+        }
     }
 
     private Long tryGetUserId() {

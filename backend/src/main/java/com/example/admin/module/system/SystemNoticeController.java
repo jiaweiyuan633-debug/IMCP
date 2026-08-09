@@ -4,6 +4,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,6 +61,23 @@ public class SystemNoticeController {
     @OperLog(module = "通知公告", action = "删除公告")
     public Result<Void> delete(@PathVariable Long id) {
         noticeService.delete(id);
+        return Result.success();
+    }
+
+    @GetMapping("/unread-count")
+    public Result<Long> unreadCount() {
+        return Result.success(noticeService.unreadCount(SecurityUtils.getUserId()));
+    }
+
+    @PutMapping("/read/{id}")
+    public Result<Void> markRead(@PathVariable Long id) {
+        noticeService.markRead(SecurityUtils.getUserId(), id);
+        return Result.success();
+    }
+
+    @PutMapping("/read-all")
+    public Result<Void> markAllRead() {
+        noticeService.markAllRead(SecurityUtils.getUserId());
         return Result.success();
     }
 }
