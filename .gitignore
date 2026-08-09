@@ -8,6 +8,7 @@ frontend/dist/
 frontend/.eslintcache
 website/node_modules/
 website/dist/
+website/.vite/
 .pnpm-store/
 
 # Python
