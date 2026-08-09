@@ -7,6 +7,7 @@ import com.example.admin.module.system.mapper.SysDeptMapper;
 import com.example.admin.module.system.mapper.SysRoleDeptMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
+import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,46 @@ public class DataScopeHelper {
     private final SysUserRoleMapper userRoleMapper;
     private final SysRoleDeptMapper roleDeptMapper;
     private final SysDeptMapper deptMapper;
+    private final SysUserMapper userMapper;
+
+    public boolean isAdmin() {
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        return loginUser.getRoles() != null && loginUser.getRoles().contains("admin");
+    }
+
+    public List<Long> allowedUserIds() {
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (isAdmin()) {
+            return null;
+        }
+        List<Integer> scopes = roleMapper.selectDataScopesByUserId(loginUser.getUserId());
+        if (scopes.contains(SCOPE_ALL)) {
+            return null;
+        }
+        if (scopes.contains(SCOPE_CUSTOM)) {
+            List<Long> deptIds = customDeptIds(loginUser.getUserId());
+            return deptIds.isEmpty() ? List.of(-1L) : userIdsByDepts(deptIds);
+        }
+        if (scopes.contains(SCOPE_DEPT_AND_CHILD)) {
+            List<Long> deptIds = deptAndChildIds(loginUser.getDeptId());
+            return deptIds.isEmpty() ? List.of(-1L) : userIdsByDepts(deptIds);
+        }
+        if (scopes.contains(SCOPE_DEPT)) {
+            return userIdsByDepts(List.of(loginUser.getDeptId()));
+        }
+        return List.of(loginUser.getUserId());
+    }
+
+    private List<Long> userIdsByDepts(List<Long> deptIds) {
+        if (deptIds == null || deptIds.isEmpty() || deptIds.contains(null)) {
+            return List.of(-1L);
+        }
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getDeptId, deptIds))
+                .stream()
+                .map(SysUser::getId)
+                .toList();
+    }
 
     public LambdaQueryWrapper<SysUser> apply(LambdaQueryWrapper<SysUser> wrapper) {
         LoginUser loginUser = SecurityUtils.getLoginUser();

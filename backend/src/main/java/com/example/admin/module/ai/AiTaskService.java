@@ -19,6 +19,7 @@ import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
 import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
+import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.security.SecurityUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +51,7 @@ public class AiTaskService {
     private final AiServiceConfigMapper configMapper;
     private final AiPythonClient pythonClient;
     private final ObjectMapper objectMapper;
+    private final DataScopeHelper dataScopeHelper;
 
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
@@ -107,6 +109,16 @@ public class AiTaskService {
                 .eq(StringUtils.hasText(query.getStatus()), AiTask::getStatus, query.getStatus())
                 .eq(StringUtils.hasText(query.getBizType()), AiTask::getBizType, query.getBizType())
                 .orderByDesc(AiTask::getId);
+        if (!dataScopeHelper.isAdmin()) {
+            List<Long> userIds = dataScopeHelper.allowedUserIds();
+            if (userIds != null) {
+                if (userIds.size() == 1) {
+                    wrapper.eq(AiTask::getCreatedBy, userIds.get(0));
+                } else {
+                    wrapper.in(AiTask::getCreatedBy, userIds);
+                }
+            }
+        }
         IPage<AiTask> result = taskMapper.selectPage(page, wrapper);
         List<AiTaskVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
