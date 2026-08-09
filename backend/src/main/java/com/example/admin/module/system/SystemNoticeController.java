@@ -5,6 +5,7 @@ import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysNotice;
 import com.example.admin.security.SecurityUtils;
+import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -25,6 +27,7 @@ import java.util.List;
 public class SystemNoticeController {
 
     private final SystemNoticeService noticeService;
+    private final NoticeSseService noticeSseService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:notice:list')")
@@ -39,6 +42,11 @@ public class SystemNoticeController {
     @GetMapping("/latest")
     public Result<List<SysNotice>> latest(@RequestParam(defaultValue = "5") int limit) {
         return Result.success(noticeService.latest(limit));
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream() {
+        return noticeSseService.connect(SecurityUtils.getUserId());
     }
 
     @PostMapping

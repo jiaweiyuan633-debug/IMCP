@@ -1,8 +1,8 @@
 <template>
-  <a-card title="定时任务">
+  <a-card :title="t('page.monitorJobTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'monitor:job:add'" type="primary" @click="openCreate">新增任务</a-button>
+      <a-button v-permission="'monitor:job:add'" type="primary" @click="openCreate">{{ t('page.monitorAddJob') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -20,10 +20,10 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'monitor:job:run'" @click="onRun(record)">执行</a>
-            <a v-permission="'monitor:job:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'monitor:job:delete'" @click="onDelete(record)">删除</a>
-            <a @click="openLogs(record)">日志</a>
+            <a v-permission="'monitor:job:run'" @click="onRun(record)">{{ t('page.monitorRun') }}</a>
+            <a v-permission="'monitor:job:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'monitor:job:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
+            <a @click="openLogs(record)">{{ t('page.monitorLog') }}</a>
           </a-space>
         </template>
       </template>
@@ -31,37 +31,37 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑任务' : '新增任务'"
+      :title="editingId ? t('page.monitorEditJob') : t('page.monitorAddJob')"
       :loading="saving"
       width="560"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="任务名称" required>
+        <a-form-item :label="t('page.monitorJobName')" required>
           <a-input v-model:value="form.jobName" />
         </a-form-item>
-        <a-form-item label="任务组名" required>
+        <a-form-item :label="t('page.monitorJobGroup')" required>
           <a-input v-model:value="form.jobGroup" />
         </a-form-item>
-        <a-form-item label="调用目标" required>
+        <a-form-item :label="t('page.monitorInvokeTarget')" required>
           <a-input v-model:value="form.invokeTarget" placeholder="demoTask.runDemo" />
         </a-form-item>
-        <a-form-item label="Cron 表达式" required>
+        <a-form-item :label="t('page.monitorCron')" required>
           <a-input v-model:value="form.cronExpression" placeholder="0/30 * * * * ?" />
         </a-form-item>
-        <a-form-item label="并发执行">
+        <a-form-item :label="t('common.enabled')">
           <a-select v-model:value="form.concurrent" :options="yesNoOptions" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.monitorJobStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
-        <a-form-item label="备注">
+        <a-form-item :label="t('page.monitorAlertRemark')">
           <a-textarea v-model:value="form.remark" :rows="3" />
         </a-form-item>
       </a-form>
     </ModalForm>
 
-    <a-modal v-model:open="logOpen" title="任务日志" width="860" :footer="null">
+    <a-modal v-model:open="logOpen" :title="t('page.monitorLog')" width="860" :footer="null">
       <a-table
         :columns="logColumns"
         :data-source="logRecords"
@@ -91,46 +91,49 @@ import {
 } from '@/api/monitor'
 import type { JobVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '任务名称', prop: 'jobName', placeholder: '请输入任务名称' },
+  { label: t('page.monitorJobName'), prop: 'jobName', placeholder: `${t('common.inputPlaceholder')}${t('page.monitorJobName')}` },
   {
-    label: '状态',
+    label: t('page.monitorJobStatus'),
     prop: 'status',
     type: 'select',
     options: [
-      { label: '启用', value: 1 },
-      { label: '停用', value: 0 },
+      { label: t('common.enabled'), value: 1 },
+      { label: t('common.disabled'), value: 0 },
     ],
   },
 ]
 
 const columns = [
-  { title: '任务名称', dataIndex: 'jobName', key: 'jobName' },
-  { title: '任务组', dataIndex: 'jobGroup', key: 'jobGroup' },
-  { title: '调用目标', dataIndex: 'invokeTarget', key: 'invokeTarget' },
-  { title: 'Cron', dataIndex: 'cronExpression', key: 'cronExpression' },
-  { title: '状态', key: 'status', width: 80 },
-  { title: '操作', key: 'actions', width: 200 },
+  { title: t('page.monitorJobName'), dataIndex: 'jobName', key: 'jobName' },
+  { title: t('page.monitorJobGroup'), dataIndex: 'jobGroup', key: 'jobGroup' },
+  { title: t('page.monitorInvokeTarget'), dataIndex: 'invokeTarget', key: 'invokeTarget' },
+  { title: t('page.monitorCron'), dataIndex: 'cronExpression', key: 'cronExpression' },
+  { title: t('page.monitorJobStatus'), key: 'status', width: 80 },
+  { title: t('common.actions'), key: 'actions', width: 200 },
 ]
 
 const logColumns = [
-  { title: '任务名称', dataIndex: 'jobName', key: 'jobName' },
-  { title: '调用目标', dataIndex: 'invokeTarget', key: 'invokeTarget' },
-  { title: '结果', dataIndex: 'jobMessage', key: 'jobMessage' },
-  { title: '异常', dataIndex: 'exceptionInfo', key: 'exceptionInfo' },
-  { title: '开始时间', dataIndex: 'startTime', key: 'startTime' },
-  { title: '结束时间', dataIndex: 'endTime', key: 'endTime' },
+  { title: t('page.monitorJobName'), dataIndex: 'jobName', key: 'jobName' },
+  { title: t('page.monitorInvokeTarget'), dataIndex: 'invokeTarget', key: 'invokeTarget' },
+  { title: t('page.monitorStatus'), dataIndex: 'jobMessage', key: 'jobMessage' },
+  { title: t('page.aiError'), dataIndex: 'exceptionInfo', key: 'exceptionInfo' },
+  { title: 'Start', dataIndex: 'startTime', key: 'startTime' },
+  { title: 'End', dataIndex: 'endTime', key: 'endTime' },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const yesNoOptions = [
-  { label: '允许', value: 1 },
-  { label: '禁止', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const pageNum = ref(1)
@@ -220,7 +223,7 @@ function openEdit(record: JobVo) {
 
 async function onSubmit() {
   if (!form.jobName || !form.invokeTarget || !form.cronExpression) {
-    message.warning('请填写任务名称、调用目标和 Cron')
+    message.warning(t('page.monitorJobRequired'))
     return
   }
   saving.value = true
@@ -230,7 +233,7 @@ async function onSubmit() {
     } else {
       await createJob(form)
     }
-    message.success('保存成功')
+    message.success(t('page.monitorJobSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -240,28 +243,28 @@ async function onSubmit() {
 
 async function toggleStatus(record: JobVo, checked: boolean) {
   await changeJobStatus(record.id, checked ? 1 : 0)
-  message.success('状态已更新')
+  message.success(t('page.monitorJobStatusUpdated'))
   loadData()
 }
 
 function onRun(record: JobVo) {
   Modal.confirm({
-    title: '确认执行',
-    content: `确定立即执行任务 ${record.jobName} 吗？`,
+    title: t('page.monitorJobRunTitle'),
+    content: t('page.monitorJobRunConfirm', { name: record.jobName }),
     onOk: async () => {
       await runJob(record.id)
-      message.success('已触发执行')
+      message.success(t('page.monitorJobRunSuccess'))
     },
   })
 }
 
 function onDelete(record: JobVo) {
   Modal.confirm({
-    title: '确认删除任务',
-    content: `确定删除任务 ${record.jobName} 吗？`,
+    title: t('page.monitorJobDeleteTitle'),
+    content: t('page.monitorJobDeleteConfirm', { name: record.jobName }),
     onOk: async () => {
       await deleteJob(record.id)
-      message.success('删除成功')
+      message.success(t('page.monitorJobDeleted'))
       loadData()
     },
   })

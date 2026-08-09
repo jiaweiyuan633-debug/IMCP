@@ -1,12 +1,12 @@
 <template>
-  <a-card title="缓存管理">
+  <a-card :title="t('page.monitorCacheTitle')">
     <a-form layout="inline">
-      <a-form-item label="缓存 Key">
-        <a-input v-model:value="key" placeholder="例如 login:token:*" style="width: 320px" />
+      <a-form-item :label="t('page.monitorCacheKey')">
+        <a-input v-model:value="key" placeholder="login:token:*" style="width: 320px" />
       </a-form-item>
       <a-form-item>
         <a-button v-permission="'monitor:cache:delete'" type="primary" :loading="deleting" @click="onDelete">
-          删除缓存
+          {{ t('page.monitorClear') }}
         </a-button>
       </a-form-item>
     </a-form>
@@ -21,6 +21,9 @@
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { clearCacheKey } from '@/api/monitor'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const commonKeys = ['login:token:', 'login:online:', 'auth:perms:', 'ai:task:']
 const key = ref('')
@@ -28,13 +31,13 @@ const deleting = ref(false)
 
 async function onDelete() {
   if (!key.value) {
-    message.warning('请输入缓存 Key')
+    message.warning(`${t('common.inputPlaceholder')}${t('page.monitorCacheKey')}`)
     return
   }
   deleting.value = true
   try {
     await clearCacheKey(key.value)
-    message.success('缓存已删除')
+    message.success(t('page.monitorCacheCleared'))
   } finally {
     deleting.value = false
   }

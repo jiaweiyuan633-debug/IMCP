@@ -13,6 +13,7 @@ public class AiTask {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String taskNo;
     private String bizType;
     private Long bizId;

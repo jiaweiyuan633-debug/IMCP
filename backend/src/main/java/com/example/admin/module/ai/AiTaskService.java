@@ -20,6 +20,7 @@ import com.example.admin.module.ai.mapper.AiTaskResultMapper;
 import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
+import com.example.admin.common.TenantContext;
 import com.example.admin.security.SecurityUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -69,6 +70,7 @@ public class AiTaskService {
 
         String taskNo = "AI" + DateUtil.format(new Date(), "yyyyMMddHHmmssSSS") + RandomUtil.randomNumbers(4);
         AiTask task = new AiTask();
+        task.setTenantId(TenantContext.getTenantId());
         task.setTaskNo(taskNo);
         task.setBizType(request.getBizType());
         task.setBizId(request.getBizId());
@@ -185,6 +187,7 @@ public class AiTaskService {
 
         if (AiTaskStatus.SUCCEEDED.name().equals(status)) {
             AiTaskResult result = new AiTaskResult();
+            result.setTenantId(TenantContext.getTenantId());
             result.setTaskId(task.getId());
             result.setResultType(task.getBizType());
             result.setResultJson(toJson(request.getResult()));

@@ -139,4 +139,36 @@ export function getSqlLogPage(params: Record<string, unknown>): Promise<PageResu
   return request.get('/monitor/sql-log', { params })
 }
 
+export interface AlertRuleVo {
+  id: number
+  ruleName: string
+  metric: string
+  operator: string
+  threshold: number
+  enabled: number
+  remark?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function getAlertRulePage(params: Record<string, unknown>): Promise<PageResult<AlertRuleVo>> {
+  return request.get('/monitor/alert-rule', { params })
+}
+
+export function createAlertRule(data: Record<string, unknown>): Promise<number> {
+  return request.post('/monitor/alert-rule', data)
+}
+
+export function updateAlertRule(data: Record<string, unknown>): Promise<void> {
+  return request.put('/monitor/alert-rule', data)
+}
+
+export function deleteAlertRule(id: number): Promise<void> {
+  return request.delete(`/monitor/alert-rule/${id}`)
+}
+
+export function runAlertRuleCheck(): Promise<number> {
+  return request.post('/monitor/alert-rule/run')
+}
+
 

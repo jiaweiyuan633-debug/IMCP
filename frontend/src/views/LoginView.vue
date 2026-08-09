@@ -17,9 +17,9 @@
         >
           <a-input-password v-model:value="form.password" :placeholder="t('login.passwordPlaceholder')" />
         </a-form-item>
-        <a-form-item v-if="captchaEnabled" label="验证码" name="captchaCode">
+        <a-form-item v-if="captchaEnabled" :label="t('login.captcha')" name="captchaCode">
           <a-space>
-            <a-input v-model:value="form.captchaCode" placeholder="请输入验证码" style="width: 160px" />
+            <a-input v-model:value="form.captchaCode" :placeholder="t('login.captchaPlaceholder')" style="width: 160px" />
             <img v-if="captchaImage" :src="captchaImage" alt="captcha" class="captcha-image" @click="loadCaptcha" />
           </a-space>
         </a-form-item>
@@ -71,7 +71,7 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (error) {
-    message.error((error as Error).message || '登录失败')
+    message.error((error as Error).message || t('login.failed'))
   } finally {
     loading.value = false
   }

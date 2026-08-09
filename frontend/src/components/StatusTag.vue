@@ -4,10 +4,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   value: number | string
 }>()
+const { t } = useI18n()
 
 const color = computed(() => {
   const value = String(props.value)
@@ -29,16 +31,16 @@ const color = computed(() => {
 const text = computed(() => {
   const value = String(props.value)
   const map: Record<string, string> = {
-    '0': '禁用',
-    '1': '启用',
-    PENDING: '待处理',
-    QUEUED: '排队中',
-    RUNNING: '执行中',
-    SUCCEEDED: '成功',
-    FAILED: '失败',
-    CANCELLED: '已取消',
-    APPROVED: '已通过',
-    REJECTED: '已拒绝',
+    '0': t('common.disabled'),
+    '1': t('common.enabled'),
+    PENDING: t('common.pending'),
+    QUEUED: t('common.queued'),
+    RUNNING: t('common.running'),
+    SUCCEEDED: t('common.succeeded'),
+    FAILED: t('common.failed'),
+    CANCELLED: t('common.cancelled'),
+    APPROVED: t('common.approved'),
+    REJECTED: t('common.rejected'),
   }
   return map[value] || value
 })

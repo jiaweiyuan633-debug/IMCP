@@ -8,6 +8,7 @@
 cd backend && mvn spring-boot:run
 cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && pnpm install && pnpm dev
+cd website && pnpm install && pnpm dev --port 5174
 ```
 
 也可以在 Windows 上直接运行：
@@ -51,15 +52,16 @@ cd docker
 docker compose up -d --build
 ```
 
-Compose 编排五个服务：MySQL 8、Redis 7、Java 后端、AI 服务、Nginx 前端。
+Compose 编排六个服务：MySQL 8、Redis 7、Java 后端、AI 服务、后台管理系统、Y15智能管理平台官网。
 
-服务端口可覆盖：`MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT`。
+服务端口可覆盖：`MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT`、`WEBSITE_PORT`。
 
 Compose 内置：
 
 - MySQL/Redis 健康检查
 - 后端通过 `CALLBACK_BASE_URL` 指向容器内 AI 回调地址
 - 前端 Nginx 反向代理 `/api` 和 `/uploads`
+- 官网使用独立 Nginx 容器，默认端口 `8081`
 
 Docker Hub 拉取超时时，可先用 DaoCloud 镜像源拉取并打标准标签。
 
@@ -83,7 +85,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --set ingress.host=admin.example.com
 ```
 
-Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%，2-6 副本）和 Ingress。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过 Secret 保存密码。
+Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%，2-6 副本）和 Ingress。官网当前通过 Docker 独立交付，也可按相同模板扩展 K8s 服务。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过 Secret 保存密码。
 
 ## 4. 可观测性
 
@@ -92,6 +94,7 @@ Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%�
 - AI 指标：`/api/v1/metrics`
 - 结构化日志包含 `requestId/traceId`
 - 监控页面：服务器监控、SQL 监控、登录/操作日志、定时任务日志
+- 告警规则：CPU/内存/JVM/磁盘阈值触发后写入通知公告，并通过 SSE 实时推送
 
 ## 5. 运维脚本
 
@@ -115,4 +118,5 @@ scripts/fetch-openapi.ps1
 - 定期备份并演练恢复
 - 所有数据库变更通过 Flyway 执行
 - 多租户生产环境前确认租户标识传递、数据权限与备份粒度策略
+- 官网域名与后台域名分离，启用 HTTPS 后配置 CDN 与转化埋点
 

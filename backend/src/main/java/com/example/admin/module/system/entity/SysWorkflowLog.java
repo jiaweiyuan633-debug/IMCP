@@ -13,6 +13,7 @@ public class SysWorkflowLog {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long workflowId;
     private String action;
     private Long operatorId;

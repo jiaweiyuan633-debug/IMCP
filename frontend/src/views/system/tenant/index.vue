@@ -1,8 +1,8 @@
 <template>
-  <a-card title="租户管理">
+  <a-card :title="t('page.tenantTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:tenant:add'" type="primary" @click="openCreate">新增租户</a-button>
+      <a-button v-permission="'system:tenant:add'" type="primary" @click="openCreate">{{ t('page.tenantAdd') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -20,19 +20,19 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:tenant:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:tenant:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:tenant:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:tenant:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
     </ProTable>
-    <ModalForm v-model:open="modalOpen" :title="editingId ? '编辑租户' : '新增租户'" :loading="saving" @ok="onSubmit">
+    <ModalForm v-model:open="modalOpen" :title="editingId ? t('page.tenantEdit') : t('page.tenantAdd')" :loading="saving" @ok="onSubmit">
       <a-form layout="vertical" :model="form">
-        <a-form-item label="租户名称" required><a-input v-model:value="form.tenantName" /></a-form-item>
-        <a-form-item label="租户编码" required><a-input v-model:value="form.tenantCode" /></a-form-item>
-        <a-form-item label="联系人"><a-input v-model:value="form.contactName" /></a-form-item>
-        <a-form-item label="联系电话"><a-input v-model:value="form.contactPhone" /></a-form-item>
-        <a-form-item label="状态"><a-select v-model:value="form.status" :options="statusOptions" /></a-form-item>
+        <a-form-item :label="t('page.tenantName')" required><a-input v-model:value="form.tenantName" /></a-form-item>
+        <a-form-item :label="t('page.tenantCode')" required><a-input v-model:value="form.tenantCode" /></a-form-item>
+        <a-form-item :label="t('page.tenantContact')"><a-input v-model:value="form.contactName" /></a-form-item>
+        <a-form-item :label="t('page.tenantPhone')"><a-input v-model:value="form.contactPhone" /></a-form-item>
+        <a-form-item :label="t('page.tenantStatus')"><a-select v-model:value="form.status" :options="statusOptions" /></a-form-item>
       </a-form>
     </ModalForm>
   </a-card>
@@ -48,19 +48,22 @@ import StatusTag from '@/components/StatusTag.vue'
 import { createTenant, deleteTenant, getTenantPage, updateTenant } from '@/api/system'
 import type { TenantVo } from '@/api/system'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
 
-const searchFields: SearchField[] = [{ label: '租户名称', prop: 'tenantName', placeholder: '请输入租户名称' }]
+const { t } = useI18n()
+
+const searchFields: SearchField[] = [{ label: t('page.tenantName'), prop: 'tenantName', placeholder: `${t('common.inputPlaceholder')}${t('page.tenantName')}` }]
 const columns = [
-  { title: '租户名称', dataIndex: 'tenantName', key: 'tenantName' },
-  { title: '编码', dataIndex: 'tenantCode', key: 'tenantCode' },
-  { title: '联系人', dataIndex: 'contactName', key: 'contactName' },
-  { title: '电话', dataIndex: 'contactPhone', key: 'contactPhone' },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'actions', width: 130 },
+  { title: t('page.tenantName'), dataIndex: 'tenantName', key: 'tenantName' },
+  { title: t('page.tenantCode'), dataIndex: 'tenantCode', key: 'tenantCode' },
+  { title: t('page.tenantContact'), dataIndex: 'contactName', key: 'contactName' },
+  { title: t('page.tenantPhone'), dataIndex: 'contactPhone', key: 'contactPhone' },
+  { title: t('page.tenantStatus'), key: 'status', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 const pageNum = ref(1)
 const pageSize = ref(10)
@@ -121,7 +124,7 @@ async function onSubmit() {
     } else {
       await createTenant(form)
     }
-    message.success('保存成功')
+    message.success(t('page.tenantSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -130,11 +133,11 @@ async function onSubmit() {
 }
 function onDelete(record: TenantVo) {
   Modal.confirm({
-    title: '确认删除租户',
-    content: `确定删除 ${record.tenantName} 吗？`,
+    title: t('page.tenantDeleteTitle'),
+    content: t('page.tenantDeleteConfirm', { name: record.tenantName }),
     onOk: async () => {
       await deleteTenant(record.id)
-      message.success('删除成功')
+      message.success(t('page.tenantDeleted'))
       loadData()
     },
   })

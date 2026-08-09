@@ -1,5 +1,5 @@
 <template>
-  <a-card title="服务器监控">
+  <a-card :title="t('page.monitorServerTitle')">
     <a-row :gutter="[16, 16]">
       <a-col v-for="item in cards" :key="item.label" :xs="12" :sm="8" :lg="6">
         <a-card class="metric-card">
@@ -10,17 +10,17 @@
     </a-row>
     <a-row :gutter="[16, 16]" style="margin-top: 16px">
       <a-col :xs="24" :lg="12">
-        <a-card title="系统信息">
+        <a-card :title="t('page.monitorOs')">
           <a-descriptions :column="1" bordered size="small">
-            <a-descriptions-item label="操作系统">{{ data?.osName }} {{ data?.osArch }}</a-descriptions-item>
-            <a-descriptions-item label="主机名">{{ data?.hostName }}</a-descriptions-item>
-            <a-descriptions-item label="CPU 核心">{{ data?.cpuCores }}</a-descriptions-item>
-            <a-descriptions-item label="运行时长">{{ uptimeText }}</a-descriptions-item>
+            <a-descriptions-item :label="t('page.monitorOs')">{{ data?.osName }} {{ data?.osArch }}</a-descriptions-item>
+            <a-descriptions-item label="Hostname">{{ data?.hostName }}</a-descriptions-item>
+            <a-descriptions-item :label="`${t('page.monitorCpu')} Cores`">{{ data?.cpuCores }}</a-descriptions-item>
+            <a-descriptions-item label="Uptime">{{ uptimeText }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
       </a-col>
       <a-col :xs="24" :lg="12">
-        <a-card title="磁盘使用">
+        <a-card :title="t('page.monitorDisk')">
           <a-table :columns="diskColumns" :data-source="data?.disks || []" row-key="name" :pagination="false" size="small" />
         </a-card>
       </a-col>
@@ -32,23 +32,26 @@
 import { computed, onMounted, ref } from 'vue'
 import { getServerMonitor } from '@/api/monitor'
 import type { ServerMonitorVo } from '@/api/monitor'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const data = ref<ServerMonitorVo | null>(null)
 
 const diskColumns = [
-  { title: '分区', dataIndex: 'name', key: 'name' },
-  { title: '总量', dataIndex: 'total', key: 'total', customRender: ({ text }: { text: number }) => formatBytes(text) },
-  { title: '已用', dataIndex: 'used', key: 'used', customRender: ({ text }: { text: number }) => formatBytes(text) },
-  { title: '使用率', dataIndex: 'usagePercent', key: 'usagePercent', customRender: ({ text }: { text: number }) => `${text}%` },
+  { title: t('page.monitorDisk'), dataIndex: 'name', key: 'name' },
+  { title: 'Total', dataIndex: 'total', key: 'total', customRender: ({ text }: { text: number }) => formatBytes(text) },
+  { title: 'Used', dataIndex: 'used', key: 'used', customRender: ({ text }: { text: number }) => formatBytes(text) },
+  { title: 'Usage', dataIndex: 'usagePercent', key: 'usagePercent', customRender: ({ text }: { text: number }) => `${text}%` },
 ]
 
 const cards = computed(() => {
   const d = data.value
   return [
-    { label: 'CPU 负载', value: d ? `${d.cpuLoad.toFixed(2)}` : '-' },
-    { label: '内存使用', value: d ? `${d.memUsagePercent}%` : '-' },
-    { label: 'JVM 堆', value: d ? `${d.jvmUsagePercent}%` : '-' },
-    { label: 'CPU 核心', value: d ? String(d.cpuCores) : '-' },
+    { label: t('page.monitorCpu'), value: d ? `${d.cpuLoad.toFixed(2)}` : '-' },
+    { label: t('page.monitorMemory'), value: d ? `${d.memUsagePercent}%` : '-' },
+    { label: t('page.monitorJvm'), value: d ? `${d.jvmUsagePercent}%` : '-' },
+    { label: `${t('page.monitorCpu')} Cores`, value: d ? String(d.cpuCores) : '-' },
   ]
 })
 
@@ -59,7 +62,7 @@ const uptimeText = computed(() => {
   const seconds = data.value.uptimeSeconds
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  return `${hours}小时${minutes}分钟`
+  return `${hours}h ${minutes}m`
 })
 
 function formatBytes(value: number) {

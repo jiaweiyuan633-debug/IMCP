@@ -1,12 +1,12 @@
 <template>
-  <a-card title="在线用户">
+  <a-card :title="t('page.monitorOnlineTitle')">
     <div class="toolbar">
-      <a-button type="primary" :loading="loading" @click="loadData">刷新</a-button>
+      <a-button type="primary" :loading="loading" @click="loadData">{{ t('common.search') }}</a-button>
     </div>
     <a-table :columns="columns" :data-source="records" :loading="loading" row-key="tokenId" :pagination="false">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
-          <a v-permission="'monitor:online:kick'" @click="onKick(record)">强制下线</a>
+          <a v-permission="'monitor:online:kick'" @click="onKick(record)">{{ t('page.monitorKick') }}</a>
         </template>
       </template>
     </a-table>
@@ -18,13 +18,16 @@ import { onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { getOnlineUsers, kickOnlineUser } from '@/api/monitor'
 import type { OnlineUserVo } from '@/api/monitor'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const columns = [
-  { title: '用户名', dataIndex: 'username', key: 'username' },
-  { title: 'IP', dataIndex: 'ip', key: 'ip' },
-  { title: '登录时间', dataIndex: 'loginTime', key: 'loginTime' },
-  { title: '浏览器', dataIndex: 'userAgent', key: 'userAgent' },
-  { title: '操作', key: 'actions', width: 120 },
+  { title: t('page.monitorUsername'), dataIndex: 'username', key: 'username' },
+  { title: t('page.monitorIp'), dataIndex: 'ip', key: 'ip' },
+  { title: t('page.monitorLoginTime'), dataIndex: 'loginTime', key: 'loginTime' },
+  { title: t('page.monitorUserAgent'), dataIndex: 'userAgent', key: 'userAgent' },
+  { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 
 const loading = ref(false)
@@ -41,11 +44,11 @@ async function loadData() {
 
 function onKick(record: OnlineUserVo) {
   Modal.confirm({
-    title: '确认强制下线',
-    content: `确定将用户 ${record.username} 强制下线吗？`,
+    title: t('page.monitorKick'),
+    content: `${t('page.monitorKick')} ${record.username}?`,
     onOk: async () => {
       await kickOnlineUser(record.tokenId)
-      message.success('已强制下线')
+      message.success(t('page.monitorKickSuccess'))
       loadData()
     },
   })

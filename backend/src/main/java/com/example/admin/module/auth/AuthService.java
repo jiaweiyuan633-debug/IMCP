@@ -21,6 +21,7 @@ import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.vo.MenuVo;
+import com.example.admin.common.TenantContext;
 import com.example.admin.security.JwtUtil;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
@@ -75,6 +76,7 @@ public class AuthService {
             recordLoginFailure(username);
             throw new BusinessException(ResultCode.BAD_CREDENTIALS);
         }
+        TenantContext.setTenantId(user.getTenantId());
         if (user.getStatus() == null || user.getStatus() != 1) {
             saveLoginLog(httpRequest, username, false, "账号已被禁用");
             throw new BusinessException(ResultCode.USER_DISABLED);
@@ -126,6 +128,9 @@ public class AuthService {
 
         Long userId = Long.valueOf(claims.getSubject());
         SysUser user = userMapper.selectById(userId);
+        if (user != null && user.getTenantId() != null) {
+            TenantContext.setTenantId(user.getTenantId());
+        }
         if (user == null || user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
@@ -244,6 +249,7 @@ public class AuthService {
 
     private void saveLoginLog(HttpServletRequest request, String username, boolean success, String message) {
         SysLoginLog loginLog = new SysLoginLog();
+        loginLog.setTenantId(TenantContext.getTenantId());
         loginLog.setUsername(username);
         loginLog.setIp(request.getRemoteAddr());
         String userAgent = request.getHeader("User-Agent");

@@ -1,36 +1,36 @@
 <template>
-  <a-card title="AI 配置">
+  <a-card :title="t('page.aiConfigTitle')">
     <a-table :columns="columns" :data-source="configs" :loading="loading" row-key="id" :pagination="false">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
           <StatusTag :value="record.enabled" />
         </template>
         <template v-else-if="column.key === 'actions'">
-          <a v-permission="'ai:config:edit'" @click="openEdit(record)">编辑</a>
+          <a v-permission="'ai:config:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
         </template>
       </template>
     </a-table>
 
     <ModalForm
       v-model:open="modalOpen"
-      title="编辑 AI 服务配置"
+      :title="t('page.aiConfigEdit')"
       :loading="saving"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="服务名称" required>
+        <a-form-item :label="t('page.aiConfigName')" required>
           <a-input v-model:value="form.name" />
         </a-form-item>
-        <a-form-item label="服务地址" required>
+        <a-form-item :label="t('page.aiBaseUrl')" required>
           <a-input v-model:value="form.baseUrl" placeholder="http://localhost:8000" />
         </a-form-item>
-        <a-form-item label="调用密钥">
+        <a-form-item :label="t('page.aiApiKey')">
           <a-input-password v-model:value="form.apiKey" />
         </a-form-item>
-        <a-form-item label="超时时间（秒）">
+        <a-form-item :label="t('page.aiTimeout')">
           <a-input-number v-model:value="form.timeoutSeconds" :min="5" :max="300" />
         </a-form-item>
-        <a-form-item label="启用">
+        <a-form-item :label="t('page.aiEnabled')">
           <a-switch v-model:checked="enabled" />
         </a-form-item>
       </a-form>
@@ -45,14 +45,17 @@ import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import { getAiConfigs, updateAiConfig } from '@/api/ai'
 import type { AiConfigVo } from '@/api/ai'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const columns = [
-  { title: '编码', dataIndex: 'code', key: 'code' },
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '服务地址', dataIndex: 'baseUrl', key: 'baseUrl' },
-  { title: '超时(秒)', dataIndex: 'timeoutSeconds', key: 'timeoutSeconds', width: 100 },
-  { title: '状态', key: 'enabled', width: 90 },
-  { title: '操作', key: 'actions', width: 90 },
+  { title: t('page.aiConfigCode'), dataIndex: 'code', key: 'code' },
+  { title: t('page.aiConfigName'), dataIndex: 'name', key: 'name' },
+  { title: t('page.aiBaseUrl'), dataIndex: 'baseUrl', key: 'baseUrl' },
+  { title: t('page.aiTimeout'), dataIndex: 'timeoutSeconds', key: 'timeoutSeconds', width: 100 },
+  { title: t('page.aiEnabled'), key: 'enabled', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 90 },
 ]
 
 const loading = ref(false)
@@ -91,7 +94,7 @@ function openEdit(record: AiConfigVo) {
 
 async function onSubmit() {
   if (!editingId.value || !form.name || !form.baseUrl) {
-    message.warning('请填写服务名称和地址')
+    message.warning(t('page.aiConfigWarning'))
     return
   }
   saving.value = true
@@ -103,7 +106,7 @@ async function onSubmit() {
       timeoutSeconds: form.timeoutSeconds,
       enabled: enabled.value ? 1 : 0,
     })
-    message.success('配置已更新')
+    message.success(t('page.aiConfigUpdated'))
     modalOpen.value = false
     loadData()
   } finally {

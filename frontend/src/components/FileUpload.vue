@@ -1,7 +1,7 @@
 <template>
   <a-upload :show-upload-list="false" :custom-request="doUpload" accept="image/*">
     <a-avatar v-if="value" :src="displayUrl" :size="64" shape="square" />
-    <a-button v-else>选择图片</a-button>
+    <a-button v-else>{{ t('common.uploadTitle') }}</a-button>
   </a-upload>
 </template>
 
@@ -9,6 +9,7 @@
 import { computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { uploadFile } from '@/api/common'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   value?: string
@@ -17,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:value': [value: string]
 }>()
+const { t } = useI18n()
 
 const displayUrl = computed(() => resolveUrl(props.value || ''))
 
@@ -24,9 +26,9 @@ async function doUpload({ file }: { file: File }) {
   try {
     const result = await uploadFile(file)
     emit('update:value', result.url)
-    message.success('上传成功')
+    message.success(t('common.uploadSuccess'))
   } catch {
-    message.error('上传失败')
+    message.error(t('common.uploadError'))
   }
 }
 

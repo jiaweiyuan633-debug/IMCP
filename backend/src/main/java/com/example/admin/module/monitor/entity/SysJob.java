@@ -14,6 +14,7 @@ public class SysJob {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String jobName;
     private String jobGroup;
     private String invokeTarget;

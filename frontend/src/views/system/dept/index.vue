@@ -1,7 +1,7 @@
 <template>
-  <a-card title="部门管理">
+  <a-card :title="t('page.deptTitle')">
     <div class="toolbar">
-      <a-button v-permission="'system:dept:add'" type="primary" @click="openCreate()">新增部门</a-button>
+      <a-button v-permission="'system:dept:add'" type="primary" @click="openCreate()">{{ t('page.deptAdd') }}</a-button>
     </div>
     <a-table
       :columns="columns"
@@ -17,9 +17,9 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:dept:add'" @click="openCreate(record)">新增下级</a>
-            <a v-permission="'system:dept:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:dept:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:dept:add'" @click="openCreate(record)">{{ t('page.deptAddChild') }}</a>
+            <a v-permission="'system:dept:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:dept:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -27,13 +27,13 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑部门' : '新增部门'"
+      :title="editingId ? t('page.deptEdit') : t('page.deptAdd')"
       :loading="saving"
       width="520"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="上级部门">
+        <a-form-item :label="t('page.deptParent')">
           <a-tree-select
             v-model:value="form.parentId"
             :tree-data="parentTreeData"
@@ -41,22 +41,22 @@
             :field-names="{ label: 'deptName', value: 'id', children: 'children' }"
           />
         </a-form-item>
-        <a-form-item label="部门名称" required>
+        <a-form-item :label="t('page.deptName')" required>
           <a-input v-model:value="form.deptName" />
         </a-form-item>
-        <a-form-item label="负责人">
+        <a-form-item :label="t('page.deptLeader')">
           <a-input v-model:value="form.leader" />
         </a-form-item>
-        <a-form-item label="联系电话">
+        <a-form-item :label="t('page.deptPhone')">
           <a-input v-model:value="form.phone" />
         </a-form-item>
-        <a-form-item label="邮箱">
+        <a-form-item :label="t('page.deptEmail')">
           <a-input v-model:value="form.email" />
         </a-form-item>
-        <a-form-item label="排序">
+        <a-form-item :label="t('page.deptSort')">
           <a-input-number v-model:value="form.orderNum" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.deptStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
@@ -71,20 +71,23 @@ import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import { createDept, deleteDept, getDeptTree, updateDept } from '@/api/system'
 import type { DeptSaveRequest, DeptVo } from '@/api/system'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const columns = [
-  { title: '部门名称', dataIndex: 'deptName', key: 'deptName' },
-  { title: '负责人', dataIndex: 'leader', key: 'leader' },
-  { title: '联系电话', dataIndex: 'phone', key: 'phone' },
-  { title: '邮箱', dataIndex: 'email', key: 'email' },
-  { title: '排序', dataIndex: 'orderNum', key: 'orderNum', width: 80 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: t('page.deptName'), dataIndex: 'deptName', key: 'deptName' },
+  { title: t('page.deptLeader'), dataIndex: 'leader', key: 'leader' },
+  { title: t('page.deptPhone'), dataIndex: 'phone', key: 'phone' },
+  { title: t('page.deptEmail'), dataIndex: 'email', key: 'email' },
+  { title: t('page.deptSort'), dataIndex: 'orderNum', key: 'orderNum', width: 80 },
+  { title: t('page.deptStatus'), key: 'status', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 180 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const loading = ref(false)
@@ -103,7 +106,7 @@ const form = reactive({
 })
 
 const parentTreeData = computed<DeptVo[]>(() => [
-  { id: 0, parentId: 0, deptName: '根部门', orderNum: 0, status: 1, children: tree.value },
+  { id: 0, parentId: 0, deptName: t('page.deptRoot'), orderNum: 0, status: 1, children: tree.value },
 ])
 
 async function loadData() {
@@ -145,7 +148,7 @@ function openEdit(record: DeptVo) {
 
 async function onSubmit() {
   if (!form.deptName) {
-    message.warning('请填写部门名称')
+    message.warning(t('page.deptRequired'))
     return
   }
   saving.value = true
@@ -157,7 +160,7 @@ async function onSubmit() {
     } else {
       await createDept(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.deptSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -167,11 +170,11 @@ async function onSubmit() {
 
 function onDelete(record: DeptVo) {
   Modal.confirm({
-    title: '确认删除部门',
-    content: `确定删除部门 ${record.deptName} 吗？`,
+    title: t('page.deptDeleteTitle'),
+    content: t('page.deptDeleteConfirm', { name: record.deptName }),
     onOk: async () => {
       await deleteDept(record.id)
-      message.success('删除成功')
+      message.success(t('page.deptDeleted'))
       loadData()
     },
   })

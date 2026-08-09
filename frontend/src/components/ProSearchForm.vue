@@ -4,7 +4,7 @@
       <a-select
         v-if="field.type === 'select'"
         v-model:value="model[field.prop]"
-        :placeholder="field.placeholder || '请选择'"
+        :placeholder="field.placeholder || t('common.selectPlaceholder')"
         :options="field.options"
         allow-clear
         style="width: 160px"
@@ -12,7 +12,7 @@
       <a-input
         v-else
         v-model:value="model[field.prop]"
-        :placeholder="field.placeholder || '请输入'"
+        :placeholder="field.placeholder || t('common.inputPlaceholder')"
         allow-clear
         style="width: 180px"
       />

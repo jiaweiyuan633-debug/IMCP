@@ -11,6 +11,7 @@ public class AiServiceConfig {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String code;
     private String name;
     private String baseUrl;

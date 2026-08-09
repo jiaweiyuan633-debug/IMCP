@@ -1,0 +1,16 @@
+ALTER TABLE sys_notice ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_notice_read ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_job ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_job_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_workflow ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_workflow_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_login_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_oper_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_sql_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE sys_alert_rule ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE ai_service_config ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE ai_task ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+ALTER TABLE ai_task_result ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 1 AFTER id;
+
+ALTER TABLE ai_service_config DROP INDEX uk_ai_service_config_code;
+ALTER TABLE ai_service_config ADD UNIQUE KEY uk_ai_service_config_tenant_code (tenant_id, code);

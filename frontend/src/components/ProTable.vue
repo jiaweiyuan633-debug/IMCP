@@ -15,6 +15,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   columns: unknown[]
@@ -32,12 +33,14 @@ const emit = defineEmits<{
   change: []
 }>()
 
+const { t } = useI18n()
+
 const pagination = computed(() => ({
   current: props.pageNum,
   pageSize: props.pageSize,
   total: props.total,
   showSizeChanger: true,
-  showTotal: (total: number) => `共 ${total} 条`,
+  showTotal: (total: number) => t('common.total', { total }),
 }))
 
 function onChange(paginationValue: { current?: number; pageSize?: number }) {

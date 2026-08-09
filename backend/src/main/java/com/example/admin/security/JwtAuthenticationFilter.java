@@ -4,6 +4,7 @@ import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.common.TenantContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -51,6 +52,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         tokenService.cachePermissions(userId, perms);
                     }
                     SysUser user = userMapper.selectById(userId);
+                    if (user != null && user.getTenantId() != null) {
+                        TenantContext.setTenantId(user.getTenantId());
+                    }
                     LoginUser loginUser = LoginUser.builder()
                             .userId(userId)
                             .deptId(user == null ? null : user.getDeptId())
@@ -84,7 +88,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
             return header.substring(BEARER_PREFIX.length());
         }
-        return null;
+        return request.getParameter("token");
     }
 }
 

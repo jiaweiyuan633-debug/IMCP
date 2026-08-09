@@ -1,5 +1,5 @@
 <template>
-  <a-card title="SQL 监控">
+  <a-card :title="t('page.monitorSqlTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <ProTable
       v-model:page-num="pageNum"
@@ -30,16 +30,19 @@ import ProTable from '@/components/ProTable.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import { getSqlLogPage } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
 
-const searchFields: SearchField[] = [{ label: 'SQL 内容', prop: 'sqlText', placeholder: '请输入 SQL 内容' }]
+const { t } = useI18n()
+
+const searchFields: SearchField[] = [{ label: t('page.monitorSqlText'), prop: 'sqlText', placeholder: `${t('common.inputPlaceholder')}${t('page.monitorSqlText')}` }]
 
 const columns = [
-  { title: 'SQL', dataIndex: 'sqlText', key: 'sqlText' },
-  { title: '方法', dataIndex: 'method', key: 'method', width: 220 },
-  { title: '耗时', key: 'durationMs', width: 100 },
-  { title: '结果', key: 'success', width: 90 },
-  { title: '错误', dataIndex: 'errorMsg', key: 'errorMsg' },
-  { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  { title: t('page.monitorSqlText'), dataIndex: 'sqlText', key: 'sqlText' },
+  { title: t('page.monitorMethod'), dataIndex: 'method', key: 'method', width: 220 },
+  { title: t('page.monitorDuration'), key: 'durationMs', width: 100 },
+  { title: t('page.monitorStatus'), key: 'success', width: 90 },
+  { title: t('page.aiError'), dataIndex: 'errorMsg', key: 'errorMsg' },
+  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
 ]
 
 const pageNum = ref(1)

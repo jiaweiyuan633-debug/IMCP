@@ -13,6 +13,7 @@ public class AiTaskResult {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long taskId;
     private String resultType;
     private String resultJson;

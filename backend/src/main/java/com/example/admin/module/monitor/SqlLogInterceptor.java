@@ -15,6 +15,7 @@ import org.apache.ibatis.session.RowBounds;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import com.example.admin.common.TenantContext;
 
 import java.util.Properties;
 
@@ -72,8 +73,8 @@ public class SqlLogInterceptor implements Interceptor {
             String sqlText = sql.length() > 2000 ? sql.substring(0, 2000) : sql;
             String error = errorMsg != null && errorMsg.length() > 1000 ? errorMsg.substring(0, 1000) : errorMsg;
             jdbcTemplate.update(
-                    "INSERT INTO sys_sql_log (sql_text, method, duration_ms, success, error_msg) VALUES (?, ?, ?, ?, ?)",
-                    sqlText, method, duration, success ? 1 : 0, error);
+                    "INSERT INTO sys_sql_log (tenant_id, sql_text, method, duration_ms, success, error_msg) VALUES (?, ?, ?, ?, ?, ?)",
+                    TenantContext.getTenantId(), sqlText, method, duration, success ? 1 : 0, error);
         } catch (Exception exception) {
             log.warn("Failed to save sql log", exception);
         }

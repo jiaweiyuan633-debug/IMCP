@@ -14,8 +14,12 @@ public class SysWorkflow {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String processName;
     private String bizType;
+    private Long processDefId;
+    private Long currentNodeId;
+    private String currentNodeName;
     private Long bizId;
     private Long applicantId;
     private String applicantName;

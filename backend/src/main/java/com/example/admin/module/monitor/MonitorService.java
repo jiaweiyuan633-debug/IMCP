@@ -80,7 +80,8 @@ public class MonitorService {
                        COALESCE(SUM(status = 'FAILED'), 0) AS failed,
                        COALESCE(SUM(status IN ('PENDING', 'QUEUED', 'RUNNING')), 0) AS running
                 FROM ai_task
-                """);
+                WHERE tenant_id = ?
+                """, TenantContext.getTenantId());
         return DashboardStatsVo.builder()
                 .userCount(userMapper.selectCount(null))
                 .roleCount(roleMapper.selectCount(null))

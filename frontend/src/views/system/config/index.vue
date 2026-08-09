@@ -1,8 +1,8 @@
 <template>
-  <a-card title="参数配置">
+  <a-card :title="t('page.configTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:config:add'" type="primary" @click="openCreate">新增参数</a-button>
+      <a-button v-permission="'system:config:add'" type="primary" @click="openCreate">{{ t('page.configAdd') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -17,13 +17,13 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'configType'">
           <a-tag :color="record.configType === 0 ? 'blue' : 'default'">
-            {{ record.configType === 0 ? '系统内置' : '自定义' }}
+            {{ record.configType === 0 ? t('page.configTypeSystem') : t('page.configTypeCustom') }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:config:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:config:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:config:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:config:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -31,24 +31,24 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑参数' : '新增参数'"
+      :title="editingId ? t('page.configEdit') : t('page.configAdd')"
       :loading="saving"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="参数名称" required>
+        <a-form-item :label="t('page.configName')" required>
           <a-input v-model:value="form.configName" />
         </a-form-item>
-        <a-form-item label="参数键名" required>
+        <a-form-item :label="t('page.configKey')" required>
           <a-input v-model:value="form.configKey" />
         </a-form-item>
-        <a-form-item label="参数键值" required>
+        <a-form-item :label="t('page.configValue')" required>
           <a-input v-model:value="form.configValue" />
         </a-form-item>
-        <a-form-item label="系统内置">
+        <a-form-item :label="t('page.configType')">
           <a-select v-model:value="form.configType" :options="typeOptions" />
         </a-form-item>
-        <a-form-item label="备注">
+        <a-form-item :label="t('page.configRemark')">
           <a-textarea v-model:value="form.remark" :rows="3" />
         </a-form-item>
       </a-form>
@@ -65,24 +65,27 @@ import ModalForm from '@/components/ModalForm.vue'
 import { createConfig, deleteConfig, getConfigPage, updateConfig } from '@/api/system'
 import type { ConfigVo } from '@/api/system'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '参数名称', prop: 'configName', placeholder: '请输入参数名称' },
-  { label: '参数键名', prop: 'configKey', placeholder: '请输入参数键名' },
+  { label: t('page.configName'), prop: 'configName', placeholder: `${t('common.inputPlaceholder')}${t('page.configName')}` },
+  { label: t('page.configKey'), prop: 'configKey', placeholder: `${t('common.inputPlaceholder')}${t('page.configKey')}` },
 ]
 
 const columns = [
-  { title: '参数名称', dataIndex: 'configName', key: 'configName' },
-  { title: '参数键名', dataIndex: 'configKey', key: 'configKey' },
-  { title: '参数键值', dataIndex: 'configValue', key: 'configValue' },
-  { title: '类型', key: 'configType', width: 100 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'actions', width: 130 },
+  { title: t('page.configName'), dataIndex: 'configName', key: 'configName' },
+  { title: t('page.configKey'), dataIndex: 'configKey', key: 'configKey' },
+  { title: t('page.configValue'), dataIndex: 'configValue', key: 'configValue' },
+  { title: t('page.configType'), key: 'configType', width: 100 },
+  { title: t('page.configRemark'), dataIndex: 'remark', key: 'remark' },
+  { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 
 const typeOptions = [
-  { label: '系统内置', value: 0 },
-  { label: '自定义', value: 1 },
+  { label: t('page.configTypeSystem'), value: 0 },
+  { label: t('page.configTypeCustom'), value: 1 },
 ]
 
 const pageNum = ref(1)
@@ -152,7 +155,7 @@ function openEdit(record: ConfigVo) {
 
 async function onSubmit() {
   if (!form.configName || !form.configKey || !form.configValue) {
-    message.warning('请填写参数名称、键名和键值')
+    message.warning(t('page.configRequired'))
     return
   }
   saving.value = true
@@ -162,7 +165,7 @@ async function onSubmit() {
     } else {
       await createConfig(form)
     }
-    message.success('保存成功')
+    message.success(t('page.configSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -172,11 +175,11 @@ async function onSubmit() {
 
 function onDelete(record: ConfigVo) {
   Modal.confirm({
-    title: '确认删除参数',
-    content: `确定删除参数 ${record.configName} 吗？`,
+    title: t('page.configDeleteTitle'),
+    content: t('page.configDeleteConfirm', { name: record.configName }),
     onOk: async () => {
       await deleteConfig(record.id)
-      message.success('删除成功')
+      message.success(t('page.configDeleted'))
       loadData()
     },
   })

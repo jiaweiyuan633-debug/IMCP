@@ -14,6 +14,7 @@ public class SysNotice {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String noticeTitle;
     private Integer noticeType;
     private String noticeContent;

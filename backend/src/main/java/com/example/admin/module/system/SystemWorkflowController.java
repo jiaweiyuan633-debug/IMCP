@@ -34,6 +34,14 @@ public class SystemWorkflowController {
         return Result.success(workflowService.page(pageNum, pageSize, status));
     }
 
+    @GetMapping("/tasks")
+    @PreAuthorize("hasAuthority('system:workflow:list')")
+    public Result<PageResult<SysWorkflow>> tasks(
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "10") long pageSize) {
+        return Result.success(workflowService.taskPage(pageNum, pageSize));
+    }
+
     @PostMapping
     @OperLog(module = "工作流", action = "发起流程")
     public Result<Long> create(@RequestBody SysWorkflow workflow) {
