@@ -332,6 +332,10 @@ export function getLatestNotices(limit = 5): Promise<NoticeVo[]> {
   return request.get('/system/notice/latest', { params: { limit } })
 }
 
+export function getNoticeDetail(id: number): Promise<NoticeVo> {
+  return request.get(`/system/notice/${id}`)
+}
+
 export function getUnreadNoticeCount(): Promise<number> {
   return request.get('/system/notice/unread-count')
 }
@@ -366,6 +370,10 @@ export function getMessagePage(params: Record<string, unknown>): Promise<PageRes
 
 export function getLatestMessages(limit = 5): Promise<MessageVo[]> {
   return request.get('/system/message/latest', { params: { limit } })
+}
+
+export function getMessageDetail(id: number): Promise<MessageVo> {
+  return request.get(`/system/message/${id}`)
 }
 
 export function getUnreadMessageCount(): Promise<number> {

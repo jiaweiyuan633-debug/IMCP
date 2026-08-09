@@ -124,12 +124,13 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import {
   getLatestNotices,
+  getMessageDetail,
   getMessagePage,
   getMessageTodos,
   markAllMessageRead,
@@ -144,6 +145,7 @@ import type { SearchField } from '@/types'
 import dayjs from 'dayjs'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 
 const activeTab = ref('messages')
@@ -352,6 +354,21 @@ function formatTime(value?: string): string {
 }
 
 loadMessages()
+
+async function openFromQuery() {
+  const id = Number(route.query.id)
+  if (!id) {
+    return
+  }
+  try {
+    const record = await getMessageDetail(id)
+    openDetail(record)
+  } catch {
+    // ignore invalid message id
+  }
+}
+
+openFromQuery()
 </script>
 
 <style scoped>

@@ -98,14 +98,17 @@
             </a-badge>
             <template #overlay>
               <a-menu class="notice-menu" @click="onMessageClick">
-                <a-menu-item v-for="item in latestMessages" :key="`message-${item.id}`">
+                <a-menu-item v-for="item in noticeItems" :key="`${item.kind}-${item.id}`">
                   <div class="notice-item">
-                    <span class="notice-title">{{ item.title }}</span>
+                    <span class="notice-title">
+                      <a-tag :color="item.kind === 'notice' ? 'blue' : 'green'" style="margin-right: 4px">{{ item.tag }}</a-tag>
+                      {{ item.title }}
+                    </span>
                     <span class="notice-time">{{ formatTime(item.createdAt) }}</span>
                   </div>
                 </a-menu-item>
-                <a-menu-item v-if="latestMessages.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
-                <a-menu-divider v-if="latestMessages.length > 0" />
+                <a-menu-item v-if="noticeItems.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
+                <a-menu-divider v-if="noticeItems.length > 0" />
                 <a-menu-item key="mark-all">{{ t('page.noticeMarkAllRead') }}</a-menu-item>
                 <a-menu-item key="view-all">{{ t('page.noticeViewAll') }}</a-menu-item>
               </a-menu>
@@ -196,13 +199,16 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { getAccessToken } from '@/utils/auth'
 import {
   getLatestMessages,
+  getLatestNotices,
   getNoticeSseTicket,
   getUnreadMessageCount,
   getUnreadNoticeCount,
   markAllMessageRead,
+  markAllNoticeRead,
   markMessageRead,
+  markNoticeRead,
 } from '@/api/system'
-import type { MessageVo } from '@/api/system'
+import type { MessageVo, NoticeVo } from '@/api/system'
 import { API_BASE_URL } from '@/utils/env'
 import dayjs from 'dayjs'
 import GlobalSearch from '@/components/GlobalSearch.vue'
@@ -214,6 +220,7 @@ const permissionStore = usePermissionStore()
 const userStore = useUserStore()
 const { t, locale } = useI18n()
 const latestMessages = ref<MessageVo[]>([])
+const latestNotices = ref<NoticeVo[]>([])
 const unreadCount = ref(0)
 let noticeStream: EventSource | null = null
 let messageSocket: WebSocket | null = null
@@ -241,7 +248,7 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('offline', onOffline)
   window.addEventListener('online', onOnline)
-  latestMessages.value = await getLatestMessages()
+  await refreshNoticeItems()
   unreadCount.value = await getUnreadTotal()
   startNoticeStream()
   startMessageSocket()
@@ -375,19 +382,55 @@ async function onMessageClick({ key }: { key: string | number }) {
     const id = Number(value.replace('message-', ''))
     await markMessageRead(id)
     unreadCount.value = Math.max(unreadCount.value - 1, 0)
-    latestMessages.value = await getLatestMessages()
-    router.push('/system/message')
+    await refreshNoticeItems()
+    router.push({ path: '/system/message', query: { id } })
+    return
+  }
+  if (value.startsWith('notice-')) {
+    const id = Number(value.replace('notice-', ''))
+    await markNoticeRead(id)
+    unreadCount.value = Math.max(unreadCount.value - 1, 0)
+    await refreshNoticeItems()
+    router.push({ path: '/system/notice', query: { id } })
     return
   }
   if (value === 'mark-all') {
-    await markAllMessageRead()
+    await Promise.all([markAllMessageRead(), markAllNoticeRead()])
     unreadCount.value = 0
-    latestMessages.value = await getLatestMessages()
+    await refreshNoticeItems()
     return
   }
   if (value === 'view-all') {
     router.push('/system/message')
   }
+}
+
+const noticeItems = computed(() => {
+  const messages = latestMessages.value.map((item) => ({
+    kind: 'message' as const,
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    createdAt: item.createdAt,
+    tag: t('page.messageTitle'),
+  }))
+  const notices = latestNotices.value.map((item) => ({
+    kind: 'notice' as const,
+    id: item.id,
+    title: item.noticeTitle,
+    content: item.noticeContent,
+    createdAt: item.createdAt,
+    tag: item.noticeType === 1 ? t('page.noticeNotice') : t('page.noticeAnnounce'),
+  }))
+  return [...messages, ...notices]
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, 8)
+})
+
+async function refreshNoticeItems() {
+  const [messages, notices] = await Promise.all([getLatestMessages(), getLatestNotices()])
+  latestMessages.value = messages
+  latestNotices.value = notices
 }
 
 async function getUnreadTotal(): Promise<number> {
@@ -406,7 +449,7 @@ function startNoticeStream() {
     .then((ticket) => {
       const source = new EventSource(`${API_BASE_URL}/system/notice/stream?ticket=${encodeURIComponent(ticket)}`)
       source.addEventListener('notice', async () => {
-        latestMessages.value = await getLatestMessages()
+        await refreshNoticeItems()
         unreadCount.value = await getUnreadTotal()
       })
       source.onerror = () => {
@@ -429,7 +472,7 @@ function startMessageSocket() {
     const wsBase = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
     const socket = new WebSocket(`${wsBase}/ws/messages?token=${encodeURIComponent(token)}`)
     socket.onmessage = async () => {
-      latestMessages.value = await getLatestMessages()
+      await refreshNoticeItems()
       unreadCount.value = await getUnreadTotal()
     }
     socket.onclose = () => {

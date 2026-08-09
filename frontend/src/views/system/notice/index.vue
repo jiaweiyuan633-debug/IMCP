@@ -26,6 +26,7 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
+            <a @click="openDetail(record)">{{ t('page.messageView') }}</a>
             <a v-permission="'system:notice:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
             <a v-permission="'system:notice:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
@@ -55,22 +56,32 @@
         </a-form-item>
       </a-form>
     </ModalForm>
+
+    <a-modal v-model:open="detailOpen" :title="detailRecord?.noticeTitle || ''" :footer="null" width="680">
+      <div class="notice-detail">
+        <p>{{ detailRecord?.noticeContent || '--' }}</p>
+        <p class="notice-meta">{{ formatTime(detailRecord?.createdAt) }}</p>
+      </div>
+    </a-modal>
   </a-card>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { createNotice, deleteNotice, getNoticePage, markAllNoticeRead, updateNotice } from '@/api/system'
+import { createNotice, deleteNotice, getNoticeDetail, getNoticePage, markAllNoticeRead, updateNotice } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import dayjs from 'dayjs'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const searchFields: SearchField[] = [
   { label: t('page.noticeTitleField'), prop: 'title', placeholder: `${t('common.inputPlaceholder')}${t('page.noticeTitleField')}` },
@@ -109,6 +120,8 @@ const total = ref(0)
 const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
+const detailOpen = ref(false)
+const detailRecord = ref<NoticeVo | null>(null)
 const editingId = ref<number | undefined>()
 const records = ref<NoticeVo[]>([])
 const searchModel = reactive<Record<string, unknown>>({})
@@ -166,6 +179,15 @@ function openEdit(record: NoticeVo) {
   modalOpen.value = true
 }
 
+function openDetail(record: NoticeVo) {
+  detailRecord.value = record
+  detailOpen.value = true
+}
+
+function formatTime(value?: string): string {
+  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+}
+
 async function onSubmit() {
   if (!form.noticeTitle) {
     message.warning(t('page.noticeTitleRequired'))
@@ -205,11 +227,36 @@ function onDelete(record: NoticeVo) {
 }
 
 loadData()
+
+async function openFromQuery() {
+  const id = Number(route.query.id)
+  if (!id) {
+    return
+  }
+  try {
+    const record = await getNoticeDetail(id)
+    openDetail(record)
+  } catch {
+    // ignore invalid notice id
+  }
+}
+
+openFromQuery()
 </script>
 
 <style scoped>
 .toolbar {
   margin-bottom: 16px;
+}
+
+.notice-detail {
+  min-height: 120px;
+}
+
+.notice-meta {
+  margin-top: 24px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>
 

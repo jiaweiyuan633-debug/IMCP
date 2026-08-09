@@ -48,6 +48,12 @@ public class SystemNoticeController {
         return Result.success(noticeService.latest(limit));
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<SysNoticeDO> detail(@PathVariable Long id) {
+        return Result.success(noticeService.detail(id));
+    }
+
     @GetMapping("/ticket")
     public Result<String> sseTicket() {
         return Result.success(sseTicketService.issue(SecurityUtils.getUserId()));

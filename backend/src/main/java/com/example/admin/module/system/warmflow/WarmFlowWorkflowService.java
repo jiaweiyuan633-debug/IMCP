@@ -52,6 +52,7 @@ public class WarmFlowWorkflowService {
 
     private static final String USER_PREFIX = "user:";
     private static final String ALL_PERMISSION = "all";
+    private static final String ADMIN_PERMISSION = "admin";
     private static final String WORKFLOW_BIZ_TYPE = "workflow";
 
     private final SysWorkflowMapper workflowMapper;
@@ -78,6 +79,9 @@ public class WarmFlowWorkflowService {
         Set<Long> taskIds = new HashSet<>();
         collectTaskIds(handler, taskIds);
         collectTaskIds(ALL_PERMISSION, taskIds);
+        if (isAdmin(user)) {
+            collectTaskIds(ADMIN_PERMISSION, taskIds);
+        }
         if (taskIds.isEmpty()) {
             return new PageResult<>(List.of(), 0, pageNum, pageSize);
         }

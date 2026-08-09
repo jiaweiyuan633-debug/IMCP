@@ -58,4 +58,18 @@ public interface SysMessageMapper extends BaseMapper<SysMessageDO> {
               AND r.id IS NULL
             """)
     long selectUnreadCount(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT m.*, CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS read_flag
+            FROM sys_message m
+            LEFT JOIN sys_message_read r ON r.message_id = m.id AND r.user_id = #{userId}
+            WHERE m.deleted = 0
+              AND m.id = #{messageId}
+              AND m.tenant_id = #{tenantId}
+              AND (m.receiver_id = #{userId} OR m.receiver_id IS NULL)
+            """)
+    SysMessageDO selectDetail(@Param("tenantId") Long tenantId,
+                              @Param("userId") Long userId,
+                              @Param("messageId") Long messageId);
 }

@@ -50,6 +50,14 @@ public class SystemMessageService {
                 Math.min(Math.max(limit, MIN_LATEST_LIMIT), MAX_LATEST_LIMIT));
     }
 
+    public SysMessageDO detail(Long userId, Long id) {
+        SysMessageDO message = messageMapper.selectDetail(TenantContext.getTenantId(), userId, id);
+        if (message == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return message;
+    }
+
     public long unreadCount(Long userId) {
         return messageMapper.selectUnreadCount(TenantContext.getTenantId(), userId);
     }

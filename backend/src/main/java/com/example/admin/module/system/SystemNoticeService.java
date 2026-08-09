@@ -47,6 +47,16 @@ public class SystemNoticeService {
                 .last("LIMIT " + Math.min(Math.max(limit, MIN_LATEST_LIMIT), MAX_LATEST_LIMIT)));
     }
 
+    public SysNoticeDO detail(Long id) {
+        SysNoticeDO notice = noticeMapper.selectOne(new LambdaQueryWrapper<SysNoticeDO>()
+                .eq(SysNoticeDO::getId, id)
+                .eq(SysNoticeDO::getStatus, PUBLISHED));
+        if (notice == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return notice;
+    }
+
     public Long create(SysNoticeDO notice) {
         notice.setId(null);
         notice.setCreatedBy(SecurityUtils.tryGetUserId());

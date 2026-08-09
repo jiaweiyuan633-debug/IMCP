@@ -6,6 +6,7 @@ import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.dto.MessageSendRequest;
 import com.example.admin.module.system.entity.SysMessageDO;
 import com.example.admin.module.system.entity.SysWorkflowDO;
+import com.example.admin.module.system.warmflow.WarmFlowWorkflowService;
 import com.example.admin.security.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ import java.util.List;
 public class SystemMessageController {
 
     private final SystemMessageService messageService;
-    private final SystemWorkflowService workflowService;
+    private final WarmFlowWorkflowService workflowService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -43,6 +44,12 @@ public class SystemMessageController {
     @PreAuthorize("isAuthenticated()")
     public Result<List<SysMessageDO>> latest(@RequestParam(defaultValue = "5") int limit) {
         return Result.success(messageService.latest(limit));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<SysMessageDO> detail(@PathVariable Long id) {
+        return Result.success(messageService.detail(SecurityUtils.getUserId(), id));
     }
 
     @GetMapping("/unread-count")
