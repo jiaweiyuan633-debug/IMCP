@@ -14,8 +14,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'metric'">
@@ -93,6 +95,7 @@ import {
 } from '@/api/monitor'
 import type { AlertRuleVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -154,15 +157,9 @@ function severityColor(severity: string): string {
   return 'orange'
 }
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
-const records = ref<AlertRuleVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   ruleName: '',
   metric: 'CPU_USAGE',
@@ -175,35 +172,13 @@ const form = reactive({
   remark: '',
 })
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getAlertRulePage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      ruleName: (searchModel.ruleName as string) || undefined,
-      enabled: searchModel.enabled as number | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<AlertRuleVo>(getAlertRulePage, {
+    buildParams: (query) => ({
+      ruleName: (query.ruleName as string) || undefined,
+      enabled: query.enabled as number | undefined,
+    }),
   })
-  pageNum.value = 1
-  loadData()
-}
 
 function openCreate() {
   editingId.value = undefined
@@ -290,8 +265,6 @@ async function onRunCheck() {
   const count = await runAlertRuleCheck()
   message.success(count > 0 ? t('page.monitorAlertRunSuccess', { count }) : t('page.monitorAlertRunNone'))
 }
-
-loadData()
 </script>
 
 <style scoped>

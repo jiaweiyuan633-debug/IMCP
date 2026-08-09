@@ -111,7 +111,19 @@ export function runJob(id: number): Promise<void> {
   return request.post(`/monitor/job/${id}/run`)
 }
 
-export function getJobLogPage(params: Record<string, unknown>): Promise<PageResult<unknown>> {
+export interface JobLogVo {
+  id: number
+  jobName?: string
+  jobGroup?: string
+  invokeTarget?: string
+  jobMessage?: string
+  status: number
+  exceptionInfo?: string
+  startTime?: string
+  endTime?: string
+}
+
+export function getJobLogPage(params: Record<string, unknown>): Promise<PageResult<JobLogVo>> {
   return request.get('/monitor/job/log', { params })
 }
 
@@ -135,7 +147,17 @@ export function getServerMonitor(): Promise<ServerMonitorVo> {
   return request.get('/monitor/server')
 }
 
-export function getSqlLogPage(params: Record<string, unknown>): Promise<PageResult<unknown>> {
+export interface SqlLogVo {
+  id: number
+  sqlText?: string
+  method?: string
+  durationMs?: number
+  success: number
+  errorMsg?: string
+  createdAt?: string
+}
+
+export function getSqlLogPage(params: Record<string, unknown>): Promise<PageResult<SqlLogVo>> {
   return request.get('/monitor/sql-log', { params })
 }
 

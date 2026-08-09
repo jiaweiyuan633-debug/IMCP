@@ -24,7 +24,9 @@
           :loading="messageLoading"
           :total="messageTotal"
           row-key="id"
+          :error="messageError"
           @change="loadMessages"
+          @retry="loadMessages"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'messageType'">
@@ -40,6 +42,7 @@
             <template v-else-if="column.key === 'actions'">
               <a-space>
                 <a @click="openDetail(record)">{{ t('page.messageView') }}</a>
+                <a v-if="record.bizType" @click="goBiz(record)">{{ t('page.messageTodoGo') }}</a>
                 <a v-if="record.readFlag !== 1" @click="onMarkRead(record)">{{ t('page.messageReadTitle') }}</a>
               </a-space>
             </template>
@@ -56,7 +59,9 @@
           :loading="todoLoading"
           :total="todoTotal"
           row-key="id"
+          :error="todoError"
           @change="loadTodos"
+          @retry="loadTodos"
         >
           <template #bodyCell="{ column }">
             <template v-if="column.key === 'actions'">
@@ -75,7 +80,9 @@
           :loading="noticeLoading"
           :total="noticeTotal"
           row-key="id"
+          :error="noticeError"
           @change="loadNotices"
+          @retry="loadNotices"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'noticeType'">
@@ -128,6 +135,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
+import { useTableQuery } from '@/composables/useTableQuery'
+import { navigateToBiz } from '@/utils/bizRoute'
 import {
   getLatestNotices,
   getMessageDetail,
@@ -141,7 +150,7 @@ import {
   type NoticeVo,
   type WorkflowVo,
 } from '@/api/system'
-import type { SearchField } from '@/types'
+import type { PageResult, SearchField } from '@/types'
 import dayjs from 'dayjs'
 
 const { t } = useI18n()
@@ -197,24 +206,47 @@ const noticeColumns = [
   { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
-const messagePageNum = ref(1)
-const messagePageSize = ref(10)
-const messageTotal = ref(0)
-const messageLoading = ref(false)
-const messageRecords = ref<MessageVo[]>([])
-const messageSearchModel = reactive<Record<string, unknown>>({})
+async function fetchLatestNotices(): Promise<PageResult<NoticeVo>> {
+  const records = await getLatestNotices(20)
+  return { records, total: records.length, pageNum: 1, pageSize: records.length }
+}
 
-const todoPageNum = ref(1)
-const todoPageSize = ref(10)
-const todoTotal = ref(0)
-const todoLoading = ref(false)
-const todoRecords = ref<WorkflowVo[]>([])
+const {
+  pageNum: messagePageNum,
+  pageSize: messagePageSize,
+  total: messageTotal,
+  loading: messageLoading,
+  records: messageRecords,
+  error: messageError,
+  loadData: loadMessages,
+  onSearch: onMessageSearch,
+  onReset: onMessageReset,
+} = useTableQuery<MessageVo>(getMessagePage, {
+  buildParams: (query) => ({
+    messageType: query.messageType as string | undefined,
+    readStatus: query.readStatus as number | undefined,
+  }),
+})
 
-const noticePageNum = ref(1)
-const noticePageSize = ref(10)
-const noticeTotal = ref(0)
-const noticeLoading = ref(false)
-const noticeRecords = ref<NoticeVo[]>([])
+const {
+  pageNum: todoPageNum,
+  pageSize: todoPageSize,
+  total: todoTotal,
+  loading: todoLoading,
+  records: todoRecords,
+  error: todoError,
+  loadData: loadTodos,
+} = useTableQuery<WorkflowVo>(getMessageTodos, { immediate: false })
+
+const {
+  pageNum: noticePageNum,
+  pageSize: noticePageSize,
+  total: noticeTotal,
+  loading: noticeLoading,
+  records: noticeRecords,
+  error: noticeError,
+  loadData: loadNotices,
+} = useTableQuery<NoticeVo>(fetchLatestNotices, { immediate: false })
 
 const sendOpen = ref(false)
 const sendLoading = ref(false)
@@ -224,47 +256,6 @@ const sendForm = reactive<{ title: string; content: string; broadcast: boolean }
   broadcast: true,
 })
 
-async function loadMessages() {
-  messageLoading.value = true
-  try {
-    const data = await getMessagePage({
-      pageNum: messagePageNum.value,
-      pageSize: messagePageSize.value,
-      messageType: messageSearchModel.messageType as string | undefined,
-      readStatus: messageSearchModel.readStatus as number | undefined,
-    })
-    messageRecords.value = data.records
-    messageTotal.value = data.total
-  } finally {
-    messageLoading.value = false
-  }
-}
-
-async function loadTodos() {
-  todoLoading.value = true
-  try {
-    const data = await getMessageTodos({
-      pageNum: todoPageNum.value,
-      pageSize: todoPageSize.value,
-    })
-    todoRecords.value = data.records
-    todoTotal.value = data.total
-  } finally {
-    todoLoading.value = false
-  }
-}
-
-async function loadNotices() {
-  noticeLoading.value = true
-  try {
-    const records = await getLatestNotices(20)
-    noticeRecords.value = records
-    noticeTotal.value = records.length
-  } finally {
-    noticeLoading.value = false
-  }
-}
-
 function onTabChange(key: string) {
   if (key === 'todos' && todoRecords.value.length === 0) {
     loadTodos()
@@ -272,20 +263,6 @@ function onTabChange(key: string) {
   if (key === 'notices' && noticeRecords.value.length === 0) {
     loadNotices()
   }
-}
-
-function onMessageSearch(model: Record<string, unknown>) {
-  Object.assign(messageSearchModel, model)
-  messagePageNum.value = 1
-  loadMessages()
-}
-
-function onMessageReset() {
-  Object.keys(messageSearchModel).forEach((key) => {
-    messageSearchModel[key] = undefined
-  })
-  messagePageNum.value = 1
-  loadMessages()
 }
 
 async function onMarkRead(record: MessageVo) {
@@ -349,11 +326,15 @@ function goWorkflow() {
   router.push('/system/workflow')
 }
 
+function goBiz(record: MessageVo) {
+  if (record.bizType) {
+    navigateToBiz(router, record.bizType, record.bizId)
+  }
+}
+
 function formatTime(value?: string): string {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : ''
 }
-
-loadMessages()
 
 async function openFromQuery() {
   const id = Number(route.query.id)

@@ -13,6 +13,7 @@ import com.example.admin.module.monitor.entity.SysJobLogDO;
 import com.example.admin.module.monitor.job.SysJobSchedulerService;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
+import com.example.admin.module.monitor.vo.JobLogVo;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -100,13 +101,30 @@ public class MonitorJobService {
         schedulerService.runOnce(job);
     }
 
-    public PageResult<SysJobLogDO> logPage(long pageNum, long pageSize, String jobName) {
+    public PageResult<JobLogVo> logPage(long pageNum, long pageSize, String jobName) {
         Page<SysJobLogDO> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<SysJobLogDO> wrapper = new LambdaQueryWrapper<SysJobLogDO>()
                 .like(StringUtils.hasText(jobName), SysJobLogDO::getJobName, jobName)
                 .orderByDesc(SysJobLogDO::getId);
         IPage<SysJobLogDO> result = jobLogMapper.selectPage(page, wrapper);
-        return PageResult.of(result, result.getRecords());
+        List<JobLogVo> records = result.getRecords().stream()
+                .map(this::toJobLogVo)
+                .toList();
+        return PageResult.of(result, records);
+    }
+
+    private JobLogVo toJobLogVo(SysJobLogDO log) {
+        return JobLogVo.builder()
+                .id(log.getId())
+                .jobName(log.getJobName())
+                .jobGroup(log.getJobGroup())
+                .invokeTarget(log.getInvokeTarget())
+                .jobMessage(log.getJobMessage())
+                .status(log.getStatus())
+                .exceptionInfo(log.getExceptionInfo())
+                .startTime(log.getStartTime())
+                .endTime(log.getEndTime())
+                .build();
     }
 
     private SysJobDO toEntity(JobSaveRequest request) {

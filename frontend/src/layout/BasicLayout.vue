@@ -85,8 +85,8 @@
             </a-button>
             <template #overlay>
               <a-menu @click="onLanguageClick">
-                <a-menu-item key="zh-CN">中文</a-menu-item>
-                <a-menu-item key="en-US">English</a-menu-item>
+                <a-menu-item key="zh-CN">{{ t('common.langZh') }}</a-menu-item>
+                <a-menu-item key="en-US">{{ t('common.langEn') }}</a-menu-item>
               </a-menu>
             </template>
           </a-dropdown>
@@ -197,6 +197,7 @@ import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getAccessToken } from '@/utils/auth'
+import { navigateToBiz } from '@/utils/bizRoute'
 import {
   getNotificationFeed,
   getNoticeSseTicket,
@@ -379,9 +380,13 @@ async function onMessageClick({ key }: { key: string | number }) {
   const value = String(key)
   if (value.startsWith('message-')) {
     const id = Number(value.replace('message-', ''))
+    const target = latestMessages.value.find((m) => m.id === id)
     await markMessageRead(id)
     unreadCount.value = Math.max(unreadCount.value - 1, 0)
     await refreshNoticeItems()
+    if (target?.bizType && navigateToBiz(router, target.bizType, target.bizId)) {
+      return
+    }
     router.push({ path: '/system/message', query: { id } })
     return
   }
@@ -411,6 +416,8 @@ const noticeItems = computed(() => {
     title: item.title,
     content: item.content,
     createdAt: item.createdAt,
+    bizType: item.bizType,
+    bizId: item.bizId,
     tag: t('page.messageTitle'),
   }))
   const notices = latestNotices.value.map((item) => ({
@@ -430,7 +437,16 @@ async function refreshNoticeItems() {
   const feed = await getNotificationFeed()
   latestMessages.value = feed
     .filter((item): item is NotificationFeedItem & { kind: 'message' } => item.kind === 'message')
-    .map((item) => ({ id: item.id, title: item.title, content: item.content, createdAt: item.createdAt, messageType: 'SYSTEM', readFlag: 0 }))
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      content: item.content,
+      bizType: item.bizType,
+      bizId: item.bizId,
+      createdAt: item.createdAt,
+      messageType: 'SYSTEM',
+      readFlag: 0,
+    }))
   latestNotices.value = feed
     .filter((item): item is NotificationFeedItem & { kind: 'notice' } => item.kind === 'notice')
     .map((item) => ({

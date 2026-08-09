@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.MessageBizType;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
@@ -20,6 +21,7 @@ import com.example.admin.module.ai.manager.AiTaskManager;
 import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
+import com.example.admin.module.system.SystemMessageService;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.DataScope;
 import com.example.admin.security.SecurityUtils;
@@ -64,6 +66,7 @@ public class AiTaskService {
     private final ObjectMapper objectMapper;
     private final DataScopeHelper dataScopeHelper;
     private final StringRedisTemplate redisTemplate;
+    private final SystemMessageService messageService;
 
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
@@ -213,6 +216,21 @@ public class AiTaskService {
             result.setRawData(toJson(request));
             resultMapper.insert(result);
         }
+        notifyCreator(task, status);
+    }
+
+    private void notifyCreator(AiTaskDO task, String status) {
+        if (task.getCreatedBy() == null) {
+            return;
+        }
+        boolean succeeded = AiTaskStatus.SUCCEEDED.name().equals(status);
+        String title = succeeded ? "AI 任务完成" : "AI 任务失败";
+        String content = succeeded
+                ? "AI 任务「" + task.getTaskNo() + "」已执行完成。"
+                : "AI 任务「" + task.getTaskNo() + "」执行失败"
+                        + (task.getErrorMsg() == null || task.getErrorMsg().isBlank() ? "。" : "：" + task.getErrorMsg());
+        messageService.sendSystemToUsers(List.of(task.getCreatedBy()), task.getTenantId(),
+                title, content, MessageBizType.AI, task.getId());
     }
 
     private AiTaskVo toVo(AiTaskDO task) {

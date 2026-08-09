@@ -3,6 +3,7 @@ import axios from 'axios'
 import type { MenuNode, PageResult, RoleOptionVo, RoleVo, UserVo } from '@/types'
 import { getAccessToken } from '@/utils/auth'
 import { API_BASE_URL } from '@/utils/env'
+import i18n from '@/locales'
 
 export interface UserQuery {
   pageNum: number
@@ -301,7 +302,7 @@ export async function exportUsers(): Promise<void> {
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url
-  link.download = '用户数据.xlsx'
+  link.download = i18n.global.t('common.userDataExport')
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -369,6 +370,8 @@ export interface NotificationFeedItem {
   id: number
   title: string
   content?: string
+  bizType?: string
+  bizId?: number
   createdAt?: string
   tag?: string | null
 }
@@ -434,6 +437,14 @@ export interface TenantVo {
   createdAt?: string
 }
 
+export interface TenantAdminCandidateVo {
+  id: number
+  username: string
+  nickname?: string
+  tenantId: number
+  tenantName: string
+}
+
 export function getTenantPage(params: Record<string, unknown>): Promise<PageResult<TenantVo>> {
   return request.get('/system/tenant', { params })
 }
@@ -448,6 +459,14 @@ export function updateTenant(data: Record<string, unknown>): Promise<void> {
 
 export function deleteTenant(id: number): Promise<void> {
   return request.delete(`/system/tenant/${id}`)
+}
+
+export function getTenantUsers(tenantId: number): Promise<TenantAdminCandidateVo[]> {
+  return request.get(`/system/tenant/${tenantId}/users`)
+}
+
+export function getTenantAdminCandidates(): Promise<TenantAdminCandidateVo[]> {
+  return request.get('/system/tenant/admin-candidates')
 }
 
 export interface WorkflowVo {
@@ -509,6 +528,37 @@ export interface WorkflowLogVo {
 
 export function getWorkflowLogs(id: number): Promise<WorkflowLogVo[]> {
   return request.get(`/system/workflow-engine/${id}/logs`)
+}
+
+export interface WorkflowTraceItemVo {
+  nodeCode?: string
+  nodeName?: string
+  approver?: string
+  flowStatus?: string
+  message?: string
+  createTime?: string
+}
+
+export interface WorkflowDetailVo {
+  id: number
+  processName: string
+  bizType?: string
+  bizId?: number
+  status: string
+  applicantId?: number
+  applicantName?: string
+  currentNodeName?: string
+  content?: string
+  remark?: string
+  createdAt?: string
+  flowInstanceId?: number
+  formData?: Record<string, unknown>
+  trace?: WorkflowTraceItemVo[]
+  currentNodes?: ProcessNodeVo[]
+}
+
+export function getWorkflowDetail(id: number): Promise<WorkflowDetailVo> {
+  return request.get(`/system/workflow-engine/${id}`)
 }
 
 export interface ProcessDefVo {

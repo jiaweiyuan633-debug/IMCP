@@ -2,6 +2,7 @@ package com.example.admin.module.system.warmflow;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.MessageBizType;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.warm.flow.core.FlowEngine;
 import org.dromara.warm.flow.core.dto.FlowParams;
 import org.dromara.warm.flow.core.entity.Definition;
+import org.dromara.warm.flow.core.entity.HisTask;
 import org.dromara.warm.flow.core.entity.Instance;
 import org.dromara.warm.flow.core.entity.Task;
 import org.dromara.warm.flow.core.entity.User;
@@ -53,7 +55,6 @@ public class WarmFlowWorkflowService {
     private static final String USER_PREFIX = "user:";
     private static final String ALL_PERMISSION = "all";
     private static final String ADMIN_PERMISSION = "admin";
-    private static final String WORKFLOW_BIZ_TYPE = "workflow";
 
     private final SysWorkflowMapper workflowMapper;
     private final SysWorkflowLogMapper workflowLogMapper;
@@ -219,7 +220,7 @@ public class WarmFlowWorkflowService {
                 workflow.getTenantId(),
                 "流程转办待办",
                 "流程「" + workflow.getProcessName() + "」已转办给您，请及时处理。",
-                WORKFLOW_BIZ_TYPE,
+                MessageBizType.WORKFLOW,
                 workflow.getId());
     }
 
@@ -243,6 +244,53 @@ public class WarmFlowWorkflowService {
             result.add(vo);
         }
         return result;
+    }
+
+    public WorkflowDetailVo detail(Long id) {
+        SysWorkflowDO workflow = getOrThrow(id);
+        return WorkflowDetailVo.builder()
+                .id(workflow.getId())
+                .processName(workflow.getProcessName())
+                .bizType(workflow.getBizType())
+                .bizId(workflow.getBizId())
+                .status(workflow.getStatus())
+                .applicantId(workflow.getApplicantId())
+                .applicantName(workflow.getApplicantName())
+                .currentNodeName(workflow.getCurrentNodeName())
+                .content(workflow.getContent())
+                .remark(workflow.getRemark())
+                .createdAt(workflow.getCreatedAt())
+                .flowInstanceId(workflow.getFlowInstanceId())
+                .formData(parseForm(workflow.getFormData()))
+                .trace(buildTrace(workflow.getFlowInstanceId()))
+                .currentNodes(currentNodes(id))
+                .build();
+    }
+
+    private List<WorkflowTraceItemVo> buildTrace(Long flowInstanceId) {
+        if (flowInstanceId == null) {
+            return List.of();
+        }
+        List<HisTask> hisTasks = FlowEngine.hisTaskService().getByInsId(flowInstanceId);
+        if (hisTasks == null || hisTasks.isEmpty()) {
+            return List.of();
+        }
+        return hisTasks.stream()
+                .sorted(Comparator.comparing(HisTask::getCreateTime,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(task -> WorkflowTraceItemVo.builder()
+                        .nodeCode(task.getNodeCode())
+                        .nodeName(task.getNodeName())
+                        .approver(task.getApprover())
+                        .flowStatus(mapFlowStatus(task.getFlowStatus()))
+                        .message(task.getMessage())
+                        .createTime(toLocalDateTime(task.getCreateTime()))
+                        .build())
+                .toList();
+    }
+
+    private LocalDateTime toLocalDateTime(java.util.Date date) {
+        return date == null ? null : LocalDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault());
     }
 
     private void afterAction(SysWorkflowDO workflow, Instance instance, String action, String remark) {
@@ -309,14 +357,14 @@ public class WarmFlowWorkflowService {
                             .eq(SysUserDO::getStatus, 1))
                     .stream().map(SysUserDO::getId).toList());
         }
-        messageService.sendTodoToUsers(new ArrayList<>(userIds), tenantId, title, content, WORKFLOW_BIZ_TYPE, workflowId);
+        messageService.sendTodoToUsers(new ArrayList<>(userIds), tenantId, title, content, MessageBizType.WORKFLOW, workflowId);
     }
 
     private void notifyUser(Long userId, Long tenantId, String title, String content, Long workflowId) {
         if (userId == null) {
             return;
         }
-        messageService.sendSystemToUsers(List.of(userId), tenantId, title, content, WORKFLOW_BIZ_TYPE, workflowId);
+        messageService.sendSystemToUsers(List.of(userId), tenantId, title, content, MessageBizType.WORKFLOW, workflowId);
     }
 
     private SysWorkflowDO toWorkflowVO(Instance instance) {

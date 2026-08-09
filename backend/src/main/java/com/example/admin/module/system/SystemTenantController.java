@@ -4,6 +4,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysTenantDO;
+import com.example.admin.module.system.vo.TenantAdminCandidateVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/system/tenant")
@@ -53,6 +56,18 @@ public class SystemTenantController {
     public Result<Void> delete(@PathVariable Long id) {
         tenantService.delete(id);
         return Result.success();
+    }
+
+    @GetMapping("/{tenantId}/users")
+    @PreAuthorize("hasAnyAuthority('system:tenant:add','system:tenant:edit')")
+    public Result<List<TenantAdminCandidateVo>> tenantUsers(@PathVariable Long tenantId) {
+        return Result.success(tenantService.adminCandidates(tenantId));
+    }
+
+    @GetMapping("/admin-candidates")
+    @PreAuthorize("hasAnyAuthority('system:tenant:add','system:tenant:edit')")
+    public Result<List<TenantAdminCandidateVo>> adminCandidates() {
+        return Result.success(tenantService.adminCandidates(null));
     }
 }
 

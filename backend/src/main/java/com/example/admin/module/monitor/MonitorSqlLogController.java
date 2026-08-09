@@ -2,7 +2,7 @@ package com.example.admin.module.monitor;
 
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
-import com.example.admin.module.monitor.entity.SysSqlLogDO;
+import com.example.admin.module.monitor.vo.SqlLogVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +19,7 @@ public class MonitorSqlLogController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('monitor:sql:list')")
-    public Result<PageResult<SysSqlLogDO>> page(
+    public Result<PageResult<SqlLogVo>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String sqlText) {

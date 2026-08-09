@@ -15,8 +15,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -120,6 +122,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import FileUpload from '@/components/FileUpload.vue'
+import { useTableQuery } from '@/composables/useTableQuery'
 import {
   createUser,
   deleteUser,
@@ -173,12 +176,7 @@ const statusOptions = [
   { label: t('common.disabled'), value: 0 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
-const records = ref<UserVo[]>([])
 const roleOptions = ref<RoleOptionVo[]>([])
 const postOptions = ref<PostOptionVo[]>([])
 const deptTree = ref<DeptVo[]>([])
@@ -187,7 +185,6 @@ const assignOpen = ref(false)
 const assignSaving = ref(false)
 const editingId = ref<number | undefined>()
 const assignUserId = ref<number>()
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   avatar: '',
   username: '',
@@ -205,36 +202,14 @@ const assignForm = reactive({
   postIds: [] as number[],
 })
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getUserPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      username: (searchModel.username as string) || undefined,
-      nickname: (searchModel.nickname as string) || undefined,
-      status: searchModel.status as number | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<UserVo>(getUserPage, {
+    buildParams: (query) => ({
+      username: (query.username as string) || undefined,
+      nickname: (query.nickname as string) || undefined,
+      status: query.status as number | undefined,
+    }),
   })
-  pageNum.value = 1
-  loadData()
-}
 
 function openCreate() {
   editingId.value = undefined
@@ -368,7 +343,6 @@ onMounted(async () => {
   roleOptions.value = await getRoleOptions()
   postOptions.value = await getPostOptions()
   deptTree.value = await getDeptTree()
-  loadData()
 })
 </script>
 

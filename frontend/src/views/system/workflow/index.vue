@@ -18,8 +18,10 @@
           :data-source="instanceRecords"
           :loading="instanceLoading"
           :total="instanceTotal"
+          :error="instanceError"
           row-key="id"
           @change="loadInstances"
+          @retry="loadInstances"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
@@ -27,6 +29,7 @@
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-space>
+                <a @click="openDetail(record)">{{ t('page.workflowDetail') }}</a>
                 <a @click="openLogs(record)">{{ t('page.workflowLogs') }}</a>
                 <a v-if="record.status === 'PENDING'" v-permission="'system:workflow:approve'" @click="openApprove(record)">{{ t('page.workflowApprove') }}</a>
                 <a v-if="record.status === 'PENDING'" v-permission="'system:workflow:reject'" @click="openReject(record)">{{ t('page.workflowReject') }}</a>
@@ -52,8 +55,10 @@
           :data-source="taskRecords"
           :loading="taskLoading"
           :total="taskTotal"
+          :error="taskError"
           row-key="id"
           @change="loadTasks"
+          @retry="loadTasks"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
@@ -61,6 +66,7 @@
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-space>
+                <a @click="openDetail(record)">{{ t('page.workflowDetail') }}</a>
                 <a @click="openLogs(record)">{{ t('page.workflowLogs') }}</a>
                 <a v-permission="'system:workflow:approve'" @click="openApprove(record)">{{ t('page.workflowApprove') }}</a>
                 <a v-permission="'system:workflow:reject'" @click="openReject(record)">{{ t('page.workflowReject') }}</a>
@@ -82,8 +88,10 @@
           :data-source="defRecords"
           :loading="defLoading"
           :total="defTotal"
+          :error="defError"
           row-key="id"
           @change="loadDefs"
+          @retry="loadDefs"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
@@ -187,17 +195,59 @@
     <a-modal v-model:open="nodesModalOpen" :title="`${t('page.workflowDefNodes')}: ${activeDef?.defName || ''}`" :footer="null" width="620">
       <a-table :columns="nodeViewColumns" :data-source="nodeViewRecords" :pagination="false" size="small" />
     </a-modal>
+
+    <a-drawer v-model:open="detailOpen" :title="t('page.workflowDetail')" width="560">
+      <a-spin :spinning="detailLoading" tip="">
+      <template v-if="detail">
+        <a-descriptions :column="1" size="small" bordered :title="t('page.workflowDetailBase')">
+          <a-descriptions-item :label="t('page.workflowName')">{{ detail.processName }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowBizType')">{{ detail.bizType || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowBizId')">{{ detail.bizId ?? '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowApplicant')">{{ detail.applicantName || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowStatus')"><StatusTag :value="detail.status" /></a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowCurrentNode')">{{ detail.currentNodeName || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowFlowInstance')">{{ detail.flowInstanceId ?? '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowContent')">{{ detail.content || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowApprovalRemark')">{{ detail.remark || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowCreatedAt')">{{ detail.createdAt || '-' }}</a-descriptions-item>
+        </a-descriptions>
+
+        <a-descriptions :column="1" size="small" bordered :title="t('page.workflowFormDataTitle')" class="detail-section">
+          <a-descriptions-item v-if="!formDataEntries.length" :label="t('page.workflowNoFormData')">-</a-descriptions-item>
+          <a-descriptions-item v-for="entry in formDataEntries" :key="entry.key" :label="entry.key">
+            {{ entry.value }}
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <a-divider>{{ t('page.workflowTraceTitle') }}</a-divider>
+        <a-empty v-if="!detail.trace?.length" :description="t('page.workflowNoTrace')" />
+        <a-timeline v-else>
+          <a-timeline-item v-for="(item, index) in detail.trace" :key="index">
+            <div class="trace-title">
+              <span class="trace-node">{{ item.nodeName || item.nodeCode || '-' }}</span>
+              <StatusTag :value="item.flowStatus || ''" />
+            </div>
+            <div v-if="item.approver" class="trace-meta">{{ t('page.workflowTraceApprover') }}: {{ item.approver }}</div>
+            <div v-if="item.message" class="trace-meta">{{ t('page.workflowTraceMessage') }}: {{ item.message }}</div>
+            <div v-if="item.createTime" class="trace-meta">{{ t('page.workflowTraceTime') }}: {{ item.createTime }}</div>
+          </a-timeline-item>
+        </a-timeline>
+      </template>
+      </a-spin>
+    </a-drawer>
   </a-card>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { DeleteOutlined } from '@ant-design/icons-vue'
 import ModalForm from '@/components/ModalForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
+import { useTableQuery } from '@/composables/useTableQuery'
 import {
   approveWorkflow,
   createProcessDef,
@@ -209,6 +259,7 @@ import {
   getProcessDefPage,
   getRoleOptions,
   getUserPage,
+  getWorkflowDetail,
   getWorkflowLogs,
   getWorkflowCurrentNodes,
   getWorkflowPage,
@@ -219,12 +270,13 @@ import {
   updateProcessDef,
   withdrawWorkflow,
 } from '@/api/system'
-import type { ProcessDefVo, ProcessNodeVo, WorkflowLogVo, WorkflowVo } from '@/api/system'
+import type { ProcessDefVo, ProcessNodeVo, WorkflowDetailVo, WorkflowLogVo, WorkflowVo } from '@/api/system'
 import type { RoleOptionVo } from '@/types'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const activeKey = ref('instances')
 
@@ -267,12 +319,23 @@ const nodeViewColumns = [
   { title: t('page.workflowNodeRole'), dataIndex: 'roleName', key: 'roleName' },
 ]
 
-const instancePageNum = ref(1)
-const instancePageSize = ref(10)
-const instanceTotal = ref(0)
-const instanceLoading = ref(false)
-const instanceRecords = ref<WorkflowVo[]>([])
-const instanceSearchModel = reactive<Record<string, unknown>>({})
+const {
+  pageNum: instancePageNum,
+  pageSize: instancePageSize,
+  total: instanceTotal,
+  loading: instanceLoading,
+  records: instanceRecords,
+  error: instanceError,
+  loadData: loadInstances,
+  onSearch: onInstanceSearch,
+  onReset: onInstanceReset,
+} = useTableQuery<WorkflowVo>(getWorkflowPage, {
+  buildParams: (query) => ({
+    processName: (query.processName as string) || undefined,
+    status: query.status as string | undefined,
+    bizType: query.bizType as string | undefined,
+  }),
+})
 
 const instanceSearchFields: SearchField[] = [
   { label: t('page.workflowName'), prop: 'processName' },
@@ -290,22 +353,35 @@ const instanceSearchFields: SearchField[] = [
   { label: t('page.workflowBizType'), prop: 'bizType' },
 ]
 
-const taskPageNum = ref(1)
-const taskPageSize = ref(10)
-const taskTotal = ref(0)
-const taskLoading = ref(false)
-const taskRecords = ref<WorkflowVo[]>([])
-const taskSearchModel = reactive<Record<string, unknown>>({})
+const {
+  pageNum: taskPageNum,
+  pageSize: taskPageSize,
+  total: taskTotal,
+  loading: taskLoading,
+  records: taskRecords,
+  error: taskError,
+  loadData: loadTasks,
+  onSearch: onTaskSearch,
+  onReset: onTaskReset,
+} = useTableQuery<WorkflowVo>(getWorkflowTasks, {
+  buildParams: (query) => ({
+    processName: (query.processName as string) || undefined,
+  }),
+})
 
 const taskSearchFields: SearchField[] = [
   { label: t('page.workflowName'), prop: 'processName' },
 ]
 
-const defPageNum = ref(1)
-const defPageSize = ref(10)
-const defTotal = ref(0)
-const defLoading = ref(false)
-const defRecords = ref<ProcessDefVo[]>([])
+const {
+  pageNum: defPageNum,
+  pageSize: defPageSize,
+  total: defTotal,
+  loading: defLoading,
+  records: defRecords,
+  error: defError,
+  loadData: loadDefs,
+} = useTableQuery<ProcessDefVo>(getProcessDefPage)
 
 const processDefOptions = ref<ProcessDefVo[]>([])
 const roleOptions = ref<RoleOptionVo[]>([])
@@ -352,52 +428,19 @@ const logsModalOpen = ref(false)
 const logLoading = ref(false)
 const logRecords = ref<WorkflowLogVo[]>([])
 
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detail = ref<WorkflowDetailVo | null>(null)
+const formDataEntries = computed(() =>
+  Object.entries(detail.value?.formData ?? {}).map(([key, value]) => ({
+    key,
+    value: typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),
+  })),
+)
+
 const nodesModalOpen = ref(false)
 const activeDef = ref<ProcessDefVo | null>(null)
 const nodeViewRecords = ref<Array<ProcessNodeVo & { roleName?: string }>>([])
-
-async function loadInstances() {
-  instanceLoading.value = true
-  try {
-    const data = await getWorkflowPage({
-      pageNum: instancePageNum.value,
-      pageSize: instancePageSize.value,
-      processName: (instanceSearchModel.processName as string) || undefined,
-      status: instanceSearchModel.status as string | undefined,
-      bizType: instanceSearchModel.bizType as string | undefined,
-    })
-    instanceRecords.value = data.records
-    instanceTotal.value = data.total
-  } finally {
-    instanceLoading.value = false
-  }
-}
-
-async function loadTasks() {
-  taskLoading.value = true
-  try {
-    const data = await getWorkflowTasks({
-      pageNum: taskPageNum.value,
-      pageSize: taskPageSize.value,
-      processName: (taskSearchModel.processName as string) || undefined,
-    })
-    taskRecords.value = data.records
-    taskTotal.value = data.total
-  } finally {
-    taskLoading.value = false
-  }
-}
-
-async function loadDefs() {
-  defLoading.value = true
-  try {
-    const data = await getProcessDefPage({ pageNum: defPageNum.value, pageSize: defPageSize.value })
-    defRecords.value = data.records
-    defTotal.value = data.total
-  } finally {
-    defLoading.value = false
-  }
-}
 
 async function loadOptions() {
   processDefOptions.value = await getProcessDefOptions()
@@ -520,34 +563,6 @@ function onDefDelete(record: ProcessDefVo) {
   })
 }
 
-function onInstanceSearch(model: Record<string, unknown>) {
-  Object.assign(instanceSearchModel, model)
-  instancePageNum.value = 1
-  loadInstances()
-}
-
-function onInstanceReset() {
-  Object.keys(instanceSearchModel).forEach((key) => {
-    instanceSearchModel[key] = undefined
-  })
-  instancePageNum.value = 1
-  loadInstances()
-}
-
-function onTaskSearch(model: Record<string, unknown>) {
-  Object.assign(taskSearchModel, model)
-  taskPageNum.value = 1
-  loadTasks()
-}
-
-function onTaskReset() {
-  Object.keys(taskSearchModel).forEach((key) => {
-    taskSearchModel[key] = undefined
-  })
-  taskPageNum.value = 1
-  loadTasks()
-}
-
 async function onPublish(record: ProcessDefVo) {
   await publishProcessDef(record.id)
   message.success(t('page.workflowOperationSuccess'))
@@ -647,6 +662,17 @@ async function openLogs(record: WorkflowVo) {
   }
 }
 
+async function openDetail(record: WorkflowVo) {
+  detailOpen.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    detail.value = await getWorkflowDetail(record.id)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
 async function openDefNodes(record: ProcessDefVo) {
   activeDef.value = record
   const nodes = await getProcessDefNodes(record.id)
@@ -657,10 +683,18 @@ async function openDefNodes(record: ProcessDefVo) {
   nodesModalOpen.value = true
 }
 
-loadDefs()
-loadInstances()
-loadTasks()
 loadOptions()
+
+async function openFromQuery() {
+  const id = Number(route.query.detail)
+  if (!id) {
+    return
+  }
+  activeKey.value = 'instances'
+  await openDetail({ id } as WorkflowVo)
+}
+
+openFromQuery()
 </script>
 
 <style scoped>
@@ -673,5 +707,26 @@ loadOptions()
   grid-template-columns: 1fr 1fr 160px 32px;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.detail-section {
+  margin-top: 16px;
+}
+
+.trace-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.trace-node {
+  font-weight: 500;
+}
+
+.trace-meta {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

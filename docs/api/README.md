@@ -81,11 +81,17 @@ Java 后端统一响应结构：
 | 通知公告 | `/api/system/notice` | 公告 CRUD、最新公告、未读数、单条已读、全部已读 |
 | 通知实时推送 | `/api/system/notice/stream` | SSE 实时通知流 |
 | 通知推送 Ticket | `/api/system/notice/ticket` | 获取一次性 SSE Ticket |
+| 消息中心 | `/api/system/message` | 分页、最新消息、详情、未读数、已读/全部已读、发送 |
+| 消息待办 | `/api/system/message/todos` | 消息待办任务（对接 Warm-Flow） |
+| 消息聚合 | `/api/system/message/feed` | 铃铛聚合：消息 + 公告统一推送（含 bizType/bizId 深链） |
 | 租户 | `/api/system/tenant` | 租户 CRUD |
+| 租户内用户 | `/api/system/tenant/{tenantId}/users` | 租户管理员候选（当前租户内用户） |
+| 管理员候选 | `/api/system/tenant/admin-candidates` | 可担任租户管理员的跨租户候选 |
 | 文件管理 | `/api/system/file` | 文件分页、删除 |
-| 工作流 | `/api/system/workflow` | 发起、分页、待办、通过、拒绝、撤回、转办、审批日志 |
-| 流程定义 | `/api/system/workflow/def` | 流程定义 CRUD、节点查询 |
-| 当前节点 | `/api/system/workflow/{id}/nodes` | 当前待办节点查询 |
+| 工作流引擎 | `/api/system/workflow-engine` | 发起、实例分页、待办、通过、拒绝、撤回、转办、审批日志 |
+| 工作流详情 | `/api/system/workflow-engine/{id}` | 详情出参：头部信息 + 表单回显(formData) + 完整流程轨迹(trace) + 当前待办节点 |
+| 流程定义 | `/api/system/workflow-engine/def` | 流程定义 CRUD、发布/取消发布、节点查询、定义选项 |
+| 当前节点 | `/api/system/workflow-engine/{id}/nodes` | 当前待办节点查询 |
 
 ## 监控
 
@@ -97,9 +103,9 @@ Java 后端统一响应结构：
 | 缓存 | `/api/monitor/cache/{key}` | 查询、删除缓存 |
 | 看板统计 | `/api/monitor/stats` | 用户/部门/任务/日志等统计 |
 | 定时任务 | `/api/monitor/job` | 任务 CRUD、状态启停、手动执行 |
-| 任务日志 | `/api/monitor/job/log` | 定时任务执行日志 |
+| 任务日志 | `/api/monitor/job/log` | 定时任务执行日志（`JobLogVo` 类型契约） |
 | 服务器监控 | `/api/monitor/server` | CPU、内存、磁盘、JVM 等指标 |
-| SQL 监控 | `/api/monitor/sql-log` | 慢 SQL 与 SQL 执行日志 |
+| SQL 监控 | `/api/monitor/sql-log` | 慢 SQL 与 SQL 执行日志（`SqlLogVo` 类型契约） |
 | 告警规则 | `/api/monitor/alert-rule` | 告警规则 CRUD、立即检查 |
 | 审计日志 | `/api/monitor/audit-log` | 审计日志分页查询 |
 

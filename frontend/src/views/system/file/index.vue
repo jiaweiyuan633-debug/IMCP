@@ -19,8 +19,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'originalName'">
@@ -63,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
@@ -72,6 +74,7 @@ import { getFileAccessToken, getStorageQuota, type StorageQuota } from '@/api/co
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
 
@@ -117,35 +120,21 @@ const columns = [
   { title: t('common.actions'), key: 'actions', width: 170 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
-const records = ref<FileVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const previewOpen = ref(false)
 const previewUrl = ref('')
 const previewName = ref('')
 const previewRecord = ref<FileVo | null>(null)
 const quota = ref<StorageQuota | null>(null)
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getFilePage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      fileName: (searchModel.fileName as string) || undefined,
-      originalName: (searchModel.originalName as string) || undefined,
-      category: searchModel.category as string | undefined,
-      storageType: searchModel.storageType as string | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<FileVo>(getFilePage, {
+    buildParams: (query) => ({
+      fileName: (query.fileName as string) || undefined,
+      originalName: (query.originalName as string) || undefined,
+      category: query.category as string | undefined,
+      storageType: query.storageType as string | undefined,
+    }),
+  })
 
 async function loadQuota() {
   try {
@@ -153,20 +142,6 @@ async function loadQuota() {
   } catch {
     quota.value = null
   }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadData()
 }
 
 function formatSize(size: number): string {
@@ -254,7 +229,6 @@ function onDelete(record: FileVo) {
   })
 }
 
-loadData()
 loadQuota()
 </script>
 

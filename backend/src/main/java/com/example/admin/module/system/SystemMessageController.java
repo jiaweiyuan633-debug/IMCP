@@ -61,6 +61,8 @@ public class SystemMessageController {
             item.setId(message.getId());
             item.setTitle(message.getTitle());
             item.setContent(message.getContent());
+            item.setBizType(message.getBizType());
+            item.setBizId(message.getBizId());
             item.setCreatedAt(message.getCreatedAt() == null ? null : message.getCreatedAt().toString());
             item.setTag(null);
             items.add(item);

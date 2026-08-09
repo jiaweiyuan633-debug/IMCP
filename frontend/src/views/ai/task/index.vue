@@ -11,8 +11,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -74,6 +76,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import { cancelAiTask, createAiTask, getAiSseTicket, getAiTaskDetail, getAiTaskPage } from '@/api/ai'
 import type { AiTaskVo } from '@/api/ai'
 import type { SearchField } from '@/types'
+import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
 import { API_BASE_URL } from '@/utils/env'
 
@@ -109,16 +112,17 @@ const columns = [
   { title: t('page.aiActions'), key: 'actions', width: 130 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const creating = ref(false)
-const records = ref<AiTaskVo[]>([])
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const detail = ref<AiTaskVo | null>(null)
-const searchModel = reactive<Record<string, unknown>>({})
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<AiTaskVo>(getAiTaskPage, {
+    buildParams: (query) => ({
+      status: (query.status as string) || undefined,
+      bizType: (query.bizType as string) || undefined,
+    }),
+  })
 const createForm = reactive({
   bizType: 'text_summary',
   paramsText: '{"content":"Please enter the text to analyze","max_length":200}',
@@ -136,36 +140,6 @@ const prettyResult = computed(() => {
     return raw
   }
 })
-
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getAiTaskPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      status: searchModel.status as string | undefined,
-      bizType: searchModel.bizType as string | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadData()
-}
 
 function openCreate() {
   createForm.bizType = 'text_summary'
@@ -253,7 +227,6 @@ function onCancel(record: AiTaskVo) {
 }
 
 onBeforeUnmount(closeTaskStream)
-loadData()
 </script>
 
 <style scoped>

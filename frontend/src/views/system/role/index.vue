@@ -11,8 +11,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -92,6 +94,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
+import { useTableQuery } from '@/composables/useTableQuery'
 import {
   assignRoleMenus,
   createRole,
@@ -144,12 +147,7 @@ const dataScopeOptions = [
   { label: t('page.scopeSelf'), value: 5 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
-const records = ref<RoleVo[]>([])
 const modalOpen = ref(false)
 const assignOpen = ref(false)
 const editingId = ref<number | undefined>()
@@ -158,7 +156,6 @@ const checkedMenuKeys = ref<number[]>([])
 const menuTreeData = ref<MenuNode[]>([])
 const deptTreeData = ref<DeptVo[]>([])
 const checkedDeptKeys = ref<number[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   code: '',
   name: '',
@@ -168,36 +165,14 @@ const form = reactive({
   sort: 0,
 })
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getRolePage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      code: (searchModel.code as string) || undefined,
-      name: (searchModel.name as string) || undefined,
-      status: searchModel.status as number | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<RoleVo>(getRolePage, {
+    buildParams: (query) => ({
+      code: (query.code as string) || undefined,
+      name: (query.name as string) || undefined,
+      status: query.status as number | undefined,
+    }),
   })
-  pageNum.value = 1
-  loadData()
-}
 
 function openCreate() {
   editingId.value = undefined
@@ -288,7 +263,6 @@ function onDelete(record: RoleVo) {
 onMounted(async () => {
   menuTreeData.value = await getMenuTree()
   deptTreeData.value = await getDeptTree()
-  loadData()
 })
 
 function dataScopeText(scope: number) {

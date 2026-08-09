@@ -11,8 +11,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -62,13 +64,17 @@
     </ModalForm>
 
     <a-modal v-model:open="logOpen" :title="t('page.monitorLog')" width="860" :footer="null">
-      <a-table
+      <ProTable
+        v-model:page-num="logPageNum"
+        v-model:page-size="logPageSize"
         :columns="logColumns"
         :data-source="logRecords"
         :loading="logLoading"
+        :total="logTotal"
+        :error="logError"
         row-key="id"
-        :pagination="{ current: logPageNum, pageSize: logPageSize, total: logTotal, showSizeChanger: true }"
-        @change="onLogChange"
+        @change="loadLogs"
+        @retry="loadLogs"
       />
     </a-modal>
   </a-card>
@@ -89,9 +95,10 @@ import {
   runJob,
   updateJob,
 } from '@/api/monitor'
-import type { JobVo } from '@/api/monitor'
+import type { JobLogVo, JobVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
 
@@ -122,8 +129,8 @@ const logColumns = [
   { title: t('page.monitorInvokeTarget'), dataIndex: 'invokeTarget', key: 'invokeTarget' },
   { title: t('page.monitorStatus'), dataIndex: 'jobMessage', key: 'jobMessage' },
   { title: t('page.aiError'), dataIndex: 'exceptionInfo', key: 'exceptionInfo' },
-  { title: 'Start', dataIndex: 'startTime', key: 'startTime' },
-  { title: 'End', dataIndex: 'endTime', key: 'endTime' },
+  { title: t('page.monitorJobStartTime'), dataIndex: 'startTime', key: 'startTime' },
+  { title: t('page.monitorJobEndTime'), dataIndex: 'endTime', key: 'endTime' },
 ]
 
 const statusOptions = [
@@ -136,15 +143,9 @@ const yesNoOptions = [
   { label: t('common.disabled'), value: 0 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
-const records = ref<JobVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   jobName: '',
   jobGroup: 'DEFAULT',
@@ -155,43 +156,37 @@ const form = reactive({
   remark: '',
 })
 
+const {
+  pageNum,
+  pageSize,
+  total,
+  loading,
+  records,
+  error,
+  loadData,
+  onSearch,
+  onReset,
+} = useTableQuery<JobVo>(getJobPage, {
+  buildParams: (query) => ({
+    jobName: (query.jobName as string) || undefined,
+    status: query.status as number | undefined,
+  }),
+})
+
 const logOpen = ref(false)
-const logLoading = ref(false)
-const logRecords = ref<Record<string, unknown>[]>([])
-const logPageNum = ref(1)
-const logPageSize = ref(10)
-const logTotal = ref(0)
 const logJobName = ref('')
-
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getJobPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      jobName: (searchModel.jobName as string) || undefined,
-      status: searchModel.status as number | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadData()
-}
+const {
+  pageNum: logPageNum,
+  pageSize: logPageSize,
+  total: logTotal,
+  loading: logLoading,
+  records: logRecords,
+  error: logError,
+  loadData: loadLogs,
+} = useTableQuery<JobLogVo>(getJobLogPage, {
+  immediate: false,
+  buildParams: () => ({ jobName: logJobName.value || undefined }),
+})
 
 function openCreate() {
   editingId.value = undefined
@@ -276,29 +271,6 @@ function openLogs(record: JobVo) {
   logOpen.value = true
   loadLogs()
 }
-
-async function loadLogs() {
-  logLoading.value = true
-  try {
-    const data = await getJobLogPage({
-      pageNum: logPageNum.value,
-      pageSize: logPageSize.value,
-      jobName: logJobName.value,
-    })
-    logRecords.value = data.records as Record<string, unknown>[]
-    logTotal.value = data.total
-  } finally {
-    logLoading.value = false
-  }
-}
-
-function onLogChange(paginationValue: { current?: number; pageSize?: number }) {
-  logPageNum.value = paginationValue.current || 1
-  logPageSize.value = paginationValue.pageSize || 10
-  loadLogs()
-}
-
-loadData()
 </script>
 
 <style scoped>

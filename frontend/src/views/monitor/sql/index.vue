@@ -8,8 +8,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'success'">
@@ -24,13 +26,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import { getSqlLogPage } from '@/api/monitor'
+import type { SqlLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
 
@@ -45,42 +48,18 @@ const columns = [
   { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
-const records = ref<Record<string, unknown>[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
-
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getSqlLogPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      sqlText: (searchModel.sqlText as string) || undefined,
-    })
-    records.value = data.records as Record<string, unknown>[]
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadData()
-}
-
-loadData()
+const {
+  pageNum,
+  pageSize,
+  total,
+  loading,
+  records,
+  error,
+  loadData,
+  onSearch,
+  onReset,
+} = useTableQuery<SqlLogVo>(getSqlLogPage, {
+  buildParams: (query) => ({ sqlText: (query.sqlText as string) || undefined }),
+})
 </script>
 

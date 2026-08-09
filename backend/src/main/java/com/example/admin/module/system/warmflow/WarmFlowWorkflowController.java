@@ -40,6 +40,12 @@ public class WarmFlowWorkflowController {
         return Result.success(workflowService.page(pageNum, pageSize, status, processName, bizType, applicantId, defId));
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('system:workflow:list')")
+    public Result<WorkflowDetailVo> detail(@PathVariable Long id) {
+        return Result.success(workflowService.detail(id));
+    }
+
     @GetMapping("/tasks")
     @PreAuthorize("hasAuthority('system:workflow:list')")
     public Result<PageResult<SysWorkflowDO>> tasks(

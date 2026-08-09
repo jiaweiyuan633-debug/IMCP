@@ -12,8 +12,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'noticeType'">
@@ -79,6 +81,7 @@ import type { NoticeVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
 import dayjs from 'dayjs'
+import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -114,17 +117,11 @@ const statusOptions = [
   { label: t('common.disabled'), value: 0 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const detailOpen = ref(false)
 const detailRecord = ref<NoticeVo | null>(null)
 const editingId = ref<number | undefined>()
-const records = ref<NoticeVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   noticeTitle: '',
   noticeType: 1,
@@ -132,35 +129,13 @@ const form = reactive({
   status: 1,
 })
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getNoticePage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      title: (searchModel.title as string) || undefined,
-      type: searchModel.type as number | undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<NoticeVo>(getNoticePage, {
+    buildParams: (query) => ({
+      title: (query.title as string) || undefined,
+      type: query.type as number | undefined,
+    }),
   })
-  pageNum.value = 1
-  loadData()
-}
 
 function openCreate() {
   editingId.value = undefined
@@ -225,8 +200,6 @@ function onDelete(record: NoticeVo) {
     },
   })
 }
-
-loadData()
 
 async function openFromQuery() {
   const id = Number(route.query.id)

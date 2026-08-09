@@ -11,8 +11,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -35,7 +37,14 @@
         <a-form-item :label="t('page.tenantUserLimit')"><a-input-number v-model:value="form.userLimit" :min="1" style="width: 100%" /></a-form-item>
         <a-form-item :label="t('page.tenantStorageLimit')"><a-input-number v-model:value="form.storageLimitMb" :min="0" style="width: 100%" /></a-form-item>
         <a-form-item :label="t('page.tenantAdmin')">
-          <a-select v-model:value="form.adminUserId" :options="userOptions" allow-clear show-search option-filter-prop="label" />
+          <a-select
+            v-model:value="form.adminUserId"
+            :options="userOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            :placeholder="t('common.selectPlaceholder')"
+          />
         </a-form-item>
         <a-form-item :label="t('page.tenantStatus')"><a-select v-model:value="form.status" :options="statusOptions" /></a-form-item>
       </a-form>
@@ -50,10 +59,18 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { createTenant, deleteTenant, getTenantPage, getUserPage, updateTenant } from '@/api/system'
-import type { TenantVo } from '@/api/system'
+import {
+  createTenant,
+  deleteTenant,
+  getTenantAdminCandidates,
+  getTenantPage,
+  getTenantUsers,
+  updateTenant,
+} from '@/api/system'
+import type { TenantAdminCandidateVo, TenantVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
 
@@ -72,15 +89,9 @@ const statusOptions = [
   { label: t('common.enabled'), value: 1 },
   { label: t('common.disabled'), value: 0 },
 ]
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
 const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
-const records = ref<TenantVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   tenantName: '',
   tenantCode: '',
@@ -93,30 +104,20 @@ const form = reactive({
 })
 const userOptions = ref<{ label: string; value: number }[]>([])
 
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getTenantPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      tenantName: (searchModel.tenantName as string) || undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
+function toUserOptions(candidates: TenantAdminCandidateVo[], showTenant: boolean) {
+  return candidates.map((user) => ({
+    label: showTenant
+      ? t('page.tenantAdminOption', { tenantName: user.tenantName, username: user.username })
+      : `${user.username}${user.nickname ? ` (${user.nickname})` : ''}`,
+    value: user.id,
+  }))
 }
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-function onReset() {
-  Object.keys(searchModel).forEach((k) => (searchModel[k] = undefined))
-  pageNum.value = 1
-  loadData()
-}
+
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<TenantVo>(getTenantPage, {
+    buildParams: (query) => ({ tenantName: (query.tenantName as string) || undefined }),
+  })
+
 function openCreate() {
   editingId.value = undefined
   Object.assign(form, {
@@ -130,6 +131,7 @@ function openCreate() {
     status: 1,
   })
   modalOpen.value = true
+  loadCandidates()
 }
 function openEdit(record: TenantVo) {
   editingId.value = record.id
@@ -144,6 +146,18 @@ function openEdit(record: TenantVo) {
     status: record.status,
   })
   modalOpen.value = true
+  loadCandidates(record.id)
+}
+
+async function loadCandidates(tenantId?: number) {
+  try {
+    const candidates = tenantId
+      ? await getTenantUsers(tenantId)
+      : await getTenantAdminCandidates()
+    userOptions.value = toUserOptions(candidates, !tenantId)
+  } catch {
+    userOptions.value = []
+  }
 }
 async function onSubmit() {
   saving.value = true
@@ -171,14 +185,6 @@ function onDelete(record: TenantVo) {
     },
   })
 }
-loadData()
-
-async function loadUserOptions() {
-  const users = await getUserPage({ pageNum: 1, pageSize: 100 })
-  userOptions.value = users.records.map((user) => ({ label: `${user.username}${user.nickname ? ` (${user.nickname})` : ''}`, value: user.id }))
-}
-
-loadUserOptions()
 </script>
 
 <style scoped>

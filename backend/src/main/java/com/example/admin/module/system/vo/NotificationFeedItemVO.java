@@ -9,6 +9,8 @@ public class NotificationFeedItemVO {
     private Long id;
     private String title;
     private String content;
+    private String bizType;
+    private Long bizId;
     private String createdAt;
     private String tag;
 }

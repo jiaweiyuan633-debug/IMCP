@@ -11,8 +11,10 @@
       :data-source="records"
       :loading="loading"
       :total="total"
+      :error="error"
       row-key="id"
       @change="loadData"
+      @retry="loadData"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -29,7 +31,6 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
@@ -37,6 +38,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import { exportAuditLogs, getAuditLogPage } from '@/api/monitor'
 import type { AuditLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -54,48 +56,17 @@ const columns = [
   { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
-const records = ref<AuditLogVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
+const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
+  useTableQuery<AuditLogVo>(getAuditLogPage, {
+    buildParams: (query) => ({
+      module: (query.module as string) || undefined,
+    }),
+  })
 
 async function onExport() {
   await exportAuditLogs()
   message.success(t('page.monitorAuditExported'))
 }
-
-async function loadData() {
-  loading.value = true
-  try {
-    const data = await getAuditLogPage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      module: (searchModel.module as string) || undefined,
-    })
-    records.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadData()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadData()
-}
-
-loadData()
 </script>
 
 <style scoped>

@@ -1,7 +1,7 @@
 <template>
-  <a-result v-if="appError" status="error" title="页面出现错误" sub-title="请点击重试恢复页面">
+  <a-result v-if="appError" status="error" :title="t('page.appError')" :sub-title="t('page.appErrorRetry')">
     <template #extra>
-      <a-button type="primary" @click="appError = false">重试</a-button>
+      <a-button type="primary" @click="appError = false">{{ t('common.retry') }}</a-button>
     </template>
   </a-result>
   <a-config-provider v-else :theme="themeConfig">
@@ -13,8 +13,10 @@
 import { computed, onErrorCaptured, ref } from 'vue'
 import { theme as antdTheme } from 'ant-design-vue'
 import { useAppStore } from '@/stores/app'
+import { useI18n } from 'vue-i18n'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const appError = ref(false)
 
 onErrorCaptured(() => {

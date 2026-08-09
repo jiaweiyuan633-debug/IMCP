@@ -88,7 +88,7 @@ service.interceptors.response.use(
         return service.request(error.config)
       }
     }
-    message.error(localizedMessage(error.response?.data?.code, error.response?.data?.message || error.message || '网络异常'))
+    message.error(localizedMessage(error.response?.data?.code, error.response?.data?.message || error.message || i18n.global.t('common.networkError')))
     return Promise.reject(error)
   },
 )

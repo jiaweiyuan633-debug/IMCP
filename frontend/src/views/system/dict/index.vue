@@ -12,7 +12,9 @@
       :loading="loading"
       :total="total"
       row-key="id"
+      :error="error"
       @change="loadTypes"
+      @retry="loadTypes"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -62,7 +64,9 @@
         :loading="dataLoading"
         :total="dataTotal"
         row-key="id"
+        :error="dataError"
         @change="loadData"
+        @retry="loadData"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -115,6 +119,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { useTableQuery } from '@/composables/useTableQuery'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
@@ -167,24 +172,13 @@ const defaultOptions = [
   { label: t('page.no'), value: 0 },
 ]
 
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const loading = ref(false)
 const saving = ref(false)
-const typeRecords = ref<DictTypeVo[]>([])
-const searchModel = reactive<Record<string, unknown>>({})
 const typeModalOpen = ref(false)
 const typeEditingId = ref<number | undefined>()
 const typeForm = reactive({ dictName: '', dictType: '', status: 1, remark: '' })
 
 const dataModalOpen = ref(false)
 const dataFormOpen = ref(false)
-const dataPageNum = ref(1)
-const dataPageSize = ref(10)
-const dataTotal = ref(0)
-const dataLoading = ref(false)
-const dataRecords = ref<DictDataVo[]>([])
 const currentDictType = ref('')
 const dataEditingId = ref<number | undefined>()
 const dataForm = reactive({
@@ -196,35 +190,37 @@ const dataForm = reactive({
   status: 1,
 })
 
-async function loadTypes() {
-  loading.value = true
-  try {
-    const data = await getDictTypePage({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      dictName: (searchModel.dictName as string) || undefined,
-      dictType: (searchModel.dictType as string) || undefined,
-    })
-    typeRecords.value = data.records
-    total.value = data.total
-  } finally {
-    loading.value = false
-  }
-}
+const {
+  pageNum,
+  pageSize,
+  total,
+  loading,
+  records: typeRecords,
+  error,
+  loadData: loadTypes,
+  onSearch,
+  onReset,
+} = useTableQuery<DictTypeVo>(getDictTypePage, {
+  buildParams: (query) => ({
+    dictName: (query.dictName as string) || undefined,
+    dictType: (query.dictType as string) || undefined,
+  }),
+})
 
-function onSearch(model: Record<string, unknown>) {
-  Object.assign(searchModel, model)
-  pageNum.value = 1
-  loadTypes()
-}
-
-function onReset() {
-  Object.keys(searchModel).forEach((key) => {
-    searchModel[key] = undefined
-  })
-  pageNum.value = 1
-  loadTypes()
-}
+const {
+  pageNum: dataPageNum,
+  pageSize: dataPageSize,
+  total: dataTotal,
+  loading: dataLoading,
+  records: dataRecords,
+  error: dataError,
+  loadData,
+} = useTableQuery<DictDataVo>(getDictDataPage, {
+  immediate: false,
+  buildParams: () => ({
+    dictType: currentDictType.value,
+  }),
+})
 
 function openTypeCreate() {
   typeEditingId.value = undefined
@@ -282,21 +278,6 @@ function openData(record: DictTypeVo) {
   loadData()
 }
 
-async function loadData() {
-  dataLoading.value = true
-  try {
-    const data = await getDictDataPage({
-      pageNum: dataPageNum.value,
-      pageSize: dataPageSize.value,
-      dictType: currentDictType.value,
-    })
-    dataRecords.value = data.records
-    dataTotal.value = data.total
-  } finally {
-    dataLoading.value = false
-  }
-}
-
 function openDataCreate() {
   dataEditingId.value = undefined
   Object.assign(dataForm, { dictLabel: '', dictValue: '', dictSort: 0, listClass: '', isDefault: 0, status: 1 })
@@ -348,8 +329,6 @@ function onDataDelete(record: DictDataVo) {
     },
   })
 }
-
-loadTypes()
 </script>
 
 <style scoped>

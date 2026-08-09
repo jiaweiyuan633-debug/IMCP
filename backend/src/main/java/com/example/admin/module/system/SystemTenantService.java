@@ -10,10 +10,16 @@ import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.module.system.mapper.SysTenantMapper;
 import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.module.system.vo.TenantAdminCandidateVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -94,6 +100,34 @@ public class SystemTenantService {
 
     public void delete(Long id) {
         tenantMapper.deleteById(id);
+    }
+
+    /**
+     * 租户管理员候选用户。tenantId 为 null 时返回跨租户全部用户（新建租户用），
+     * 否则仅返回该租户下的用户（编辑租户用）。绕过当前租户限制，仅限平台超管调用。
+     */
+    public List<TenantAdminCandidateVo> adminCandidates(Long tenantId) {
+        List<SysUserDO> users = userMapper.selectAdminCandidates(tenantId);
+        if (users == null || users.isEmpty()) {
+            return List.of();
+        }
+        List<Long> tenantIds = users.stream()
+                .map(SysUserDO::getTenantId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, String> tenantNames = tenantIds.isEmpty() ? Map.of()
+                : tenantMapper.selectBatchIds(tenantIds).stream()
+                        .collect(Collectors.toMap(SysTenantDO::getId, SysTenantDO::getTenantName));
+        return users.stream()
+                .map(user -> TenantAdminCandidateVo.builder()
+                        .id(user.getId())
+                        .username(user.getUsername())
+                        .nickname(user.getNickname())
+                        .tenantId(user.getTenantId())
+                        .tenantName(user.getTenantId() == null ? null : tenantNames.get(user.getTenantId()))
+                        .build())
+                .toList();
     }
 }
 

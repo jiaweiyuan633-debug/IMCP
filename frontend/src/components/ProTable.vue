@@ -7,6 +7,10 @@
     :pagination="pagination"
     @change="onChange"
   >
+    <template #empty>
+      <TableError v-if="error" :error="error" @retry="emit('retry')" />
+      <slot name="empty" v-else />
+    </template>
     <template #bodyCell="slotProps">
       <slot name="bodyCell" v-bind="slotProps" />
     </template>
@@ -16,6 +20,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import TableError from '@/components/TableError.vue'
 
 const props = defineProps<{
   columns: unknown[]
@@ -25,12 +30,14 @@ const props = defineProps<{
   pageNum: number
   pageSize: number
   rowKey?: string
+  error?: Error | null
 }>()
 
 const emit = defineEmits<{
   'update:pageNum': [value: number]
   'update:pageSize': [value: number]
   change: []
+  retry: []
 }>()
 
 const { t } = useI18n()
@@ -49,4 +56,3 @@ function onChange(paginationValue: { current?: number; pageSize?: number }) {
   emit('change')
 }
 </script>
-
