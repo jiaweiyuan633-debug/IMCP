@@ -23,7 +23,9 @@ public class RoleSaveRequest {
     private String description;
 
     private Integer status;
+    private Integer dataScope = 1;
     private Integer sort;
     private List<Long> menuIds;
+    private List<Long> deptIds;
 }
 

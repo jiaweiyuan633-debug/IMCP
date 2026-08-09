@@ -9,6 +9,10 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 mybatis-plus:
   configuration:
@@ -28,6 +32,7 @@ jwt:
 app:
   callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
   ai-base-url: ${AI_BASE_URL:}
+  upload-path: ${UPLOAD_PATH:uploads}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
 

@@ -11,6 +11,7 @@ import com.example.admin.module.system.dto.RoleSaveRequest;
 import com.example.admin.module.system.entity.SysRole;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysRoleMenuMapper;
+import com.example.admin.module.system.mapper.SysRoleDeptMapper;
 import com.example.admin.module.system.vo.RoleOptionVo;
 import com.example.admin.module.system.vo.RoleVo;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class SystemRoleService {
 
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
+    private final SysRoleDeptMapper roleDeptMapper;
 
     public PageResult<RoleVo> page(RoleQuery query) {
         Page<SysRole> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -66,6 +68,9 @@ public class SystemRoleService {
         if (request.getMenuIds() != null) {
             assignMenus(role.getId(), request.getMenuIds());
         }
+        if (request.getDeptIds() != null) {
+            assignDepts(role.getId(), request.getDeptIds());
+        }
         return role.getId();
     }
 
@@ -87,10 +92,14 @@ public class SystemRoleService {
         role.setName(request.getName());
         role.setDescription(request.getDescription());
         role.setStatus(request.getStatus());
+        role.setDataScope(request.getDataScope());
         role.setSort(request.getSort() == null ? 0 : request.getSort());
         roleMapper.updateById(role);
         if (request.getMenuIds() != null) {
             assignMenus(role.getId(), request.getMenuIds());
+        }
+        if (request.getDeptIds() != null) {
+            assignDepts(role.getId(), request.getDeptIds());
         }
     }
 
@@ -98,6 +107,7 @@ public class SystemRoleService {
     public void delete(Long id) {
         roleMapper.deleteById(id);
         roleMenuMapper.deleteByRoleId(id);
+        roleDeptMapper.deleteByRoleId(id);
     }
 
     @Transactional
@@ -109,12 +119,21 @@ public class SystemRoleService {
         roleMenuMapper.insertBatch(roleId, menuIds);
     }
 
+    public void assignDepts(Long roleId, List<Long> deptIds) {
+        roleDeptMapper.deleteByRoleId(roleId);
+        if (deptIds == null || deptIds.isEmpty()) {
+            return;
+        }
+        roleDeptMapper.insertBatch(roleId, deptIds);
+    }
+
     private SysRole toEntity(RoleSaveRequest request) {
         SysRole role = new SysRole();
         role.setCode(request.getCode().trim());
         role.setName(request.getName());
         role.setDescription(request.getDescription());
         role.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        role.setDataScope(request.getDataScope() == null ? 1 : request.getDataScope());
         role.setSort(request.getSort() == null ? 0 : request.getSort());
         return role;
     }
@@ -127,9 +146,11 @@ public class SystemRoleService {
                 .name(role.getName())
                 .description(role.getDescription())
                 .status(role.getStatus())
+                .dataScope(role.getDataScope())
                 .sort(role.getSort())
                 .createdAt(role.getCreatedAt())
                 .menuIds(menuIds == null ? Collections.emptyList() : menuIds)
+                .deptIds(roleDeptMapper.selectDeptIdsByRoleId(role.getId()))
                 .build();
     }
 }

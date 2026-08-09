@@ -1,5 +1,7 @@
 import request from '@/utils/request'
+import axios from 'axios'
 import type { MenuNode, PageResult, RoleOptionVo, RoleVo, UserVo } from '@/types'
+import { getAccessToken } from '@/utils/auth'
 
 export interface UserQuery {
   pageNum: number
@@ -13,6 +15,7 @@ export interface UserSaveRequest {
   id?: number
   username: string
   password?: string
+  avatar?: string
   nickname?: string
   email?: string
   phone?: string
@@ -36,8 +39,10 @@ export interface RoleSaveRequest {
   name: string
   description?: string
   status: number
+  dataScope: number
   sort: number
   menuIds: number[]
+  deptIds: number[]
 }
 
 export interface MenuSaveRequest {
@@ -284,5 +289,27 @@ export function updateConfig(data: Record<string, unknown>): Promise<void> {
 
 export function deleteConfig(id: number): Promise<void> {
   return request.delete(`/system/config/${id}`)
+}
+
+export async function exportUsers(): Promise<void> {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  const response = await axios.get(`${baseURL}/system/user/export`, {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '用户数据.xlsx'
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export function importUsers(file: File): Promise<number> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/system/user/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
 }
 

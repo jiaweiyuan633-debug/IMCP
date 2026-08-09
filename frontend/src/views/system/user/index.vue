@@ -3,6 +3,10 @@
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
       <a-button v-permission="'system:user:add'" type="primary" @click="openCreate">新增用户</a-button>
+      <a-button @click="onExport">导出</a-button>
+      <a-upload :show-upload-list="false" :before-upload="onImport">
+        <a-button>导入</a-button>
+      </a-upload>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -46,6 +50,9 @@
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
+        <a-form-item label="头像">
+          <FileUpload v-model:value="form.avatar" />
+        </a-form-item>
         <a-form-item label="用户名" required>
           <a-input v-model:value="form.username" />
         </a-form-item>
@@ -100,6 +107,7 @@ import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
+import FileUpload from '@/components/FileUpload.vue'
 import {
   createUser,
   deleteUser,
@@ -107,6 +115,8 @@ import {
   getPostOptions,
   getRoleOptions,
   getUserPage,
+  exportUsers,
+  importUsers,
   updateUser,
   updateUserStatus,
 } from '@/api/system'
@@ -158,6 +168,7 @@ const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
 const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
+  avatar: '',
   username: '',
   password: '',
   nickname: '',
@@ -203,6 +214,7 @@ function onReset() {
 function openCreate() {
   editingId.value = undefined
   Object.assign(form, {
+    avatar: '',
     username: '',
     password: '',
     nickname: '',
@@ -219,6 +231,7 @@ function openCreate() {
 function openEdit(record: UserVo) {
   editingId.value = record.id
   Object.assign(form, {
+    avatar: record.avatar || '',
     username: record.username,
     password: '',
     nickname: record.nickname || '',
@@ -240,6 +253,7 @@ async function onSubmit() {
   saving.value = true
   try {
     const payload: UserSaveRequest = {
+      avatar: form.avatar,
       username: form.username,
       password: form.password || undefined,
       nickname: form.nickname,
@@ -262,6 +276,22 @@ async function onSubmit() {
   } finally {
     saving.value = false
   }
+}
+
+async function onExport() {
+  await exportUsers()
+  message.success('导出成功')
+}
+
+async function onImport(file: File) {
+  try {
+    const count = await importUsers(file)
+    message.success(`导入成功 ${count} 条`)
+    loadData()
+  } catch {
+    message.error('导入失败')
+  }
+  return false
 }
 
 async function toggleStatus(record: UserVo, checked: boolean) {

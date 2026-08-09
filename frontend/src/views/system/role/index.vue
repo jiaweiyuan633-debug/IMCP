@@ -18,6 +18,9 @@
         <template v-if="column.key === 'status'">
           <StatusTag :value="record.status" />
         </template>
+        <template v-else-if="column.key === 'dataScope'">
+          {{ dataScopeText(record.dataScope) }}
+        </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
             <a v-permission="'system:role:edit'" @click="openEdit(record)">编辑</a>
@@ -49,6 +52,18 @@
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
+        </a-form-item>
+        <a-form-item label="数据权限">
+          <a-select v-model:value="form.dataScope" :options="dataScopeOptions" />
+        </a-form-item>
+        <a-form-item v-if="form.dataScope === 2" label="授权部门">
+          <a-tree
+            v-model:checked-keys="checkedDeptKeys"
+            :tree-data="deptTreeData"
+            checkable
+            default-expand-all
+            :field-names="{ label: 'deptName', value: 'id', children: 'children' }"
+          />
         </a-form-item>
       </a-form>
     </ModalForm>
@@ -83,10 +98,11 @@ import {
   deleteRole,
   getMenuTree,
   getRolePage,
+  getDeptTree,
   updateRole,
 } from '@/api/system'
 import type { RoleSaveRequest } from '@/api/system'
-import type { MenuNode, RoleVo, SearchField } from '@/types'
+import type { DeptVo, MenuNode, RoleVo, SearchField } from '@/types'
 
 const searchFields: SearchField[] = [
   { label: '角色编码', prop: 'code', placeholder: '请输入角色编码' },
@@ -107,6 +123,7 @@ const columns = [
   { title: '角色名称', dataIndex: 'name', key: 'name' },
   { title: '描述', dataIndex: 'description', key: 'description' },
   { title: '状态', key: 'status', width: 90 },
+  { title: '数据权限', key: 'dataScope', width: 110 },
   { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
   { title: '操作', key: 'actions', width: 180 },
 ]
@@ -114,6 +131,14 @@ const columns = [
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '禁用', value: 0 },
+]
+
+const dataScopeOptions = [
+  { label: '全部数据', value: 1 },
+  { label: '自定义部门', value: 2 },
+  { label: '本部门', value: 3 },
+  { label: '本部门及以下', value: 4 },
+  { label: '仅本人', value: 5 },
 ]
 
 const pageNum = ref(1)
@@ -128,12 +153,15 @@ const editingId = ref<number | undefined>()
 const currentAssignRole = ref<RoleVo | null>(null)
 const checkedMenuKeys = ref<number[]>([])
 const menuTreeData = ref<MenuNode[]>([])
+const deptTreeData = ref<DeptVo[]>([])
+const checkedDeptKeys = ref<number[]>([])
 const searchModel = reactive<Record<string, unknown>>({})
 const form = reactive({
   code: '',
   name: '',
   description: '',
   status: 1,
+  dataScope: 1,
   sort: 0,
 })
 
@@ -170,7 +198,8 @@ function onReset() {
 
 function openCreate() {
   editingId.value = undefined
-  Object.assign(form, { code: '', name: '', description: '', status: 1, sort: 0 })
+  Object.assign(form, { code: '', name: '', description: '', status: 1, dataScope: 1, sort: 0 })
+  checkedDeptKeys.value = []
   modalOpen.value = true
 }
 
@@ -181,8 +210,10 @@ function openEdit(record: RoleVo) {
     name: record.name,
     description: record.description || '',
     status: record.status,
+    dataScope: record.dataScope,
     sort: record.sort,
   })
+  checkedDeptKeys.value = record.deptIds || []
   modalOpen.value = true
 }
 
@@ -198,8 +229,10 @@ async function onSubmit() {
       name: form.name,
       description: form.description,
       status: form.status,
+      dataScope: form.dataScope,
       sort: form.sort,
       menuIds: [],
+      deptIds: checkedDeptKeys.value,
     }
     if (editingId.value) {
       payload.id = editingId.value
@@ -251,8 +284,20 @@ function onDelete(record: RoleVo) {
 
 onMounted(async () => {
   menuTreeData.value = await getMenuTree()
+  deptTreeData.value = await getDeptTree()
   loadData()
 })
+
+function dataScopeText(scope: number) {
+  const map: Record<number, string> = {
+    1: '全部数据',
+    2: '自定义部门',
+    3: '本部门',
+    4: '本部门及以下',
+    5: '仅本人',
+  }
+  return map[scope] || String(scope)
+}
 </script>
 
 <style scoped>

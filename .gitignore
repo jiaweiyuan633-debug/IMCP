@@ -34,3 +34,4 @@ Thumbs.db
 # Local runtime
 .runtime/
 logs/
+uploads/

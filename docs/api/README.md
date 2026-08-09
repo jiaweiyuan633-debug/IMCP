@@ -46,6 +46,8 @@
 | GET/POST/PUT/DELETE | `/api/system/post`、`/api/system/post/options` | 岗位管理 |
 | GET/POST/PUT/DELETE | `/api/system/dict/type`、`/api/system/dict/data` | 字典管理 |
 | GET/POST/PUT/DELETE | `/api/system/config` | 参数配置 |
+| GET/POST | `/api/system/user/export`、`/api/system/user/import` | 用户 Excel 导入导出 |
+| POST | `/api/common/upload` | 文件上传 |
 
 ## 监控接口
 
@@ -56,6 +58,8 @@
 | GET/DELETE | `/api/monitor/online`、`/api/monitor/online/{tokenId}` | 在线用户与强制下线 |
 | DELETE | `/api/monitor/cache/{key}` | 删除缓存 |
 | GET | `/api/monitor/stats` | 看板统计 |
+| GET/POST/PUT/DELETE | `/api/monitor/job`、`/api/monitor/job/{id}` | 定时任务管理 |
+| GET | `/api/monitor/job/log` | 定时任务日志 |
 
 ## AI 接口
 
