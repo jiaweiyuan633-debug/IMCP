@@ -9,6 +9,7 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     collapsed: false,
     darkTheme: false,
+    locale: localStorage.getItem('admin_locale') || 'zh-CN',
     tabs: [] as TabItem[],
   }),
   actions: {
@@ -17,6 +18,10 @@ export const useAppStore = defineStore('app', {
     },
     toggleTheme() {
       this.darkTheme = !this.darkTheme
+    },
+    setLocale(locale: string) {
+      this.locale = locale
+      localStorage.setItem('admin_locale', locale)
     },
     addTab(tab: TabItem) {
       if (this.tabs.some((item) => item.path === tab.path)) {

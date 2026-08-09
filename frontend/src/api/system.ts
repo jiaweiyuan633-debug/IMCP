@@ -313,3 +313,33 @@ export function importUsers(file: File): Promise<number> {
   })
 }
 
+export interface NoticeVo {
+  id: number
+  noticeTitle: string
+  noticeType: number
+  noticeContent?: string
+  status: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function getNoticePage(params: Record<string, unknown>): Promise<PageResult<NoticeVo>> {
+  return request.get('/system/notice', { params })
+}
+
+export function getLatestNotices(limit = 5): Promise<NoticeVo[]> {
+  return request.get('/system/notice/latest', { params: { limit } })
+}
+
+export function createNotice(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/notice', data)
+}
+
+export function updateNotice(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/notice', data)
+}
+
+export function deleteNotice(id: number): Promise<void> {
+  return request.delete(`/system/notice/${id}`)
+}
+

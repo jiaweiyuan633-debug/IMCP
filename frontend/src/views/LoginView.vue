@@ -1,23 +1,23 @@
 <template>
   <div class="login-page">
     <a-card class="login-card">
-      <div class="login-title">双端管理脚手架</div>
+      <div class="login-title">{{ t('app.title') }}</div>
       <a-form layout="vertical" :model="form" @finish="onSubmit">
         <a-form-item
-          label="账号"
+          :label="t('login.username')"
           name="username"
-          :rules="[{ required: true, message: '请输入账号' }]"
+          :rules="[{ required: true, message: t('login.usernamePlaceholder') }]"
         >
-          <a-input v-model:value="form.username" placeholder="admin" />
+          <a-input v-model:value="form.username" :placeholder="t('login.usernamePlaceholder')" />
         </a-form-item>
         <a-form-item
-          label="密码"
+          :label="t('login.password')"
           name="password"
-          :rules="[{ required: true, message: '请输入密码' }]"
+          :rules="[{ required: true, message: t('login.passwordPlaceholder') }]"
         >
-          <a-input-password v-model:value="form.password" placeholder="******" />
+          <a-input-password v-model:value="form.password" :placeholder="t('login.passwordPlaceholder')" />
         </a-form-item>
-        <a-button type="primary" html-type="submit" block :loading="loading">登录</a-button>
+        <a-button type="primary" html-type="submit" block :loading="loading">{{ t('login.submit') }}</a-button>
       </a-form>
     </a-card>
   </div>
@@ -29,10 +29,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import type { LoginForm } from '@/types'
+import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { t } = useI18n()
 const loading = ref(false)
 const form = reactive<LoginForm>({
   username: 'admin',
