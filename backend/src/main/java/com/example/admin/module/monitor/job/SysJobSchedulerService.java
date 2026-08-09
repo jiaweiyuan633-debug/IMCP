@@ -13,6 +13,7 @@ import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
 import org.quartz.TriggerBuilder;
 import org.springframework.stereotype.Service;
 
@@ -65,7 +66,7 @@ public class SysJobSchedulerService {
                     .withSchedule(cronSchedule)
                     .build();
             scheduler.scheduleJob(jobDetail, trigger);
-        } catch (Exception exception) {
+        } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to schedule job {}", job.getId(), exception);
         }
     }
@@ -73,7 +74,7 @@ public class SysJobSchedulerService {
     public void pauseJob(SysJob job) {
         try {
             scheduler.pauseJob(jobKey(job));
-        } catch (Exception exception) {
+        } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to pause job {}", job.getId(), exception);
         }
     }
@@ -81,7 +82,7 @@ public class SysJobSchedulerService {
     public void resumeJob(SysJob job) {
         try {
             scheduler.resumeJob(jobKey(job));
-        } catch (Exception exception) {
+        } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to resume job {}", job.getId(), exception);
         }
     }
@@ -89,7 +90,7 @@ public class SysJobSchedulerService {
     public void deleteJob(SysJob job) {
         try {
             scheduler.deleteJob(jobKey(job));
-        } catch (Exception exception) {
+        } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to delete job {}", job.getId(), exception);
         }
     }
@@ -101,7 +102,7 @@ public class SysJobSchedulerService {
                 scheduleJob(job);
             }
             scheduler.triggerJob(key);
-        } catch (Exception exception) {
+        } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to run job {}", job.getId(), exception);
         }
     }

@@ -8,8 +8,6 @@ import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.module.system.entity.SysTenant;
 import com.example.admin.module.system.mapper.SysTenantMapper;
-import com.example.admin.common.BusinessException;
-import com.example.admin.common.ResultCode;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.FileAccessService;
 import com.example.admin.common.TenantContext;
@@ -64,7 +62,7 @@ public class FileStorageService implements FileStorage {
         sysFile.setCreatedBy(tryGetUserId());
         try {
             fileMapper.insert(sysFile);
-        } catch (Exception exception) {
+        } catch (RuntimeException exception) {
             Files.deleteIfExists(target);
             throw exception;
         }
@@ -80,7 +78,7 @@ public class FileStorageService implements FileStorage {
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

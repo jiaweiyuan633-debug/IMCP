@@ -47,7 +47,7 @@ public class SysQuartzJob implements Job {
                 JobInvokeUtil.invoke(invokeTarget);
                 message = "执行成功";
                 success = true;
-            } catch (Exception exception) {
+            } catch (ReflectiveOperationException | RuntimeException exception) {
                 success = false;
                 message = "执行失败";
                 error = exception.toString();

@@ -68,7 +68,7 @@ public class AuthService {
         }
         checkLoginLockout(request.getUsername());
         if (captchaEnabled() && !captchaService.verify(request.getCaptchaId(), request.getCaptchaCode())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "验证码错误");
+            throw new BusinessException(ResultCode.CAPTCHA_ERROR);
         }
         String username = request.getUsername().trim();
         SysUser user = userMapper.selectOne(
@@ -229,7 +229,7 @@ public class AuthService {
     public void enableTotp(TotpCodeRequest request) {
         SysUser user = getCurrentUser();
         if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
+            throw new BusinessException(ResultCode.TOTP_CODE_ERROR);
         }
         user.setTotpEnabled(1);
         userMapper.updateById(user);
@@ -238,7 +238,7 @@ public class AuthService {
     public void disableTotp(TotpCodeRequest request) {
         SysUser user = getCurrentUser();
         if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
+            throw new BusinessException(ResultCode.TOTP_CODE_ERROR);
         }
         user.setTotpSecret(null);
         user.setTotpEnabled(0);

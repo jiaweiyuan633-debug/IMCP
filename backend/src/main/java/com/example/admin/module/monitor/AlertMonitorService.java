@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -40,7 +41,7 @@ public class AlertMonitorService {
     public void scheduledCheck() {
         try {
             checkNow();
-        } catch (Exception exception) {
+        } catch (RuntimeException exception) {
             log.error("Alert monitor check failed", exception);
         }
     }
@@ -98,7 +99,7 @@ public class AlertMonitorService {
             payload.put("currentValue", value);
             payload.put("threshold", rule.getThreshold());
             restTemplate.postForEntity(rule.getWebhookUrl(), payload, String.class);
-        } catch (Exception exception) {
+        } catch (RestClientException | IllegalArgumentException exception) {
             log.warn("Alert webhook failed for {}", rule.getRuleName(), exception);
         }
     }

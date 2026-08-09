@@ -14,6 +14,7 @@ import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import com.example.admin.common.TenantContext;
 
@@ -75,7 +76,7 @@ public class SqlLogInterceptor implements Interceptor {
             jdbcTemplate.update(
                     "INSERT INTO sys_sql_log (tenant_id, sql_text, method, duration_ms, success, error_msg) VALUES (?, ?, ?, ?, ?, ?)",
                     TenantContext.getTenantId(), sqlText, method, duration, success ? 1 : 0, error);
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn("Failed to save sql log", exception);
         }
     }

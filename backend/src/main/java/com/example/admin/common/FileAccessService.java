@@ -7,6 +7,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.GeneralSecurityException;
 import java.util.Base64;
 
 @Service
@@ -38,7 +39,7 @@ public class FileAccessService {
             }
             String expected = sign(path + ":" + expires);
             return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), parts[1].getBytes(StandardCharsets.UTF_8));
-        } catch (Exception exception) {
+        } catch (IllegalArgumentException exception) {
             return false;
         }
     }
@@ -48,7 +49,7 @@ public class FileAccessService {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception exception) {
+        } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("File token signing failed", exception);
         }
     }

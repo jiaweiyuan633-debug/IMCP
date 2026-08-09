@@ -1,13 +1,13 @@
 package com.example.admin.module.common;
 
 import cn.hutool.core.util.IdUtil;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
 import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.module.system.entity.SysTenant;
 import com.example.admin.module.system.mapper.SysTenantMapper;
-import com.example.admin.common.BusinessException;
-import com.example.admin.common.ResultCode;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.FileAccessService;
 import com.example.admin.common.TenantContext;
@@ -78,7 +78,7 @@ public class MinioFileStorage implements FileStorage {
         sysFile.setCreatedBy(tryGetUserId());
         try {
             fileMapper.insert(sysFile);
-        } catch (Exception exception) {
+        } catch (RuntimeException exception) {
             client.removeObject(RemoveObjectArgs.builder()
                     .bucket(bucket)
                     .object(fileName)
@@ -96,7 +96,7 @@ public class MinioFileStorage implements FileStorage {
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

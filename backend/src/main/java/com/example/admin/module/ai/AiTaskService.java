@@ -178,7 +178,7 @@ public class AiTaskService {
                 .eq(AiServiceConfig::getCode, task.getServiceCode()));
         if (config == null || !StringUtils.hasText(config.getApiKey())
                 || !config.getApiKey().equals(token)) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "AI 回调签名无效");
+            throw new BusinessException(ResultCode.AI_CALLBACK_INVALID);
         }
         if (isTerminal(task.getStatus())) {
             return;
@@ -186,7 +186,7 @@ public class AiTaskService {
         String status = request.getStatus();
         if (!AiTaskStatus.SUCCEEDED.name().equals(status)
                 && !AiTaskStatus.FAILED.name().equals(status)) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "非法回调状态");
+            throw new BusinessException(ResultCode.AI_CALLBACK_STATUS_INVALID);
         }
 
         task.setStatus(status);
@@ -255,7 +255,7 @@ public class AiTaskService {
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

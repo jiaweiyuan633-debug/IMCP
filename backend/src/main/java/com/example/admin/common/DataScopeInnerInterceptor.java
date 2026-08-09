@@ -11,6 +11,7 @@ import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.expression.operators.relational.InExpression;
 import net.sf.jsqlparser.expression.operators.relational.ParenthesedExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.Join;
@@ -63,7 +64,7 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
                 plainSelect.setWhere(where);
                 return select.toString();
             }
-        } catch (Exception exception) {
+        } catch (JSQLParserException | RuntimeException exception) {
             log.warn("Data scope rewrite failed for sql: {}", sql, exception);
         }
         return null;

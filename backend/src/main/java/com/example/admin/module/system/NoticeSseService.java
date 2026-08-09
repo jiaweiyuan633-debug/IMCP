@@ -1,9 +1,11 @@
 package com.example.admin.module.system;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -37,7 +39,7 @@ public class NoticeSseService {
         publishLocal(payload);
         try {
             redisTemplate.convertAndSend("notice:sse", objectMapper.writeValueAsString(payload));
-        } catch (Exception exception) {
+        } catch (JsonProcessingException | DataAccessException exception) {
             log.warn("Failed to broadcast notice to redis", exception);
         }
     }

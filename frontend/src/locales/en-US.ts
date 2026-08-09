@@ -79,6 +79,13 @@ export default {
     1016: 'Tenant user limit reached',
     1017: 'AI daily task limit reached',
     1018: 'Tenant storage limit reached',
+    1019: 'Invalid captcha',
+    1020: 'Invalid TOTP code',
+    1021: 'Invalid AI callback signature',
+    1022: 'Invalid callback status',
+    1023: 'Workflow has already finished',
+    1024: 'Workflow definition unavailable',
+    1025: 'Workflow has no start node',
   },
   page: {
     notFound: 'Page not found',

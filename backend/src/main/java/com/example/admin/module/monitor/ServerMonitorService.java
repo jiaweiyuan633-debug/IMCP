@@ -9,6 +9,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,7 +44,7 @@ public class ServerMonitorService {
         String hostName = "unknown";
         try {
             hostName = InetAddress.getLocalHost().getHostName();
-        } catch (Exception ignored) {
+        } catch (UnknownHostException ignored) {
             // keep unknown
         }
 

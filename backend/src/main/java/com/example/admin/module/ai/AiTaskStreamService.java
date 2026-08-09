@@ -7,6 +7,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.Set;
 import java.util.EnumSet;
 import java.util.concurrent.ScheduledFuture;
@@ -41,7 +42,7 @@ public class AiTaskStreamService {
             if (isTerminal(task.getStatus())) {
                 emitter.complete();
             }
-        } catch (Exception exception) {
+        } catch (IOException | RuntimeException exception) {
             try {
                 emitter.completeWithError(exception);
             } catch (IllegalStateException ignored) {

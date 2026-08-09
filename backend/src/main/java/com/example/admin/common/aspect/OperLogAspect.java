@@ -7,6 +7,8 @@ import com.example.admin.module.system.entity.SysAuditLog;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.LogMaskUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
@@ -81,7 +83,7 @@ public class OperLogAspect {
             operLogEntity.setResult(toJson(result));
             operLogMapper.insert(operLogEntity);
             saveAuditLog(operLogEntity);
-        } catch (Exception exception) {
+        } catch (RuntimeException exception) {
             log.warn("Failed to write oper log", exception);
         }
     }
@@ -109,17 +111,13 @@ public class OperLogAspect {
         if (value == null) {
             return null;
         }
-        try {
-            return truncate(objectMapper.writeValueAsString(value), MAX_RESULT_LENGTH);
-        } catch (Exception exception) {
-            return truncate(String.valueOf(value), MAX_RESULT_LENGTH);
-        }
+        return truncate(LogMaskUtils.toMaskedJson(value, objectMapper), MAX_RESULT_LENGTH);
     }
 
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

@@ -1,6 +1,7 @@
 package com.example.admin.security;
 
 import com.example.admin.module.monitor.vo.OnlineUserVo;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +90,7 @@ public class TokenService {
                     ONLINE_KEY + accessJti,
                     objectMapper.writeValueAsString(onlineUser),
                     Duration.ofMinutes(properties.getAccessTokenExpireMinutes()));
-        } catch (Exception exception) {
+        } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to save online user", exception);
         }
     }
@@ -114,7 +115,7 @@ public class TokenService {
                 });
                 onlineUser.setTokenId(key.substring(ONLINE_KEY.length()));
                 onlineUsers.add(onlineUser);
-            } catch (Exception ignored) {
+            } catch (JsonProcessingException ignored) {
                 // skip malformed online record
             }
         }

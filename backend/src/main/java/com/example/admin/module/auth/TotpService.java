@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.MessageDigest;
+import java.security.GeneralSecurityException;
 import java.util.Base64;
 
 @Service
@@ -29,7 +30,7 @@ public class TotpService {
         try {
             this.encryptionKey = MessageDigest.getInstance("SHA-256")
                     .digest(key.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception exception) {
+        } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("TOTP encryption key init failed", exception);
         }
     }
@@ -69,7 +70,7 @@ public class TotpService {
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
             return Base64.getEncoder().encodeToString(combined);
-        } catch (Exception exception) {
+        } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("TOTP secret encryption failed", exception);
         }
     }
@@ -81,13 +82,16 @@ public class TotpService {
         try {
             byte[] combined = Base64.getDecoder().decode(stored);
             byte[] iv = new byte[12];
+            if (combined.length < iv.length) {
+                return stored;
+            }
             byte[] encrypted = new byte[combined.length - iv.length];
             System.arraycopy(combined, 0, iv, 0, iv.length);
             System.arraycopy(combined, iv.length, encrypted, 0, encrypted.length);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(encryptionKey, "AES"), new GCMParameterSpec(128, iv));
             return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
-        } catch (Exception exception) {
+        } catch (GeneralSecurityException | IllegalArgumentException exception) {
             return stored;
         }
     }
@@ -104,7 +108,7 @@ public class TotpService {
                     | (hash[offset + 3] & 0xff);
             int otp = binary % (int) Math.pow(10, CODE_DIGITS);
             return String.format("%0" + CODE_DIGITS + "d", otp);
-        } catch (Exception exception) {
+        } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("TOTP generation failed", exception);
         }
     }

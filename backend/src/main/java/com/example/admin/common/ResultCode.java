@@ -27,6 +27,13 @@ public enum ResultCode {
     TENANT_LIMIT_EXCEEDED(1016, "租户用户数量已达上限"),
     AI_DAILY_LIMIT_EXCEEDED(1017, "AI 任务已达每日上限"),
     STORAGE_LIMIT_EXCEEDED(1018, "租户存储空间不足"),
+    CAPTCHA_ERROR(1019, "验证码错误"),
+    TOTP_CODE_ERROR(1020, "动态验证码错误"),
+    AI_CALLBACK_INVALID(1021, "AI 回调签名无效"),
+    AI_CALLBACK_STATUS_INVALID(1022, "非法回调状态"),
+    WORKFLOW_FINISHED(1023, "当前流程已结束"),
+    WORKFLOW_DEF_INVALID(1024, "流程定义不可用"),
+    WORKFLOW_NO_START_NODE(1025, "流程定义没有可进入的起始节点"),
     UNAUTHORIZED(401, "未登录或登录已过期"),
     FORBIDDEN(403, "无权限访问"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");

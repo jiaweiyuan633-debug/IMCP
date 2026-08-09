@@ -75,7 +75,7 @@ public class AlertRuleService {
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

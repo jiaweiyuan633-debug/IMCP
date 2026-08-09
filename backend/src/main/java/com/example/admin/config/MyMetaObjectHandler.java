@@ -1,6 +1,7 @@
 package com.example.admin.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import com.example.admin.common.BusinessException;
 import com.example.admin.security.SecurityUtils;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;
@@ -28,7 +29,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
     private Long tryGetUserId() {
         try {
             return SecurityUtils.getUserId();
-        } catch (Exception exception) {
+        } catch (BusinessException exception) {
             return null;
         }
     }

@@ -21,10 +21,12 @@ import com.example.admin.module.system.mapper.SysWorkflowLogMapper;
 import com.example.admin.module.system.mapper.SysWorkflowMapper;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.expression.ExpressionException;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -72,7 +74,7 @@ public class SystemWorkflowService {
         }
         SysProcessDef def = processDefMapper.selectById(workflow.getProcessDefId());
         if (def == null || def.getStatus() == null || def.getStatus() != 1) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义不可用");
+            throw new BusinessException(ResultCode.WORKFLOW_DEF_INVALID);
         }
         List<SysProcessNode> nodes = nodesOfDef(def.getId());
         Map<String, Object> form = parseForm(workflow.getFormData());
@@ -83,7 +85,7 @@ public class SystemWorkflowService {
                 .orElse(0);
         List<SysProcessNode> startNodes = selectNodes(nodes, startOrder, form);
         if (startNodes.isEmpty()) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义没有可进入的起始节点");
+            throw new BusinessException(ResultCode.WORKFLOW_NO_START_NODE);
         }
         LoginUser user = SecurityUtils.getLoginUser();
         workflow.setId(null);
@@ -147,7 +149,7 @@ public class SystemWorkflowService {
     public void approve(Long id, Long nodeId, String remark) {
         SysWorkflow workflow = getOrThrow(id);
         if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+            throw new BusinessException(ResultCode.WORKFLOW_FINISHED);
         }
         List<Long> currentIds = parseIds(workflow.getCurrentNodeIds());
         if (currentIds.isEmpty() && workflow.getCurrentNodeId() != null) {
@@ -191,7 +193,7 @@ public class SystemWorkflowService {
     public void reject(Long id, String remark) {
         SysWorkflow workflow = getOrThrow(id);
         if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+            throw new BusinessException(ResultCode.WORKFLOW_FINISHED);
         }
         checkCanOperate(workflow, currentIds(workflow));
         finishWorkflow(workflow, WorkflowStatus.REJECTED.name());
@@ -209,7 +211,7 @@ public class SystemWorkflowService {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
         if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+            throw new BusinessException(ResultCode.WORKFLOW_FINISHED);
         }
         finishWorkflow(workflow, WorkflowStatus.WITHDRAWN.name());
         workflow.setRemark(remark);
@@ -221,7 +223,7 @@ public class SystemWorkflowService {
     public void delegate(Long id, Long delegateUserId) {
         SysWorkflow workflow = getOrThrow(id);
         if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+            throw new BusinessException(ResultCode.WORKFLOW_FINISHED);
         }
         checkCanOperate(workflow, currentIds(workflow));
         SysUser target = userMapper.selectById(delegateUserId);
@@ -271,11 +273,11 @@ public class SystemWorkflowService {
                     noticeService.create(notice);
                     workflow.setTimeoutNotified(1);
                     workflowMapper.updateById(workflow);
-                } catch (Exception exception) {
+                } catch (RuntimeException exception) {
                     log.warn("Workflow timeout reminder failed for id={}", workflow.getId(), exception);
                 }
             }
-        } catch (Exception exception) {
+        } catch (RuntimeException exception) {
             log.error("Workflow timeout check failed", exception);
         } finally {
             TenantContext.clear();
@@ -326,7 +328,7 @@ public class SystemWorkflowService {
             Boolean result = spelParser.parseExpression(node.getConditionExpression())
                     .getValue(context, Boolean.class);
             return Boolean.TRUE.equals(result);
-        } catch (Exception exception) {
+        } catch (ExpressionException exception) {
             log.warn("Workflow condition evaluate failed: {}", node.getConditionExpression(), exception);
             return false;
         }
@@ -339,7 +341,7 @@ public class SystemWorkflowService {
         try {
             return objectMapper.readValue(formData, new TypeReference<Map<String, Object>>() {
             });
-        } catch (Exception exception) {
+        } catch (JsonProcessingException exception) {
             return new HashMap<>();
         }
     }
