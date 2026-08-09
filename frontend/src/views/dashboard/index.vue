@@ -31,7 +31,6 @@ import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers'
 import { useQuery } from '@tanstack/vue-query'
 import { getDashboardStats } from '@/api/monitor'
-import type { DashboardStatsVo } from '@/api/monitor'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
 
