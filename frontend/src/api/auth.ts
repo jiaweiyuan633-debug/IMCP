@@ -17,6 +17,15 @@ export function changePassword(data: { oldPassword: string; newPassword: string 
   return request.put('/auth/password', data)
 }
 
+export function updateProfile(data: {
+  nickname?: string
+  avatar?: string
+  email?: string
+  phone?: string
+}): Promise<void> {
+  return request.put('/auth/profile', data)
+}
+
 export function getLoginConfig(): Promise<LoginConfigVo> {
   return request.get('/auth/login-config')
 }

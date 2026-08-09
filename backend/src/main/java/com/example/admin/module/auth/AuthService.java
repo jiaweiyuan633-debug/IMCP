@@ -5,6 +5,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
+import com.example.admin.module.auth.dto.ProfileUpdateRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.LoginConfigVo;
@@ -178,6 +179,19 @@ public class AuthService {
             throw new BusinessException(ResultCode.PASSWORD_ERROR);
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userMapper.updateById(user);
+    }
+
+    public void updateProfile(ProfileUpdateRequest request) {
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        SysUser user = userMapper.selectById(loginUser.getUserId());
+        if (user == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        user.setNickname(request.getNickname());
+        user.setAvatar(request.getAvatar());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
         userMapper.updateById(user);
     }
 
