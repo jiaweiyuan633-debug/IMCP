@@ -17,7 +17,9 @@ export interface UserSaveRequest {
   email?: string
   phone?: string
   status: number
+  deptId?: number
   roleIds: number[]
+  postIds: number[]
 }
 
 export interface RoleQuery {
@@ -50,6 +52,86 @@ export interface MenuSaveRequest {
   sort: number
   visible: number
   status: number
+}
+
+export interface DeptVo {
+  id: number
+  parentId: number
+  deptName: string
+  orderNum: number
+  leader?: string
+  phone?: string
+  email?: string
+  status: number
+  children?: DeptVo[]
+}
+
+export interface PostOptionVo {
+  id: number
+  postCode: string
+  postName: string
+}
+
+export interface DeptSaveRequest {
+  id?: number
+  parentId: number
+  deptName: string
+  orderNum: number
+  leader?: string
+  phone?: string
+  email?: string
+  status: number
+}
+
+export interface PostVo {
+  id: number
+  postCode: string
+  postName: string
+  sort: number
+  status: number
+  description?: string
+  createdAt?: string
+}
+
+export interface PostSaveRequest {
+  id?: number
+  postCode: string
+  postName: string
+  sort: number
+  status: number
+  description?: string
+}
+
+export interface DictTypeVo {
+  id: number
+  dictName: string
+  dictType: string
+  status: number
+  remark?: string
+  createdAt?: string
+}
+
+export interface DictDataVo {
+  id: number
+  dictType: string
+  dictLabel: string
+  dictValue: string
+  dictSort: number
+  listClass?: string
+  isDefault: number
+  status: number
+  remark?: string
+  createdAt?: string
+}
+
+export interface ConfigVo {
+  id: number
+  configName: string
+  configKey: string
+  configValue: string
+  configType: number
+  remark?: string
+  createdAt?: string
 }
 
 export function getUserPage(params: UserQuery): Promise<PageResult<UserVo>> {
@@ -114,5 +196,93 @@ export function updateMenu(data: MenuSaveRequest): Promise<void> {
 
 export function deleteMenu(id: number): Promise<void> {
   return request.delete(`/system/menu/${id}`)
+}
+
+export function getDeptTree(): Promise<DeptVo[]> {
+  return request.get('/system/dept/tree')
+}
+
+export function createDept(data: DeptSaveRequest): Promise<number> {
+  return request.post('/system/dept', data)
+}
+
+export function updateDept(data: DeptSaveRequest): Promise<void> {
+  return request.put('/system/dept', data)
+}
+
+export function deleteDept(id: number): Promise<void> {
+  return request.delete(`/system/dept/${id}`)
+}
+
+export function getPostPage(params: Record<string, unknown>): Promise<PageResult<PostVo>> {
+  return request.get('/system/post', { params })
+}
+
+export function getPostOptions(): Promise<PostOptionVo[]> {
+  return request.get('/system/post/options')
+}
+
+export function createPost(data: PostSaveRequest): Promise<number> {
+  return request.post('/system/post', data)
+}
+
+export function updatePost(data: PostSaveRequest): Promise<void> {
+  return request.put('/system/post', data)
+}
+
+export function deletePost(id: number): Promise<void> {
+  return request.delete(`/system/post/${id}`)
+}
+
+export function getDictTypePage(params: Record<string, unknown>): Promise<PageResult<DictTypeVo>> {
+  return request.get('/system/dict/type', { params })
+}
+
+export function createDictType(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/dict/type', data)
+}
+
+export function updateDictType(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/dict/type', data)
+}
+
+export function deleteDictType(id: number): Promise<void> {
+  return request.delete(`/system/dict/type/${id}`)
+}
+
+export function getDictDataPage(params: Record<string, unknown>): Promise<PageResult<DictDataVo>> {
+  return request.get('/system/dict/data', { params })
+}
+
+export function getDictDataByType(dictType: string): Promise<DictDataVo[]> {
+  return request.get(`/system/dict/data/type/${dictType}`)
+}
+
+export function createDictData(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/dict/data', data)
+}
+
+export function updateDictData(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/dict/data', data)
+}
+
+export function deleteDictData(id: number): Promise<void> {
+  return request.delete(`/system/dict/data/${id}`)
+}
+
+export function getConfigPage(params: Record<string, unknown>): Promise<PageResult<ConfigVo>> {
+  return request.get('/system/config', { params })
+}
+
+export function createConfig(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/config', data)
+}
+
+export function updateConfig(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/config', data)
+}
+
+export function deleteConfig(id: number): Promise<void> {
+  return request.delete(`/system/config/${id}`)
 }
 

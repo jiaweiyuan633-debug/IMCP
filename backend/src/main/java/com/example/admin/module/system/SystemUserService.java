@@ -9,10 +9,15 @@ import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.UserQuery;
 import com.example.admin.module.system.dto.UserSaveRequest;
 import com.example.admin.module.system.entity.SysRole;
+import com.example.admin.module.system.entity.SysDept;
+import com.example.admin.module.system.entity.SysPost;
 import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.mapper.SysDeptMapper;
+import com.example.admin.module.system.mapper.SysPostMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
+import com.example.admin.module.system.mapper.SysUserPostMapper;
 import com.example.admin.module.system.vo.UserVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,6 +38,9 @@ public class SystemUserService {
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
     private final SysUserRoleMapper userRoleMapper;
+    private final SysUserPostMapper userPostMapper;
+    private final SysDeptMapper deptMapper;
+    private final SysPostMapper postMapper;
     private final PasswordEncoder passwordEncoder;
 
     public PageResult<UserVo> page(UserQuery query) {
@@ -64,9 +72,13 @@ public class SystemUserService {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        user.setDeptId(request.getDeptId());
         userMapper.insert(user);
         if (request.getRoleIds() != null) {
             assignRoles(user.getId(), request.getRoleIds());
+        }
+        if (request.getPostIds() != null) {
+            assignPosts(user.getId(), request.getPostIds());
         }
         return user.getId();
     }
@@ -92,6 +104,7 @@ public class SystemUserService {
         user.setNickname(request.getNickname());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
+        user.setDeptId(request.getDeptId());
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -99,12 +112,16 @@ public class SystemUserService {
         if (request.getRoleIds() != null) {
             assignRoles(user.getId(), request.getRoleIds());
         }
+        if (request.getPostIds() != null) {
+            assignPosts(user.getId(), request.getPostIds());
+        }
     }
 
     @Transactional
     public void delete(Long id) {
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
+        userPostMapper.deleteByUserId(id);
     }
 
     public void updateStatus(Long id, Integer status) {
@@ -127,6 +144,16 @@ public class SystemUserService {
         }
     }
 
+    public void assignPosts(Long userId, List<Long> postIds) {
+        userPostMapper.deleteByUserId(userId);
+        if (postIds == null || postIds.isEmpty()) {
+            return;
+        }
+        for (Long postId : postIds) {
+            userPostMapper.insert(userId, postId);
+        }
+    }
+
     private UserVo toVo(SysUser user) {
         List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getId());
         List<SysRole> roles = roleIds.isEmpty()
@@ -139,8 +166,22 @@ public class SystemUserService {
                 .filter(role -> role != null)
                 .map(SysRole::getName)
                 .toList();
+        SysDept dept = user.getDeptId() == null ? null : deptMapper.selectById(user.getDeptId());
+        List<Long> postIds = userPostMapper.selectPostIdsByUserId(user.getId());
+        List<SysPost> posts = postIds.isEmpty()
+                ? Collections.emptyList()
+                : postMapper.selectBatchIds(postIds);
+        Map<Long, SysPost> postMap = posts.stream()
+                .collect(Collectors.toMap(SysPost::getId, Function.identity()));
+        List<String> postNames = postIds.stream()
+                .map(id -> postMap.get(id))
+                .filter(post -> post != null)
+                .map(SysPost::getPostName)
+                .toList();
         return UserVo.builder()
                 .id(user.getId())
+                .deptId(user.getDeptId())
+                .deptName(dept == null ? null : dept.getDeptName())
                 .username(user.getUsername())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
@@ -151,6 +192,8 @@ public class SystemUserService {
                 .createdAt(user.getCreatedAt())
                 .roleIds(roleIds)
                 .roleNames(roleNames)
+                .postIds(postIds)
+                .postNames(postNames)
                 .build();
     }
 }

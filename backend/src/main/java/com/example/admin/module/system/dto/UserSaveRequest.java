@@ -29,6 +29,8 @@ public class UserSaveRequest {
     private String phone;
 
     private Integer status;
+    private Long deptId;
     private List<Long> roleIds;
+    private List<Long> postIds;
 }
 

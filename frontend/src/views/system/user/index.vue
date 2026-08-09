@@ -24,6 +24,12 @@
         <template v-else-if="column.key === 'roleNames'">
           {{ (record.roleNames || []).join(', ') || '-' }}
         </template>
+        <template v-else-if="column.key === 'deptName'">
+          {{ record.deptName || '-' }}
+        </template>
+        <template v-else-if="column.key === 'postNames'">
+          {{ (record.postNames || []).join(', ') || '-' }}
+        </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
             <a v-permission="'system:user:edit'" @click="openEdit(record)">编辑</a>
@@ -42,6 +48,15 @@
       <a-form layout="vertical" :model="form">
         <a-form-item label="用户名" required>
           <a-input v-model:value="form.username" />
+        </a-form-item>
+        <a-form-item label="部门">
+          <a-tree-select
+            v-model:value="form.deptId"
+            :tree-data="deptTree"
+            allow-clear
+            tree-default-expand-all
+            :field-names="{ label: 'deptName', value: 'id', children: 'children' }"
+          />
         </a-form-item>
         <a-form-item :label="editingId ? '密码（留空不修改）' : '密码'" required>
           <a-input-password v-model:value="form.password" />
@@ -66,6 +81,14 @@
             option-filter-prop="label"
           />
         </a-form-item>
+        <a-form-item label="岗位">
+          <a-select
+            v-model:value="form.postIds"
+            mode="multiple"
+            :options="postOptions"
+            option-filter-prop="label"
+          />
+        </a-form-item>
       </a-form>
     </ModalForm>
   </a-card>
@@ -80,13 +103,15 @@ import ModalForm from '@/components/ModalForm.vue'
 import {
   createUser,
   deleteUser,
+  getDeptTree,
+  getPostOptions,
   getRoleOptions,
   getUserPage,
   updateUser,
   updateUserStatus,
 } from '@/api/system'
 import type { UserSaveRequest } from '@/api/system'
-import type { RoleOptionVo, SearchField, UserVo } from '@/types'
+import type { DeptVo, PostOptionVo, RoleOptionVo, SearchField, UserVo } from '@/types'
 
 const searchFields: SearchField[] = [
   { label: '用户名', prop: 'username', placeholder: '请输入用户名' },
@@ -105,6 +130,8 @@ const searchFields: SearchField[] = [
 const columns = [
   { title: '用户名', dataIndex: 'username', key: 'username' },
   { title: '昵称', dataIndex: 'nickname', key: 'nickname' },
+  { title: '部门', key: 'deptName' },
+  { title: '岗位', key: 'postNames' },
   { title: '角色', key: 'roleNames' },
   { title: '邮箱', dataIndex: 'email', key: 'email' },
   { title: '手机号', dataIndex: 'phone', key: 'phone' },
@@ -125,6 +152,8 @@ const loading = ref(false)
 const saving = ref(false)
 const records = ref<UserVo[]>([])
 const roleOptions = ref<RoleOptionVo[]>([])
+const postOptions = ref<PostOptionVo[]>([])
+const deptTree = ref<DeptVo[]>([])
 const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
 const searchModel = reactive<Record<string, unknown>>({})
@@ -135,7 +164,9 @@ const form = reactive({
   email: '',
   phone: '',
   status: 1,
+  deptId: undefined as number | undefined,
   roleIds: [] as number[],
+  postIds: [] as number[],
 })
 
 async function loadData() {
@@ -178,7 +209,9 @@ function openCreate() {
     email: '',
     phone: '',
     status: 1,
+    deptId: undefined,
     roleIds: [],
+    postIds: [],
   })
   modalOpen.value = true
 }
@@ -192,7 +225,9 @@ function openEdit(record: UserVo) {
     email: record.email || '',
     phone: record.phone || '',
     status: record.status,
+    deptId: record.deptId,
     roleIds: record.roleIds || [],
+    postIds: record.postIds || [],
   })
   modalOpen.value = true
 }
@@ -211,7 +246,9 @@ async function onSubmit() {
       email: form.email,
       phone: form.phone,
       status: form.status,
+      deptId: form.deptId,
       roleIds: form.roleIds,
+      postIds: form.postIds,
     }
     if (editingId.value) {
       payload.id = editingId.value
@@ -247,6 +284,8 @@ function onDelete(record: UserVo) {
 
 onMounted(async () => {
   roleOptions.value = await getRoleOptions()
+  postOptions.value = await getPostOptions()
+  deptTree.value = await getDeptTree()
   loadData()
 })
 </script>

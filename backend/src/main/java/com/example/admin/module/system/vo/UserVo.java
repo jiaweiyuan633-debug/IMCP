@@ -11,6 +11,8 @@ import java.util.List;
 public class UserVo {
 
     private Long id;
+    private Long deptId;
+    private String deptName;
     private String username;
     private String nickname;
     private String avatar;
@@ -21,5 +23,7 @@ public class UserVo {
     private LocalDateTime createdAt;
     private List<Long> roleIds;
     private List<String> roleNames;
+    private List<Long> postIds;
+    private List<String> postNames;
 }
 

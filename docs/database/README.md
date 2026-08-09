@@ -17,6 +17,12 @@ backend/src/main/resources/db/migration/
 | `sys_role_menu` | 角色菜单关联 |
 | `sys_login_log` | 登录日志 |
 | `sys_oper_log` | 操作日志 |
+| `sys_dept` | 部门 |
+| `sys_post` | 岗位 |
+| `sys_user_post` | 用户岗位关联 |
+| `sys_dict_type` | 字典类型 |
+| `sys_dict_data` | 字典数据 |
+| `sys_config` | 参数配置 |
 | `ai_service_config` | AI 服务配置 |
 | `ai_task` | AI 任务 |
 | `ai_task_result` | AI 任务结果 |
