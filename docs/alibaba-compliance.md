@@ -20,6 +20,8 @@
 | MySQL | 建表 | V26 为关联表补齐 `created_at/updated_at` |
 | MySQL | 索引 | V27 为登录日志、操作日志、工作流、AI 任务、公告、定时任务补齐高频查询组合索引 |
 | 工程结构 | 分层 | 新增 `ai/manager/AiTaskManager`，Service 不再直接依赖外部客户端 |
+| 工程结构 | Manager | 告警 Webhook 拆分 `AlertWebhookManager`，Service 只保留业务编排 |
+| 设计规约 | 文档 | 新增 `docs/architecture-conventions.md`，固化分层、命名、错误码、数据访问与测试规约 |
 | 编程规约 | 魔法值 | AI、租户、用户、登录限流、定时任务、告警、流程、菜单等业务默认值收敛为常量 |
 | 编程规约 | BigDecimal/日期/并发 | 复查无 `BigDecimal.equals` 等值比较、无 `SimpleDateFormat`/`Executors`/`java.sql.Date` |
 
@@ -30,7 +32,6 @@
 | 命名规约 | 实体类 DO 后缀 | 现有 `Sys*` 实体未统一改为 `Sys*DO`，改动面大，建议独立批次 |
 | 编程规约 | 魔法值清理 | 部分业务数字仍硬编码，逐步收敛常量 |
 | MySQL | 主键 UNSIGNED | 现有 `id BIGINT` 未改为 `BIGINT UNSIGNED`，需要评估迁移影响 |
-| 工程结构 | Manager 覆盖度 | 目前 AI 已拆 Manager，文件、告警等外部能力仍为 Service 直连 |
 | 异常日志 | 外部 SDK 边界 | `SysFileService` 文件对象删除仍保留单点 `catch (Exception)`，避免 SDK 多异常类耦合 |
 | 编程规约 | 魔法值清理 | 少量低频服务仍有业务默认值硬编码，后续随模块重构继续收敛 |
 

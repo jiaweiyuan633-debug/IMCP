@@ -2,6 +2,7 @@ package com.example.admin.module.monitor;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.module.monitor.entity.SysAlertRule;
+import com.example.admin.module.monitor.manager.AlertWebhookManager;
 import com.example.admin.module.monitor.mapper.SysAlertRuleMapper;
 import com.example.admin.module.monitor.vo.ServerMonitorVo;
 import com.example.admin.module.system.NoticeSseService;
@@ -13,13 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -38,7 +35,7 @@ public class AlertMonitorService {
     private final SystemNoticeService noticeService;
     private final NoticeSseService noticeSseService;
     private final StringRedisTemplate redisTemplate;
-    private final RestTemplate restTemplate;
+    private final AlertWebhookManager alertWebhookManager;
 
     @Scheduled(
             initialDelayString = "${app.alert-check-initial-delay-ms:15000}",
@@ -90,25 +87,8 @@ public class AlertMonitorService {
         notice.setStatus(NOTICE_STATUS);
         noticeService.create(notice);
         noticeSseService.publishAll(notice);
-        sendWebhook(rule, severity, value);
+        alertWebhookManager.send(rule, severity, value);
         log.warn("Alert triggered: {} severity={} current={} threshold={}", rule.getRuleName(), severity, value, rule.getThreshold());
-    }
-
-    private void sendWebhook(SysAlertRule rule, String severity, double value) {
-        if (rule.getWebhookUrl() == null || rule.getWebhookUrl().isBlank()) {
-            return;
-        }
-        try {
-            Map<String, Object> payload = new HashMap<>(8);
-            payload.put("ruleName", rule.getRuleName());
-            payload.put("metric", rule.getMetric());
-            payload.put("severity", severity);
-            payload.put("currentValue", value);
-            payload.put("threshold", rule.getThreshold());
-            restTemplate.postForEntity(rule.getWebhookUrl(), payload, String.class);
-        } catch (RestClientException | IllegalArgumentException exception) {
-            log.warn("Alert webhook failed for {}", rule.getRuleName(), exception);
-        }
     }
 
     private double readMetric(ServerMonitorVo monitor, String metric) {

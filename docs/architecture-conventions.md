@@ -1,0 +1,43 @@
+# 架构与设计规约
+
+## 分层架构
+
+统一遵循 `Controller -> Service -> Manager -> DAO`：
+
+| 层 | 职责 | 约束 |
+| --- | --- | --- |
+| Controller | 接收 HTTP 参数、参数校验、组装返回 | 不写业务规则，不直接访问 Mapper |
+| Service | 业务逻辑、事务控制、领域规则 | 事务注解只放在 Service 方法上 |
+| Manager | 跨服务、第三方 API、外部系统封装 | 外部调用统一收敛到 Manager，便于替换与测试 |
+| DAO/Mapper | 数据库访问 | 不包含业务逻辑，SQL 显式列出字段 |
+
+现有 `AiTaskManager`、`AlertWebhookManager` 是外部能力封装的示例。文件存储通过 `FileStorage` 接口隔离本地/MinIO 实现。
+
+## 命名与领域模型
+
+- DO：数据库实体，表字段与 Java 属性映射，`Sys*` 实体后续逐步迁移为 `Sys*DO`
+- DTO：接口出入参对象，只承载传输数据
+- VO：前端展示对象，可包含聚合字段
+- BO：Service 内部业务对象，避免与数据库模型耦合
+- 类名 `UpperCamelCase`，方法/变量 `lowerCamelCase`，常量 `UPPER_SNAKE_CASE`
+- 包名全部小写，`module` 下按 `controller/service/manager/mapper/entity/dto/vo` 分层
+
+## 异常与错误码
+
+- 业务异常统一抛出 `BusinessException`，错误码定义在 `ResultCode`
+- 禁止 `e.printStackTrace()`，统一使用 SLF4J `log.error/warn`
+- 日志与操作日志不得输出密码、Token、API Key、手机号、身份证等敏感字段
+- 新增错误码时同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包
+
+## 数据访问
+
+- 自定义 SQL 禁止 `SELECT *`，只查询所需字段
+- 多租户数据必须带上 `tenant_id` 条件，配合数据权限注解使用
+- 高频查询字段建立组合索引，索引命名使用 `idx_表名_字段名`
+- 每次结构变更通过 Flyway 迁移，禁止手工改库
+
+## 工程与测试
+
+- Service 业务核心必须有单元测试，外部依赖用 Mockito 隔离
+- 覆盖阈值由 JaCoCo / Vitest Coverage 在 CI 中强制校验
+- 不引入代码生成器，脚手架面向企业生产管理和 Vibe Coding 迭代
