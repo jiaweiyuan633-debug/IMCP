@@ -8,7 +8,8 @@
 - RBAC 权限：用户、角色、菜单、按钮权限、数据权限（AOP 注解 + SQL 拦截器统一注入）
 - 企业基础：部门、岗位、数据字典、参数配置、通知公告、文件管理
 - 工程能力：Quartz JDBC 持久化定时任务、本地/MinIO 文件存储（签名访问）、Excel 导入导出、OpenAPI
-- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V22
+- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V27
+- 工程规范：阿里巴巴 Java 开发手册分批整改、统一错误码、日志脱敏、核心 Service 单测、Manager 分层
 - 实时协作：SSE Ticket 安全推送、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
 - 完整工作流：流程定义、条件/并行节点、表单数据、待办任务、撤回、转办、超时提醒、审批日志
 - 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
@@ -32,7 +33,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V25）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V27）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile
@@ -117,6 +118,7 @@ GitOps 交付见 [gitops/README.md](gitops/README.md)。
 - 部署教程：`docs/deploy/`
 - 演示与答辩材料：`docs/demo-outline.md`
 - 架构说明：`docs/architecture.md`
+- 架构设计规约：`docs/architecture-conventions.md`
 - 运维手册：`docs/runbook.md`
 - 阿里规约合规说明：`docs/alibaba-compliance.md`
 

@@ -14,7 +14,7 @@
 | 异常日志 | 统一异常处理 | `GlobalExceptionHandler` 补充参数解析、约束校验、数据完整性、认证异常映射 |
 | 安全规约 | 日志脱敏 | 新增 `LogMaskUtils`，操作日志递归脱敏密码、Token、API Key、手机号、邮箱等字段 |
 | 单元测试 | 覆盖率 | 后端 JaCoCo、前端 Vitest Coverage 阈值已接入 CI |
-| 单元测试 | 核心 Service | 新增租户、用户、AI 任务、工作流单测，当前后端 15 个用例全通过 |
+| 单元测试 | 核心 Service | 新增租户、用户、AI 任务、工作流、告警 Manager 单测，当前后端 17 个用例全通过 |
 | 安全规约 | 敏感信息 | TOTP 密钥加密、文件签名访问、日志不输出敏感字段 |
 | MySQL | SQL | 自定义 SQL 已移除 `SELECT *`，改为显式字段 |
 | MySQL | 建表 | V26 为关联表补齐 `created_at/updated_at` |

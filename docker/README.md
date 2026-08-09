@@ -2,6 +2,8 @@
 
 Compose 编排六个服务：
 
+数据库结构由后端 Flyway V1-V27 自动迁移，禁止手工改库。
+
 | 服务 | 说明 |
 | --- | --- |
 | `mysql` | MySQL 8，带健康检查与数据卷 |
@@ -28,4 +30,6 @@ docker compose up -d --build
 
 Nginx 对 `location /api/` 和 `/uploads/` 做反向代理，前端路由回退到 `index.html`，支持刷新页面不 404。
 官网独立使用 `nginx-website.conf`，通过 `WEBSITE_PORT` 暴露。
+
+工程与设计规约见 `docs/architecture-conventions.md`，阿里规约合规说明见 `docs/alibaba-compliance.md`。
 

@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V25。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V27。
 
 ## 版本记录
 
@@ -31,6 +31,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V23 | 工作流条件/并行/表单与超时提醒 |
 | V24 | 文件对象存储 key |
 | V25 | TOTP 密钥列扩容以支持加密存储 |
+| V26 | 关联表补齐 `created_at/updated_at` |
+| V27 | 登录日志、操作日志、工作流、AI 任务、公告、定时任务高频查询索引 |
 
 ## 表清单
 
@@ -110,4 +112,5 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - AI 服务支持每日任务限额，非管理员查看用户敏感字段自动脱敏。
 - 上传文件通过签名 Token 访问，TOTP 密钥加密存储。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
+- 高频查询字段采用组合索引，索引命名统一为 `idx_表名_字段名`。
 

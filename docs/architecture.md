@@ -25,10 +25,21 @@ Y15 双端管理平台由四个运行时组成：
 - 文件访问：HMAC 签名 Token，短期有效
 - 2FA：TOTP 密钥 AES-GCM 加密存储
 - 工作流：流程定义、条件/并行节点、表单数据、超时提醒
+- 外部能力：AI 任务、告警 Webhook 通过 Manager 封装，文件存储通过 `FileStorage` 接口隔离
+- 日志安全：操作日志经 `LogMaskUtils` 递归脱敏密码、Token、API Key、手机号、邮箱等字段
+- 统一错误码：`ResultCode` 覆盖认证、参数、AI 回调与工作流状态，前端语言包同步维护
 
-## 演进方向
+## 当前完成度
+
+- API 版本化 `/api/v1/**` 已提供
+- PWA 离线缓存、Playwright E2E、覆盖率门槛已接入
+- GitOps 通过 ArgoCD 交付 `k8s/helm/admin-scaffold`
+- 阿里巴巴 Java 开发手册七大模块已完成分批整改，当前状态见 `docs/alibaba-compliance.md`
+- 分层、命名、错误码、数据访问与测试规约见 `docs/architecture-conventions.md`
+
+## 后续方向
 
 - 消息中间件替换 SSE 的跨实例广播
 - 对象存储接入 CDN 与预签名 URL
 - 工作流继续扩展会签、加签与动态表单
-- API 版本化与契约测试
+- 现有 `Sys*` 实体逐步迁移为 `Sys*DO` 命名
