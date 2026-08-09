@@ -75,6 +75,11 @@ docker compose -f docker-compose.yml -f observability.yml up -d
 - Tempo：`http://localhost:3200`
 - 后端链路追踪：通过 Brave 上报 Tempo，`ZIPKIN_ENDPOINT` 指向 Tempo 9411
 
+PWA 离线缓存：
+
+- 后台管理系统和官网构建时自动生成 `manifest.webmanifest` 与 `sw.js`
+- 首次访问后支持离线导航和静态资源缓存
+
 Docker Hub 拉取超时时，可先用 DaoCloud 镜像源拉取并打标准标签。
 
 ## 3. Kubernetes

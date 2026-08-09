@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import Components from 'unplugin-vue-components/vite'
 import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
@@ -10,6 +11,22 @@ export default defineConfig({
     Components({
       resolvers: [AntDesignVueResolver({ importStyle: false })],
       dts: false,
+    }),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: '后台管理系统',
+        short_name: '后台管理系统',
+        start_url: '/',
+        display: 'standalone',
+        theme_color: '#2563eb',
+        icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        navigateFallback: '/index.html',
+      },
     }),
   ],
   resolve: {

@@ -13,9 +13,9 @@
 - 完整工作流：流程定义、条件/并行节点、表单数据、待办任务、撤回、转办、超时提醒、审批日志
 - 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
-- 前端体验：全量中英文国际化、暗黑模式、移动端响应式
+- 前端体验：全量中英文国际化、暗黑模式、移动端响应式、PWA 离线缓存
 - 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
-- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试，冒烟与压测脚本
+- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、覆盖率门槛、Playwright E2E、CodeQL，冒烟与压测脚本
 
 ## 技术栈
 
@@ -108,6 +108,7 @@ scripts/fetch-openapi.ps1
 ```
 
 CI 流水线见 `.github/workflows/ci.yml`。
+GitOps 交付见 [gitops/README.md](gitops/README.md)。
 
 ## 文档入口
 

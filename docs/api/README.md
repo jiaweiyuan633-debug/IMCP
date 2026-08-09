@@ -42,6 +42,8 @@ Java 后端统一响应结构：
 
 分页接口统一返回 `PageResult`，包含 `list/total/pageNum/pageSize`。除登录等公开接口外，请求头需携带 `Authorization: Bearer <accessToken>`。
 
+接口同时提供版本化前缀 `/api/v1/**`，与 `/api/**` 行为一致；新客户端建议使用 `/api/v1/**`。
+
 ## 认证与个人中心
 
 | 方法 | 路径 | 说明 |

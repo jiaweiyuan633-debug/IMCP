@@ -8,6 +8,9 @@ import router from './router'
 import { permission } from '@/directives/permission'
 import i18n from '@/locales'
 import { queryClient } from '@/queryClient'
+import { registerSW } from 'virtual:pwa-register'
+
+registerSW({ immediate: true })
 
 const app = createApp(App)
 
