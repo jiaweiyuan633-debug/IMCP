@@ -46,6 +46,10 @@ public class CommonController {
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的文件类型");
         }
+        byte[] head = file.getBytes();
+        if (head.length > 0 && !isAllowedContent(head, extension)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容与扩展名不匹配");
+        }
 
         String datePath = DateUtil.format(new Date(), "yyyy/MM/dd");
         String filename = IdUtil.fastSimpleUUID() + "." + extension;
@@ -60,6 +64,34 @@ public class CommonController {
                 .name(originalName)
                 .size(file.getSize())
                 .build());
+    }
+
+    private boolean isAllowedContent(byte[] head, String extension) {
+        return switch (extension) {
+            case "jpg", "jpeg" -> head.length >= 3
+                    && (head[0] & 0xFF) == 0xFF
+                    && (head[1] & 0xFF) == 0xD8
+                    && (head[2] & 0xFF) == 0xFF;
+            case "png" -> head.length >= 8
+                    && (head[0] & 0xFF) == 0x89
+                    && head[1] == 'P'
+                    && head[2] == 'N'
+                    && head[3] == 'G';
+            case "gif" -> head.length >= 4
+                    && head[0] == 'G'
+                    && head[1] == 'I'
+                    && head[2] == 'F'
+                    && head[3] == '8';
+            case "pdf" -> head.length >= 4
+                    && head[0] == '%'
+                    && head[1] == 'P'
+                    && head[2] == 'D'
+                    && head[3] == 'F';
+            case "zip" -> head.length >= 2
+                    && head[0] == 'P'
+                    && head[1] == 'K';
+            default -> true;
+        };
     }
 }
 

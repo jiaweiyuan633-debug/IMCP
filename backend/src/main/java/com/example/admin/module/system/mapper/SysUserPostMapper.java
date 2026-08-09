@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Collection;
 
 @Mapper
 public interface SysUserPostMapper {
@@ -19,5 +21,16 @@ public interface SysUserPostMapper {
 
     @Select("SELECT post_id FROM sys_user_post WHERE user_id = #{userId}")
     List<Long> selectPostIdsByUserId(@Param("userId") Long userId);
+
+    @Select("""
+            <script>
+            SELECT user_id, post_id FROM sys_user_post
+            WHERE user_id IN
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+            </script>
+            """)
+    List<Map<String, Object>> selectByUserIds(@Param("userIds") Collection<Long> userIds);
 }
 

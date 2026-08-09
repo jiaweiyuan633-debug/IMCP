@@ -13,5 +13,15 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          antd: ['ant-design-vue', '@ant-design/icons-vue'],
+          echarts: ['echarts'],
+          vendor: ['vue', 'vue-router', 'pinia', 'axios', 'vue-i18n'],
+        },
+      },
+    },
+  },
 })
-

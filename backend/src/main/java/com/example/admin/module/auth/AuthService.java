@@ -7,11 +7,14 @@ import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
+import com.example.admin.module.auth.vo.LoginConfigVo;
 import com.example.admin.module.auth.vo.UserInfoVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
 import com.example.admin.module.system.entity.SysLoginLog;
+import com.example.admin.module.system.entity.SysConfig;
 import com.example.admin.module.system.entity.SysMenu;
 import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
@@ -24,6 +27,7 @@ import com.example.admin.security.TokenService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
@@ -44,23 +49,36 @@ public class AuthService {
     private final SysRoleMapper roleMapper;
     private final SysMenuMapper menuMapper;
     private final SysLoginLogMapper loginLogMapper;
+    private final SysConfigMapper configMapper;
+    private final CaptchaService captchaService;
+    private final StringRedisTemplate redisTemplate;
     private final JwtUtil jwtUtil;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+        String ip = httpRequest.getRemoteAddr();
+        if (isRateLimited(ip)) {
+            throw new BusinessException(1014, "登录过于频繁，请稍后再试");
+        }
+        checkLoginLockout(request.getUsername());
+        if (captchaEnabled() && !captchaService.verify(request.getCaptchaId(), request.getCaptchaCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "验证码错误");
+        }
         String username = request.getUsername().trim();
         SysUser user = userMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             saveLoginLog(httpRequest, username, false, "用户名或密码错误");
+            recordLoginFailure(username);
             throw new BusinessException(ResultCode.BAD_CREDENTIALS);
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
             saveLoginLog(httpRequest, username, false, "账号已被禁用");
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
+        redisTemplate.delete("login:fail:" + username);
 
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         List<String> perms = menuMapper.selectPermsByUserId(user.getId());
@@ -87,6 +105,14 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .user(toUserInfo(user, roles, perms, menus))
+                .build();
+    }
+
+    public LoginConfigVo loginConfig() {
+        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
+                .eq(SysConfig::getConfigKey, "sys.account.captchaEnabled"));
+        return LoginConfigVo.builder()
+                .captchaEnabled(config != null && Boolean.parseBoolean(config.getConfigValue()))
                 .build();
     }
 
@@ -212,5 +238,33 @@ public class AuthService {
         loginLog.setMessage(message);
         loginLog.setLoginTime(LocalDateTime.now());
         loginLogMapper.insert(loginLog);
+    }
+
+    private boolean isRateLimited(String ip) {
+        String key = "login:rate:" + ip;
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofMinutes(1));
+        }
+        return count != null && count > 20;
+    }
+
+    private void checkLoginLockout(String username) {
+        String value = redisTemplate.opsForValue().get("login:fail:" + username);
+        if (value != null && Integer.parseInt(value) >= 5) {
+            throw new BusinessException(1014, "登录失败次数过多，账号已锁定，请稍后再试");
+        }
+    }
+
+    private void recordLoginFailure(String username) {
+        String key = "login:fail:" + username;
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofMinutes(10));
+        }
+    }
+
+    private boolean captchaEnabled() {
+        return loginConfig().isCaptchaEnabled();
     }
 }

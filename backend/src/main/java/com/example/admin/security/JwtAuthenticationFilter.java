@@ -45,7 +45,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (tokenService.hasValidAccessToken(claims.getId())) {
                     Long userId = Long.valueOf(claims.getSubject());
                     List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
-                    List<String> perms = menuMapper.selectPermsByUserId(userId);
+                    List<String> perms = tokenService.getCachedPermissions(userId);
+                    if (perms == null) {
+                        perms = menuMapper.selectPermsByUserId(userId);
+                        tokenService.cachePermissions(userId, perms);
+                    }
                     SysUser user = userMapper.selectById(userId);
                     LoginUser loginUser = LoginUser.builder()
                             .userId(userId)

@@ -23,6 +23,7 @@ public class TokenService {
     private static final String REFRESH_KEY = "login:refresh:";
     private static final String BLACKLIST_KEY = "login:blacklist:";
     private static final String ONLINE_KEY = "login:online:";
+    private static final String PERMS_KEY = "auth:perms:";
 
     private final StringRedisTemplate redisTemplate;
     private final JwtProperties properties;
@@ -116,6 +117,28 @@ public class TokenService {
 
     public void deleteCacheKey(String key) {
         redisTemplate.delete(key);
+    }
+
+    public List<String> getCachedPermissions(Long userId) {
+        String value = redisTemplate.opsForValue().get(PERMS_KEY + userId);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return List.of(value.split(","));
+    }
+
+    public void cachePermissions(Long userId, List<String> perms) {
+        redisTemplate.opsForValue().set(
+                PERMS_KEY + userId,
+                String.join(",", perms),
+                Duration.ofMinutes(30));
+    }
+
+    public void evictAllPermissions() {
+        Set<String> keys = redisTemplate.keys(PERMS_KEY + "*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
 }
 

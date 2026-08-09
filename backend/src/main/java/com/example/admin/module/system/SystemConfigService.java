@@ -13,6 +13,8 @@ import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.vo.ConfigVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -34,6 +36,14 @@ public class SystemConfigService {
         return PageResult.of(result, records);
     }
 
+    @Cacheable(value = "configs", key = "#configKey")
+    public String getByKey(String configKey) {
+        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
+                .eq(SysConfig::getConfigKey, configKey));
+        return config == null ? null : config.getConfigValue();
+    }
+
+    @CacheEvict(value = "configs", allEntries = true)
     public Long create(ConfigSaveRequest request) {
         checkKeyUnique(request.getConfigKey(), null);
         SysConfig config = toEntity(request);
@@ -41,6 +51,7 @@ public class SystemConfigService {
         return config.getId();
     }
 
+    @CacheEvict(value = "configs", allEntries = true)
     public void update(ConfigSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "参数 ID 不能为空");
@@ -49,6 +60,7 @@ public class SystemConfigService {
         configMapper.updateById(toEntity(request));
     }
 
+    @CacheEvict(value = "configs", allEntries = true)
     public void delete(Long id) {
         configMapper.deleteById(id);
     }

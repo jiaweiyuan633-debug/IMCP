@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Collection;
 
 @Mapper
 public interface SysUserRoleMapper {
@@ -22,5 +24,16 @@ public interface SysUserRoleMapper {
 
     @Select("SELECT role_id FROM sys_user_role WHERE user_id = #{userId}")
     List<Long> selectRoleIdsByUserId(@Param("userId") Long userId);
+
+    @Select("""
+            <script>
+            SELECT user_id, role_id FROM sys_user_role
+            WHERE user_id IN
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+            </script>
+            """)
+    List<Map<String, Object>> selectByUserIds(@Param("userIds") Collection<Long> userIds);
 }
 

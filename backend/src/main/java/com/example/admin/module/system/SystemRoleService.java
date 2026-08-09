@@ -12,6 +12,7 @@ import com.example.admin.module.system.entity.SysRole;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysRoleMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleDeptMapper;
+import com.example.admin.security.TokenService;
 import com.example.admin.module.system.vo.RoleOptionVo;
 import com.example.admin.module.system.vo.RoleVo;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class SystemRoleService {
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysRoleDeptMapper roleDeptMapper;
+    private final TokenService tokenService;
 
     public PageResult<RoleVo> page(RoleQuery query) {
         Page<SysRole> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -117,6 +119,7 @@ public class SystemRoleService {
             return;
         }
         roleMenuMapper.insertBatch(roleId, menuIds);
+        tokenService.evictAllPermissions();
     }
 
     public void assignDepts(Long roleId, List<Long> deptIds) {

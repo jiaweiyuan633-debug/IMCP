@@ -18,6 +18,8 @@ import com.example.admin.module.system.vo.DictDataVo;
 import com.example.admin.module.system.vo.DictTypeVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -81,6 +83,7 @@ public class SystemDictService {
         return PageResult.of(result, records);
     }
 
+    @Cacheable(value = "dictData", key = "#dictType")
     public List<DictDataVo> dataByType(String dictType) {
         return dataMapper.selectList(new LambdaQueryWrapper<SysDictData>()
                         .eq(SysDictData::getDictType, dictType)
@@ -91,12 +94,14 @@ public class SystemDictService {
                 .toList();
     }
 
+    @CacheEvict(value = "dictData", allEntries = true)
     public Long dataCreate(DictDataSaveRequest request) {
         SysDictData data = toDataEntity(request);
         dataMapper.insert(data);
         return data.getId();
     }
 
+    @CacheEvict(value = "dictData", allEntries = true)
     public void dataUpdate(DictDataSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "字典数据 ID 不能为空");
@@ -104,6 +109,7 @@ public class SystemDictService {
         dataMapper.updateById(toDataEntity(request));
     }
 
+    @CacheEvict(value = "dictData", allEntries = true)
     public void dataDelete(Long id) {
         dataMapper.deleteById(id);
     }

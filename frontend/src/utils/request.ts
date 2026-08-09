@@ -3,9 +3,10 @@ import { message } from 'ant-design-vue'
 import router from '@/router'
 import type { Result } from '@/types'
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/utils/auth'
+import { API_BASE_URL } from '@/utils/env'
 
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: API_BASE_URL,
   timeout: 20000,
 })
 
@@ -68,6 +69,14 @@ service.interceptors.response.use(
     return Promise.reject(new Error(result.message))
   },
   async (error) => {
+    if (
+      ['ECONNABORTED', 'ERR_NETWORK'].includes(error.code) &&
+      !error.config?.retried
+    ) {
+      error.config.retried = true
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return service.request(error.config)
+    }
     if (error.response?.status === 401 && !error.config?.retried) {
       const ok = await refreshAccessToken()
       if (ok) {

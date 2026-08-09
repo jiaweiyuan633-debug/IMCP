@@ -2,6 +2,7 @@ import request from '@/utils/request'
 import axios from 'axios'
 import type { MenuNode, PageResult, RoleOptionVo, RoleVo, UserVo } from '@/types'
 import { getAccessToken } from '@/utils/auth'
+import { API_BASE_URL } from '@/utils/env'
 
 export interface UserQuery {
   pageNum: number
@@ -292,7 +293,7 @@ export function deleteConfig(id: number): Promise<void> {
 }
 
 export async function exportUsers(): Promise<void> {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  const baseURL = API_BASE_URL
   const response = await axios.get(`${baseURL}/system/user/export`, {
     headers: { Authorization: `Bearer ${getAccessToken()}` },
     responseType: 'blob',

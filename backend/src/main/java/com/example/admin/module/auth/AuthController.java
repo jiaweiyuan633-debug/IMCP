@@ -1,6 +1,8 @@
 package com.example.admin.module.auth;
 
 import com.example.admin.common.Result;
+import com.example.admin.module.auth.vo.CaptchaResponse;
+import com.example.admin.module.auth.vo.LoginConfigVo;
 import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
@@ -22,6 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final CaptchaService captchaService;
+
+    @GetMapping("/login-config")
+    public Result<LoginConfigVo> loginConfig() {
+        return Result.success(authService.loginConfig());
+    }
+
+    @GetMapping("/captcha")
+    public Result<CaptchaResponse> captcha() throws Exception {
+        return Result.success(captchaService.generate());
+    }
 
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {

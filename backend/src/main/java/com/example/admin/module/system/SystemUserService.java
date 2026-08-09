@@ -20,6 +20,7 @@ import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserPostMapper;
+import com.example.admin.security.TokenService;
 import com.example.admin.module.system.vo.UserVo;
 import com.alibaba.excel.EasyExcel;
 import com.example.admin.module.system.entity.SysConfig;
@@ -52,6 +53,7 @@ public class SystemUserService {
     private final SysPostMapper postMapper;
     private final DataScopeHelper dataScopeHelper;
     private final SysConfigMapper configMapper;
+    private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
     public PageResult<UserVo> page(UserQuery query) {
@@ -63,7 +65,33 @@ public class SystemUserService {
                 .orderByDesc(SysUser::getId);
         dataScopeHelper.apply(wrapper);
         IPage<SysUser> result = userMapper.selectPage(page, wrapper);
-        List<UserVo> records = result.getRecords().stream().map(this::toVo).toList();
+        List<SysUser> users = result.getRecords();
+        List<Long> userIds = users.stream().map(SysUser::getId).toList();
+        Map<Long, SysDept> deptMap = users.stream()
+                .map(SysUser::getDeptId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList()
+                .isEmpty() ? Map.of()
+                : deptMapper.selectBatchIds(users.stream().map(SysUser::getDeptId)
+                        .filter(id -> id != null)
+                        .distinct()
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(SysDept::getId, Function.identity()));
+        Map<Long, List<Long>> roleIdsByUser = groupByUser(userRoleMapper.selectByUserIds(userIds), "role_id", "roleId");
+        Map<Long, List<Long>> postIdsByUser = groupByUser(userPostMapper.selectByUserIds(userIds), "post_id", "postId");
+        Map<Long, SysRole> roleMap = loadMap(roleIdsByUser, roleMapper::selectBatchIds);
+        Map<Long, SysPost> postMap = loadMap(postIdsByUser, postMapper::selectBatchIds);
+        List<UserVo> records = users.stream()
+                .map(user -> toVo(
+                        user,
+                        deptMap,
+                        roleIdsByUser.getOrDefault(user.getId(), Collections.emptyList()),
+                        postIdsByUser.getOrDefault(user.getId(), Collections.emptyList()),
+                        roleMap,
+                        postMap))
+                .toList();
         return PageResult.of(result, records);
     }
 
@@ -154,6 +182,7 @@ public class SystemUserService {
         for (Long roleId : roleIds) {
             userRoleMapper.insert(userId, roleId);
         }
+        tokenService.evictAllPermissions();
     }
 
     public void assignPosts(Long userId, List<Long> postIds) {
@@ -166,25 +195,19 @@ public class SystemUserService {
         }
     }
 
-    private UserVo toVo(SysUser user) {
-        List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getId());
-        List<SysRole> roles = roleIds.isEmpty()
-                ? Collections.emptyList()
-                : roleMapper.selectBatchIds(roleIds);
-        Map<Long, SysRole> roleMap = roles.stream()
-                .collect(Collectors.toMap(SysRole::getId, Function.identity()));
+    private UserVo toVo(
+            SysUser user,
+            Map<Long, SysDept> deptMap,
+            List<Long> roleIds,
+            List<Long> postIds,
+            Map<Long, SysRole> roleMap,
+            Map<Long, SysPost> postMap) {
         List<String> roleNames = roleIds.stream()
                 .map(id -> roleMap.get(id))
                 .filter(role -> role != null)
                 .map(SysRole::getName)
                 .toList();
-        SysDept dept = user.getDeptId() == null ? null : deptMapper.selectById(user.getDeptId());
-        List<Long> postIds = userPostMapper.selectPostIdsByUserId(user.getId());
-        List<SysPost> posts = postIds.isEmpty()
-                ? Collections.emptyList()
-                : postMapper.selectBatchIds(postIds);
-        Map<Long, SysPost> postMap = posts.stream()
-                .collect(Collectors.toMap(SysPost::getId, Function.identity()));
+        SysDept dept = user.getDeptId() == null ? null : deptMap.get(user.getDeptId());
         List<String> postNames = postIds.stream()
                 .map(id -> postMap.get(id))
                 .filter(post -> post != null)
@@ -207,6 +230,39 @@ public class SystemUserService {
                 .postIds(postIds)
                 .postNames(postNames)
                 .build();
+    }
+
+    private Map<Long, List<Long>> groupByUser(List<Map<String, Object>> rows, String snakeKey, String camelKey) {
+        return rows.stream().collect(Collectors.groupingBy(
+                row -> longValue(row, "user_id", "userId"),
+                Collectors.mapping(row -> longValue(row, snakeKey, camelKey), Collectors.toList())));
+    }
+
+    private <T> Map<Long, T> loadMap(
+            Map<Long, List<Long>> idsByUser,
+            java.util.function.Function<java.util.Collection<Long>, java.util.List<T>> loader) {
+        List<Long> ids = idsByUser.values().stream().flatMap(List::stream).distinct().toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return loader.apply(ids).stream()
+                .collect(Collectors.toMap(this::entityId, Function.identity()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Long entityId(Object entity) {
+        if (entity instanceof SysRole role) {
+            return role.getId();
+        }
+        if (entity instanceof SysPost post) {
+            return post.getId();
+        }
+        throw new IllegalArgumentException("Unsupported entity");
+    }
+
+    private Long longValue(Map<String, Object> row, String snakeKey, String camelKey) {
+        Object value = row.containsKey(snakeKey) ? row.get(snakeKey) : row.get(camelKey);
+        return ((Number) value).longValue();
     }
 
     public void exportUsers(HttpServletResponse response) throws IOException {

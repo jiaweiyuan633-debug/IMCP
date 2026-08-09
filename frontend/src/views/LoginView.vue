@@ -17,6 +17,12 @@
         >
           <a-input-password v-model:value="form.password" :placeholder="t('login.passwordPlaceholder')" />
         </a-form-item>
+        <a-form-item v-if="captchaEnabled" label="验证码" name="captchaCode">
+          <a-space>
+            <a-input v-model:value="form.captchaCode" placeholder="请输入验证码" style="width: 160px" />
+            <img v-if="captchaImage" :src="captchaImage" alt="captcha" class="captcha-image" @click="loadCaptcha" />
+          </a-space>
+        </a-form-item>
         <a-button type="primary" html-type="submit" block :loading="loading">{{ t('login.submit') }}</a-button>
       </a-form>
     </a-card>
@@ -24,12 +30,13 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import type { LoginForm } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { getCaptcha, getLoginConfig } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +46,22 @@ const loading = ref(false)
 const form = reactive<LoginForm>({
   username: 'admin',
   password: '',
+})
+const captchaEnabled = ref(false)
+const captchaImage = ref('')
+
+async function loadCaptcha() {
+  const data = await getCaptcha()
+  form.captchaId = data.captchaId
+  captchaImage.value = data.image
+}
+
+onMounted(async () => {
+  const config = await getLoginConfig()
+  captchaEnabled.value = config.captchaEnabled
+  if (config.captchaEnabled) {
+    await loadCaptcha()
+  }
 })
 
 async function onSubmit() {
@@ -74,5 +97,12 @@ async function onSubmit() {
   font-weight: 600;
   text-align: center;
   margin-bottom: 20px;
+}
+
+.captcha-image {
+  height: 32px;
+  cursor: pointer;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
 }
 </style>

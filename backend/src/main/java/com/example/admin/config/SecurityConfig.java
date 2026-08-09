@@ -51,6 +51,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/refresh",
+                                "/api/auth/captcha",
+                                "/api/auth/login-config",
                                 "/api/ai/callback/**",
                                 "/uploads/**",
                                 "/doc.html",

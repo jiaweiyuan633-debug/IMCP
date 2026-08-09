@@ -39,6 +39,17 @@ export interface LoginResponse {
 export interface LoginForm {
   username: string
   password: string
+  captchaId?: string
+  captchaCode?: string
+}
+
+export interface LoginConfigVo {
+  captchaEnabled: boolean
+}
+
+export interface CaptchaResponse {
+  captchaId: string
+  image: string
 }
 
 export interface PageResult<T> {
