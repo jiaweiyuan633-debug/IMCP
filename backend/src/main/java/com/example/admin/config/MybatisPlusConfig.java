@@ -11,6 +11,7 @@ import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.example.admin.common.DataScopeInnerInterceptor;
 
 import java.util.Set;
 
@@ -64,6 +65,7 @@ public class MybatisPlusConfig {
                 return !TENANT_TABLES.contains(tableName.toLowerCase());
             }
         }));
+        interceptor.addInnerInterceptor(new DataScopeInnerInterceptor());
         return interceptor;
     }
 }

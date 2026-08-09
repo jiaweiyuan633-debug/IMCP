@@ -95,6 +95,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - `created_by/updated_by` 由 `MyMetaObjectHandler` 自动填充，核心业务表带 `version` 乐观锁并由 `OptimisticLockerInnerInterceptor` 校验。
 - 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
 - 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
+- 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，对 `sys_user/ai_task/sys_oper_log/sys_login_log` 自动注入权限条件。
 - 权限、字典、参数支持 Redis 缓存，权限变更自动失效缓存。
 - 文件元数据统一写入 `sys_file`，存储后端支持本地目录与 MinIO。
 - SQL 日志阈值由 `SQL_LOG_THRESHOLD_MS` 控制，默认 50ms。

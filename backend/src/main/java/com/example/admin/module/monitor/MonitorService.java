@@ -19,6 +19,7 @@ import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.common.TenantContext;
 import com.example.admin.security.TokenService;
 import com.example.admin.module.system.DataScopeHelper;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.system.entity.SysUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,23 +42,25 @@ public class MonitorService {
     private final JdbcTemplate jdbcTemplate;
     private final DataScopeHelper dataScopeHelper;
 
+    @DataScope(tables = {"sys_login_log"})
     public PageResult<SysLoginLog> loginLogPage(long pageNum, long pageSize, String username) {
-        Page<SysLoginLog> page = new Page<>(pageNum, pageSize);
+        Page<SysLoginLog> page = new Page<>(pageNum, pageSize, false);
         LambdaQueryWrapper<SysLoginLog> wrapper = new LambdaQueryWrapper<SysLoginLog>()
                 .like(StringUtils.hasText(username), SysLoginLog::getUsername, username)
                 .orderByDesc(SysLoginLog::getId);
-        applyLoginLogScope(wrapper);
         IPage<SysLoginLog> result = loginLogMapper.selectPage(page, wrapper);
+        page.setTotal(loginLogMapper.selectCount(wrapper));
         return PageResult.of(result, result.getRecords());
     }
 
+    @DataScope(tables = {"sys_oper_log"})
     public PageResult<SysOperLog> operLogPage(long pageNum, long pageSize, String module) {
-        Page<SysOperLog> page = new Page<>(pageNum, pageSize);
+        Page<SysOperLog> page = new Page<>(pageNum, pageSize, false);
         LambdaQueryWrapper<SysOperLog> wrapper = new LambdaQueryWrapper<SysOperLog>()
                 .like(StringUtils.hasText(module), SysOperLog::getModule, module)
                 .orderByDesc(SysOperLog::getId);
-        applyUserIdScope(wrapper, SysOperLog::getUserId);
         IPage<SysOperLog> result = operLogMapper.selectPage(page, wrapper);
+        page.setTotal(operLogMapper.selectCount(wrapper));
         return PageResult.of(result, result.getRecords());
     }
 

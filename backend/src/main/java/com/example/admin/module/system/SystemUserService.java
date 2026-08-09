@@ -24,6 +24,7 @@ import com.example.admin.module.system.mapper.SysTenantMapper;
 import com.example.admin.module.system.entity.SysTenant;
 import com.example.admin.security.TokenService;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.system.vo.UserVo;
 import com.alibaba.excel.EasyExcel;
 import com.example.admin.module.system.entity.SysConfig;
@@ -60,16 +61,17 @@ public class SystemUserService {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
 
+    @DataScope(tables = {"sys_user"})
     public PageResult<UserVo> page(UserQuery query) {
-        Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize());
+        Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .like(StringUtils.hasText(query.getUsername()), SysUser::getUsername, query.getUsername())
                 .like(StringUtils.hasText(query.getNickname()), SysUser::getNickname, query.getNickname())
                 .eq(query.getStatus() != null, SysUser::getStatus, query.getStatus())
                 .orderByDesc(SysUser::getId);
-        dataScopeHelper.apply(wrapper);
         wrapper.eq(SysUser::getTenantId, TenantContext.getTenantId());
         IPage<SysUser> result = userMapper.selectPage(page, wrapper);
+        page.setTotal(userMapper.selectCount(wrapper));
         List<SysUser> users = result.getRecords();
         List<Long> userIds = users.stream().map(SysUser::getId).toList();
         if (userIds.isEmpty()) {
@@ -291,10 +293,10 @@ public class SystemUserService {
         return ((Number) value).longValue();
     }
 
+    @DataScope(tables = {"sys_user"})
     public void exportUsers(HttpServletResponse response) throws IOException {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .orderByDesc(SysUser::getId);
-        dataScopeHelper.apply(wrapper);
         boolean mask = !dataScopeHelper.isAdmin();
         List<UserExcelDTO> rows = userMapper.selectList(wrapper).stream().map(user -> {
             UserExcelDTO dto = new UserExcelDTO();

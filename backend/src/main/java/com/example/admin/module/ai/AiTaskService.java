@@ -21,6 +21,7 @@ import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.security.SecurityUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -116,23 +117,15 @@ public class AiTaskService {
         return task.getId();
     }
 
+    @DataScope(tables = {"ai_task"})
     public PageResult<AiTaskVo> page(AiTaskQuery query) {
-        Page<AiTask> page = new Page<>(query.getPageNum(), query.getPageSize());
+        Page<AiTask> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
         LambdaQueryWrapper<AiTask> wrapper = new LambdaQueryWrapper<AiTask>()
                 .eq(StringUtils.hasText(query.getStatus()), AiTask::getStatus, query.getStatus())
                 .eq(StringUtils.hasText(query.getBizType()), AiTask::getBizType, query.getBizType())
                 .orderByDesc(AiTask::getId);
-        if (!dataScopeHelper.isAdmin()) {
-            List<Long> userIds = dataScopeHelper.allowedUserIds();
-            if (userIds != null) {
-                if (userIds.size() == 1) {
-                    wrapper.eq(AiTask::getCreatedBy, userIds.get(0));
-                } else {
-                    wrapper.in(AiTask::getCreatedBy, userIds);
-                }
-            }
-        }
         IPage<AiTask> result = taskMapper.selectPage(page, wrapper);
+        page.setTotal(taskMapper.selectCount(wrapper));
         List<AiTaskVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
     }
