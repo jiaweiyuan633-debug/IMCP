@@ -39,13 +39,32 @@ public class SystemTenantService {
         if (tenant.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "租户 ID 不能为空");
         }
-        if (tenant.getUserLimit() == null) {
-            tenant.setUserLimit(100);
+        SysTenant existing = tenantMapper.selectById(tenant.getId());
+        if (existing == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        if (tenant.getStorageLimitMb() == null) {
-            tenant.setStorageLimitMb(1024);
+        if (!StringUtils.hasText(tenant.getTenantName()) || !StringUtils.hasText(tenant.getTenantCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "租户名称和编码不能为空");
         }
-        tenantMapper.updateById(tenant);
+        Integer userLimit = tenant.getUserLimit() == null ? existing.getUserLimit() : tenant.getUserLimit();
+        Long storageLimitMb = tenant.getStorageLimitMb() == null ? existing.getStorageLimitMb() : tenant.getStorageLimitMb();
+        if (userLimit == null || userLimit < 1) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户上限必须大于 0");
+        }
+        if (storageLimitMb == null || storageLimitMb < 0) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "存储上限不能小于 0");
+        }
+        existing.setTenantName(tenant.getTenantName());
+        existing.setTenantCode(tenant.getTenantCode());
+        existing.setStatus(tenant.getStatus() == null ? existing.getStatus() : tenant.getStatus());
+        existing.setContactName(tenant.getContactName());
+        existing.setContactPhone(tenant.getContactPhone());
+        existing.setUserLimit(userLimit);
+        existing.setStorageLimitMb(storageLimitMb);
+        if (tenant.getAdminUserId() != null) {
+            existing.setAdminUserId(tenant.getAdminUserId());
+        }
+        tenantMapper.updateById(existing);
     }
 
     public void delete(Long id) {
