@@ -1,11 +1,11 @@
 <template>
-  <a-card title="用户管理">
+  <a-card :title="t('page.userTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:user:add'" type="primary" @click="openCreate">新增用户</a-button>
-      <a-button @click="onExport">导出</a-button>
+      <a-button v-permission="'system:user:add'" type="primary" @click="openCreate">{{ t('page.userAdd') }}</a-button>
+      <a-button @click="onExport">{{ t('page.userExport') }}</a-button>
       <a-upload :show-upload-list="false" :before-upload="onImport">
-        <a-button>导入</a-button>
+        <a-button>{{ t('page.userImport') }}</a-button>
       </a-upload>
     </div>
     <ProTable
@@ -36,8 +36,8 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:user:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:user:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:user:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:user:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -45,18 +45,18 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑用户' : '新增用户'"
+      :title="editingId ? t('page.userEdit') : t('page.userAdd')"
       :loading="saving"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="头像">
+        <a-form-item :label="t('page.userAvatar')">
           <FileUpload v-model:value="form.avatar" />
         </a-form-item>
-        <a-form-item label="用户名" required>
+        <a-form-item :label="t('page.userUsername')" required>
           <a-input v-model:value="form.username" />
         </a-form-item>
-        <a-form-item label="部门">
+        <a-form-item :label="t('page.userDept')">
           <a-tree-select
             v-model:value="form.deptId"
             :tree-data="deptTree"
@@ -65,22 +65,22 @@
             :field-names="{ label: 'deptName', value: 'id', children: 'children' }"
           />
         </a-form-item>
-        <a-form-item :label="editingId ? '密码（留空不修改）' : '密码'" required>
+        <a-form-item :label="editingId ? t('page.userPasswordEditHint') : t('page.userPassword')" required>
           <a-input-password v-model:value="form.password" />
         </a-form-item>
-        <a-form-item label="昵称">
+        <a-form-item :label="t('page.userNickname')">
           <a-input v-model:value="form.nickname" />
         </a-form-item>
-        <a-form-item label="邮箱">
+        <a-form-item :label="t('page.userEmail')">
           <a-input v-model:value="form.email" />
         </a-form-item>
-        <a-form-item label="手机号">
+        <a-form-item :label="t('page.userPhone')">
           <a-input v-model:value="form.phone" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.userStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
-        <a-form-item label="角色">
+        <a-form-item :label="t('page.userRole')">
           <a-select
             v-model:value="form.roleIds"
             mode="multiple"
@@ -88,7 +88,7 @@
             option-filter-prop="label"
           />
         </a-form-item>
-        <a-form-item label="岗位">
+        <a-form-item :label="t('page.userPost')">
           <a-select
             v-model:value="form.postIds"
             mode="multiple"
@@ -122,37 +122,40 @@ import {
 } from '@/api/system'
 import type { UserSaveRequest } from '@/api/system'
 import type { DeptVo, PostOptionVo, RoleOptionVo, SearchField, UserVo } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '用户名', prop: 'username', placeholder: '请输入用户名' },
-  { label: '昵称', prop: 'nickname', placeholder: '请输入昵称' },
+  { label: t('page.userUsername'), prop: 'username', placeholder: `${t('common.inputPlaceholder')}${t('page.userUsername')}` },
+  { label: t('page.userNickname'), prop: 'nickname', placeholder: `${t('common.inputPlaceholder')}${t('page.userNickname')}` },
   {
-    label: '状态',
+    label: t('page.userStatus'),
     prop: 'status',
     type: 'select',
     options: [
-      { label: '启用', value: 1 },
-      { label: '禁用', value: 0 },
+      { label: t('common.enabled'), value: 1 },
+      { label: t('common.disabled'), value: 0 },
     ],
   },
 ]
 
 const columns = [
-  { title: '用户名', dataIndex: 'username', key: 'username' },
-  { title: '昵称', dataIndex: 'nickname', key: 'nickname' },
-  { title: '部门', key: 'deptName' },
-  { title: '岗位', key: 'postNames' },
-  { title: '角色', key: 'roleNames' },
-  { title: '邮箱', dataIndex: 'email', key: 'email' },
-  { title: '手机号', dataIndex: 'phone', key: 'phone' },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '最近登录', dataIndex: 'lastLoginTime', key: 'lastLoginTime' },
-  { title: '操作', key: 'actions', width: 120 },
+  { title: t('page.userUsername'), dataIndex: 'username', key: 'username' },
+  { title: t('page.userNickname'), dataIndex: 'nickname', key: 'nickname' },
+  { title: t('page.userDept'), key: 'deptName' },
+  { title: t('page.userPost'), key: 'postNames' },
+  { title: t('page.userRole'), key: 'roleNames' },
+  { title: t('page.userEmail'), dataIndex: 'email', key: 'email' },
+  { title: t('page.userPhone'), dataIndex: 'phone', key: 'phone' },
+  { title: t('page.userStatus'), key: 'status', width: 90 },
+  { title: t('page.userLastLogin'), dataIndex: 'lastLoginTime', key: 'lastLoginTime' },
+  { title: t('page.userActions'), key: 'actions', width: 120 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '禁用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const pageNum = ref(1)
@@ -247,7 +250,7 @@ function openEdit(record: UserVo) {
 
 async function onSubmit() {
   if (!form.username || (!editingId.value && !form.password)) {
-    message.warning('请填写用户名和密码')
+    message.warning(t('page.userUsernameRequired'))
     return
   }
   saving.value = true
@@ -270,7 +273,7 @@ async function onSubmit() {
     } else {
       await createUser(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.userSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -280,33 +283,33 @@ async function onSubmit() {
 
 async function onExport() {
   await exportUsers()
-  message.success('导出成功')
+  message.success(t('page.userExportSuccess'))
 }
 
 async function onImport(file: File) {
   try {
     const count = await importUsers(file)
-    message.success(`导入成功 ${count} 条`)
+    message.success(t('page.userImportSuccess', { count }))
     loadData()
   } catch {
-    message.error('导入失败')
+    message.error(t('page.userImportError'))
   }
   return false
 }
 
 async function toggleStatus(record: UserVo, checked: boolean) {
   await updateUserStatus(record.id, checked ? 1 : 0)
-  message.success('状态已更新')
+  message.success(t('page.userStatusUpdated'))
   loadData()
 }
 
 function onDelete(record: UserVo) {
   Modal.confirm({
-    title: '确认删除用户',
-    content: `确定删除用户 ${record.username} 吗？`,
+    title: t('page.userDeleteTitle'),
+    content: t('page.userDeleteConfirm', { name: record.username }),
     onOk: async () => {
       await deleteUser(record.id)
-      message.success('删除成功')
+      message.success(t('page.userDeleted'))
       loadData()
     },
   })

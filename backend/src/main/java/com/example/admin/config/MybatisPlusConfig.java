@@ -12,8 +12,29 @@ import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Set;
+
 @Configuration
 public class MybatisPlusConfig {
+
+    private static final Set<String> TENANT_TABLES = Set.of(
+            "sys_user",
+            "sys_file",
+            "sys_notice",
+            "sys_notice_read",
+            "sys_job",
+            "sys_job_log",
+            "sys_workflow",
+            "sys_workflow_log",
+            "sys_process_def",
+            "sys_process_node",
+            "sys_login_log",
+            "sys_oper_log",
+            "sys_sql_log",
+            "sys_alert_rule",
+            "ai_service_config",
+            "ai_task",
+            "ai_task_result");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
@@ -33,7 +54,7 @@ public class MybatisPlusConfig {
 
             @Override
             public boolean ignoreTable(String tableName) {
-                return !"sys_user".equalsIgnoreCase(tableName) && !"sys_file".equalsIgnoreCase(tableName);
+                return !TENANT_TABLES.contains(tableName.toLowerCase());
             }
         }));
         return interceptor;

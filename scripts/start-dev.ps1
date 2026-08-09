@@ -1,7 +1,8 @@
 param(
     [string]$BackendPort = '8080',
     [string]$AiPort = '8000',
-    [string]$FrontendPort = '5173'
+    [string]$FrontendPort = '5173',
+    [string]$WebsitePort = '5174'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,8 +57,15 @@ Start-HiddenProcess `
     -Arguments @('dev', '--port', $FrontendPort) `
     -WorkingDirectory (Join-Path $root 'frontend')
 
+Start-HiddenProcess `
+    -Name 'website' `
+    -FilePath 'pnpm.cmd' `
+    -Arguments @('dev', '--port', $WebsitePort) `
+    -WorkingDirectory (Join-Path $root 'website')
+
 Write-Host ''
 Write-Host "Frontend : http://localhost:$FrontendPort"
 Write-Host "Backend  : http://localhost:$BackendPort"
 Write-Host "AI docs  : http://localhost:$AiPort/docs"
+Write-Host "Website  : http://localhost:$WebsitePort"
 

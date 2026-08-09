@@ -13,6 +13,7 @@ public class SysSqlLog {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String sqlText;
     private String method;
     private Long durationMs;

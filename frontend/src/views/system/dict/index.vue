@@ -1,8 +1,8 @@
 <template>
-  <a-card title="字典管理">
+  <a-card :title="t('page.dictTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:dict:add'" type="primary" @click="openTypeCreate">新增字典类型</a-button>
+      <a-button v-permission="'system:dict:add'" type="primary" @click="openTypeCreate">{{ t('page.dictAddType') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -20,9 +20,9 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:dict:list'" @click="openData(record)">数据</a>
-            <a v-permission="'system:dict:edit'" @click="openTypeEdit(record)">编辑</a>
-            <a v-permission="'system:dict:delete'" @click="onTypeDelete(record)">删除</a>
+            <a v-permission="'system:dict:list'" @click="openData(record)">{{ t('page.dictData') }}</a>
+            <a v-permission="'system:dict:edit'" @click="openTypeEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:dict:delete'" @click="onTypeDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -30,29 +30,29 @@
 
     <ModalForm
       v-model:open="typeModalOpen"
-      :title="typeEditingId ? '编辑字典类型' : '新增字典类型'"
+      :title="typeEditingId ? t('page.dictEditType') : t('page.dictAddType')"
       :loading="saving"
       @ok="onTypeSubmit"
     >
       <a-form layout="vertical" :model="typeForm">
-        <a-form-item label="字典名称" required>
+        <a-form-item :label="t('page.dictName')" required>
           <a-input v-model:value="typeForm.dictName" />
         </a-form-item>
-        <a-form-item label="字典类型" required>
+        <a-form-item :label="t('page.dictType')" required>
           <a-input v-model:value="typeForm.dictType" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.dictStatus')">
           <a-select v-model:value="typeForm.status" :options="statusOptions" />
         </a-form-item>
-        <a-form-item label="备注">
+        <a-form-item :label="t('page.dictRemark')">
           <a-textarea v-model:value="typeForm.remark" :rows="3" />
         </a-form-item>
       </a-form>
     </ModalForm>
 
-    <a-modal v-model:open="dataModalOpen" title="字典数据" width="860" :footer="null">
+    <a-modal v-model:open="dataModalOpen" :title="t('page.dictDataTitle')" width="860" :footer="null">
       <div class="toolbar">
-        <a-button v-permission="'system:dict:data:add'" type="primary" @click="openDataCreate">新增数据</a-button>
+        <a-button v-permission="'system:dict:data:add'" type="primary" @click="openDataCreate">{{ t('page.dictAddData') }}</a-button>
       </div>
       <ProTable
         v-model:page-num="dataPageNum"
@@ -73,8 +73,8 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
-              <a v-permission="'system:dict:data:edit'" @click="openDataEdit(record)">编辑</a>
-              <a v-permission="'system:dict:data:delete'" @click="onDataDelete(record)">删除</a>
+              <a v-permission="'system:dict:data:edit'" @click="openDataEdit(record)">{{ t('common.edit') }}</a>
+              <a v-permission="'system:dict:data:delete'" @click="onDataDelete(record)">{{ t('common.delete') }}</a>
             </a-space>
           </template>
         </template>
@@ -83,28 +83,28 @@
 
     <ModalForm
       v-model:open="dataFormOpen"
-      :title="dataEditingId ? '编辑字典数据' : '新增字典数据'"
+      :title="dataEditingId ? t('page.dictEditData') : t('page.dictAddData')"
       :loading="saving"
       width="520"
       @ok="onDataSubmit"
     >
       <a-form layout="vertical" :model="dataForm">
-        <a-form-item label="字典标签" required>
+        <a-form-item :label="t('page.dictLabel')" required>
           <a-input v-model:value="dataForm.dictLabel" />
         </a-form-item>
-        <a-form-item label="字典键值" required>
+        <a-form-item :label="t('page.dictValue')" required>
           <a-input v-model:value="dataForm.dictValue" />
         </a-form-item>
-        <a-form-item label="排序">
+        <a-form-item :label="t('page.dictSort')">
           <a-input-number v-model:value="dataForm.dictSort" />
         </a-form-item>
-        <a-form-item label="标签样式">
+        <a-form-item :label="t('page.dictListClass')">
           <a-input v-model:value="dataForm.listClass" placeholder="success/danger/warning" />
         </a-form-item>
-        <a-form-item label="默认">
+        <a-form-item :label="t('page.dictDefault')">
           <a-select v-model:value="dataForm.isDefault" :options="defaultOptions" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.dictStatus')">
           <a-select v-model:value="dataForm.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
@@ -131,37 +131,40 @@ import {
 } from '@/api/system'
 import type { DictDataVo, DictTypeVo } from '@/api/system'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '字典名称', prop: 'dictName', placeholder: '请输入字典名称' },
-  { label: '字典类型', prop: 'dictType', placeholder: '请输入字典类型' },
+  { label: t('page.dictName'), prop: 'dictName', placeholder: `${t('common.inputPlaceholder')}${t('page.dictName')}` },
+  { label: t('page.dictType'), prop: 'dictType', placeholder: `${t('common.inputPlaceholder')}${t('page.dictType')}` },
 ]
 
 const typeColumns = [
-  { title: '字典名称', dataIndex: 'dictName', key: 'dictName' },
-  { title: '字典类型', dataIndex: 'dictType', key: 'dictType' },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: t('page.dictName'), dataIndex: 'dictName', key: 'dictName' },
+  { title: t('page.dictType'), dataIndex: 'dictType', key: 'dictType' },
+  { title: t('page.dictStatus'), key: 'status', width: 90 },
+  { title: t('page.dictRemark'), dataIndex: 'remark', key: 'remark' },
+  { title: t('common.actions'), key: 'actions', width: 180 },
 ]
 
 const dataColumns = [
-  { title: '字典标签', dataIndex: 'dictLabel', key: 'dictLabel' },
-  { title: '字典键值', dataIndex: 'dictValue', key: 'dictValue' },
-  { title: '排序', dataIndex: 'dictSort', key: 'dictSort', width: 80 },
-  { title: '默认', key: 'isDefault', width: 80 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'actions', width: 130 },
+  { title: t('page.dictLabel'), dataIndex: 'dictLabel', key: 'dictLabel' },
+  { title: t('page.dictValue'), dataIndex: 'dictValue', key: 'dictValue' },
+  { title: t('page.dictSort'), dataIndex: 'dictSort', key: 'dictSort', width: 80 },
+  { title: t('page.dictDefault'), key: 'isDefault', width: 80 },
+  { title: t('page.dictStatus'), key: 'status', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const defaultOptions = [
-  { label: '是', value: 1 },
-  { label: '否', value: 0 },
+  { label: t('page.yes'), value: 1 },
+  { label: t('page.no'), value: 0 },
 ]
 
 const pageNum = ref(1)
@@ -242,7 +245,7 @@ function openTypeEdit(record: DictTypeVo) {
 
 async function onTypeSubmit() {
   if (!typeForm.dictName || !typeForm.dictType) {
-    message.warning('请填写字典名称和类型')
+    message.warning(t('page.dictTypeRequired'))
     return
   }
   saving.value = true
@@ -252,7 +255,7 @@ async function onTypeSubmit() {
     } else {
       await createDictType(typeForm)
     }
-    message.success('保存成功')
+    message.success(t('page.dictSaved'))
     typeModalOpen.value = false
     loadTypes()
   } finally {
@@ -262,11 +265,11 @@ async function onTypeSubmit() {
 
 function onTypeDelete(record: DictTypeVo) {
   Modal.confirm({
-    title: '确认删除字典类型',
-    content: `删除 ${record.dictName} 会同时删除其字典数据，确定吗？`,
+    title: t('page.dictTypeDeleteTitle'),
+    content: t('page.dictTypeDeleteConfirm', { name: record.dictName }),
     onOk: async () => {
       await deleteDictType(record.id)
-      message.success('删除成功')
+      message.success(t('page.dictDeleted'))
       loadTypes()
     },
   })
@@ -315,7 +318,7 @@ function openDataEdit(record: DictDataVo) {
 
 async function onDataSubmit() {
   if (!dataForm.dictLabel || !dataForm.dictValue) {
-    message.warning('请填写字典标签和键值')
+    message.warning(t('page.dictDataRequired'))
     return
   }
   saving.value = true
@@ -326,7 +329,7 @@ async function onDataSubmit() {
     } else {
       await createDictData(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.dictSaved'))
     dataFormOpen.value = false
     loadData()
   } finally {
@@ -336,11 +339,11 @@ async function onDataSubmit() {
 
 function onDataDelete(record: DictDataVo) {
   Modal.confirm({
-    title: '确认删除字典数据',
-    content: `确定删除 ${record.dictLabel} 吗？`,
+    title: t('page.dictDataDeleteTitle'),
+    content: t('page.dictDataDeleteConfirm', { name: record.dictLabel }),
     onOk: async () => {
       await deleteDictData(record.id)
-      message.success('删除成功')
+      message.success(t('page.dictDeleted'))
       loadData()
     },
   })

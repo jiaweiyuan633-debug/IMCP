@@ -1,6 +1,6 @@
 <template>
   <a-layout class="app-layout" style="min-height: 100vh">
-    <a-layout-sider v-model:collapsed="appStore.collapsed" :width="220" theme="dark" collapsible :trigger="null">
+    <a-layout-sider class="desktop-sider" v-model:collapsed="appStore.collapsed" :width="220" theme="dark" collapsible :trigger="null">
       <div class="app-logo">
         <ApiOutlined v-if="appStore.collapsed" />
         <template v-else>{{ t('app.title') }}</template>
@@ -28,6 +28,36 @@
         </template>
       </a-menu>
     </a-layout-sider>
+    <a-drawer
+      v-model:open="mobileDrawer"
+      placement="left"
+      :width="220"
+      :closable="false"
+      :styles="{ body: { padding: 0, background: '#001529' } }"
+    >
+      <div class="app-logo">{{ t('app.title') }}</div>
+      <a-menu :selected-keys="[route.path]" theme="dark" mode="inline" @click="onMenuNavigate">
+        <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
+          <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
+            <template #title>
+              <component :is="iconOf(menu.icon)" />
+              <span>{{ menu.name }}</span>
+            </template>
+            <a-menu-item
+              v-for="child in menu.children"
+              :key="fullPath(child, fullPath(menu))"
+            >
+              <component :is="iconOf(child.icon)" />
+              <span>{{ child.name }}</span>
+            </a-menu-item>
+          </a-sub-menu>
+          <a-menu-item v-else :key="fullPath(menu)">
+            <component :is="iconOf(menu.icon)" />
+            <span>{{ menu.name }}</span>
+          </a-menu-item>
+        </template>
+      </a-menu>
+    </a-drawer>
     <a-layout>
       <a-layout-header class="app-header">
         <div class="header-left">
@@ -35,7 +65,10 @@
             <MenuUnfoldOutlined v-if="appStore.collapsed" />
             <MenuFoldOutlined v-else />
           </a-button>
-          <a-breadcrumb>
+          <a-button v-if="isMobile" type="text" class="mobile-menu-button" @click="mobileDrawer = true">
+            <MenuOutlined />
+          </a-button>
+          <a-breadcrumb class="header-breadcrumb">
             <a-breadcrumb-item v-for="item in breadcrumbs" :key="item">{{ item }}</a-breadcrumb-item>
           </a-breadcrumb>
         </div>
@@ -66,7 +99,7 @@
                 <a-menu-item v-for="notice in latestNotices" :key="notice.id">
                   {{ notice.noticeTitle }}
                 </a-menu-item>
-                <a-menu-item v-if="latestNotices.length === 0" disabled>暂无通知</a-menu-item>
+                <a-menu-item v-if="latestNotices.length === 0" disabled>{{ t('common.noNotices') }}</a-menu-item>
               </a-menu>
             </template>
           </a-dropdown>
@@ -107,6 +140,7 @@
 
 <script setup lang="ts">
 import {
+  AlertOutlined,
   ApiOutlined,
   ApartmentOutlined,
   BarChartOutlined,
@@ -123,6 +157,7 @@ import {
   DeploymentUnitOutlined,
   FieldTimeOutlined,
   FileTextOutlined,
+  FolderOutlined,
   FundOutlined,
   GlobalOutlined,
   HistoryOutlined,
@@ -147,9 +182,11 @@ import { usePermissionStore } from '@/stores/permission'
 import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getLatestNotices, getUnreadNoticeCount } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
+import { getAccessToken } from '@/utils/auth'
+import { API_BASE_URL } from '@/utils/env'
 
 const route = useRoute()
 const router = useRouter()
@@ -159,13 +196,33 @@ const userStore = useUserStore()
 const { t, locale } = useI18n()
 const latestNotices = ref<NoticeVo[]>([])
 const unreadCount = ref(0)
+let noticeStream: EventSource | null = null
+const mobileDrawer = ref(false)
+const isMobile = ref(false)
+
+function onResize() {
+  isMobile.value = window.innerWidth < 768
+  if (!isMobile.value) {
+    mobileDrawer.value = false
+  }
+}
 
 onMounted(async () => {
+  onResize()
+  window.addEventListener('resize', onResize)
   latestNotices.value = await getLatestNotices()
   unreadCount.value = await getUnreadNoticeCount()
+  startNoticeStream()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  noticeStream?.close()
+  noticeStream = null
 })
 
 const iconMap: Record<string, Component> = {
+  AlertOutlined,
   ApiOutlined,
   ApartmentOutlined,
   BarChartOutlined,
@@ -179,6 +236,7 @@ const iconMap: Record<string, Component> = {
   DeploymentUnitOutlined,
   FieldTimeOutlined,
   FileTextOutlined,
+  FolderOutlined,
   FundOutlined,
   HistoryOutlined,
   IdcardOutlined,
@@ -235,6 +293,11 @@ function navigate(path: string) {
   router.push(path)
 }
 
+function onMenuNavigate({ key }: { key: string | number }) {
+  navigate(String(key))
+  mobileDrawer.value = false
+}
+
 function onTabEdit(targetKey: string | MouseEvent | KeyboardEvent, action: 'add' | 'remove') {
   if (action !== 'remove' || typeof targetKey !== 'string') {
     return
@@ -265,6 +328,23 @@ function onLanguageClick({ key }: { key: string | number }) {
 
 function onNoticeClick() {
   router.push('/system/notice')
+}
+
+function startNoticeStream() {
+  const token = getAccessToken()
+  if (!token || noticeStream) {
+    return
+  }
+  const source = new EventSource(`${API_BASE_URL}/system/notice/stream?token=${encodeURIComponent(token)}`)
+  source.addEventListener('notice', async () => {
+    latestNotices.value = await getLatestNotices()
+    unreadCount.value = await getUnreadNoticeCount()
+  })
+  source.onerror = () => {
+    source.close()
+    noticeStream = null
+  }
+  noticeStream = source
 }
 </script>
 
@@ -306,5 +386,28 @@ function onNoticeClick() {
 
 .app-tabs {
   margin-bottom: 16px;
+}
+
+@media (max-width: 767px) {
+  .desktop-sider {
+    display: none;
+  }
+
+  .header-breadcrumb,
+  .app-tabs {
+    display: none;
+  }
+
+  .app-content {
+    padding: 12px;
+  }
+
+  .header-left {
+    gap: 4px;
+  }
+
+  .app-header {
+    padding: 0 8px;
+  }
 }
 </style>

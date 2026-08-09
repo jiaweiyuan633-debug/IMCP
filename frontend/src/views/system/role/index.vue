@@ -1,8 +1,8 @@
 <template>
-  <a-card title="角色管理">
+  <a-card :title="t('page.roleTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:role:add'" type="primary" @click="openCreate">新增角色</a-button>
+      <a-button v-permission="'system:role:add'" type="primary" @click="openCreate">{{ t('page.roleAdd') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -23,9 +23,9 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:role:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:role:assign'" @click="openAssign(record)">分配菜单</a>
-            <a v-permission="'system:role:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:role:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:role:assign'" @click="openAssign(record)">{{ t('page.roleAssignMenu') }}</a>
+            <a v-permission="'system:role:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -33,30 +33,30 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑角色' : '新增角色'"
+      :title="editingId ? t('page.roleEdit') : t('page.roleAdd')"
       :loading="saving"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="角色编码" required>
+        <a-form-item :label="t('page.roleCode')" required>
           <a-input v-model:value="form.code" />
         </a-form-item>
-        <a-form-item label="角色名称" required>
+        <a-form-item :label="t('page.roleName')" required>
           <a-input v-model:value="form.name" />
         </a-form-item>
-        <a-form-item label="描述">
+        <a-form-item :label="t('page.roleDescription')">
           <a-textarea v-model:value="form.description" :rows="3" />
         </a-form-item>
-        <a-form-item label="排序">
+        <a-form-item :label="t('page.roleSort')">
           <a-input-number v-model:value="form.sort" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.roleStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
-        <a-form-item label="数据权限">
+        <a-form-item :label="t('page.roleDataScope')">
           <a-select v-model:value="form.dataScope" :options="dataScopeOptions" />
         </a-form-item>
-        <a-form-item v-if="form.dataScope === 2" label="授权部门">
+        <a-form-item v-if="form.dataScope === 2" :label="t('page.roleAssignDept')">
           <a-tree
             v-model:checked-keys="checkedDeptKeys"
             :tree-data="deptTreeData"
@@ -70,7 +70,7 @@
 
     <ModalForm
       v-model:open="assignOpen"
-      title="分配菜单权限"
+      :title="t('page.roleAssignMenuTitle')"
       :loading="saving"
       width="480"
       @ok="onAssignSubmit"
@@ -103,42 +103,45 @@ import {
 } from '@/api/system'
 import type { RoleSaveRequest } from '@/api/system'
 import type { DeptVo, MenuNode, RoleVo, SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '角色编码', prop: 'code', placeholder: '请输入角色编码' },
-  { label: '角色名称', prop: 'name', placeholder: '请输入角色名称' },
+  { label: t('page.roleCode'), prop: 'code', placeholder: `${t('common.inputPlaceholder')}${t('page.roleCode')}` },
+  { label: t('page.roleName'), prop: 'name', placeholder: `${t('common.inputPlaceholder')}${t('page.roleName')}` },
   {
-    label: '状态',
+    label: t('page.roleStatus'),
     prop: 'status',
     type: 'select',
     options: [
-      { label: '启用', value: 1 },
-      { label: '禁用', value: 0 },
+      { label: t('common.enabled'), value: 1 },
+      { label: t('common.disabled'), value: 0 },
     ],
   },
 ]
 
 const columns = [
-  { title: '角色编码', dataIndex: 'code', key: 'code' },
-  { title: '角色名称', dataIndex: 'name', key: 'name' },
-  { title: '描述', dataIndex: 'description', key: 'description' },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '数据权限', key: 'dataScope', width: 110 },
-  { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: t('page.roleCode'), dataIndex: 'code', key: 'code' },
+  { title: t('page.roleName'), dataIndex: 'name', key: 'name' },
+  { title: t('page.roleDescription'), dataIndex: 'description', key: 'description' },
+  { title: t('page.roleStatus'), key: 'status', width: 90 },
+  { title: t('page.roleDataScope'), key: 'dataScope', width: 110 },
+  { title: t('page.roleSort'), dataIndex: 'sort', key: 'sort', width: 80 },
+  { title: t('common.actions'), key: 'actions', width: 180 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '禁用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const dataScopeOptions = [
-  { label: '全部数据', value: 1 },
-  { label: '自定义部门', value: 2 },
-  { label: '本部门', value: 3 },
-  { label: '本部门及以下', value: 4 },
-  { label: '仅本人', value: 5 },
+  { label: t('page.scopeAll'), value: 1 },
+  { label: t('page.scopeCustom'), value: 2 },
+  { label: t('page.scopeDept'), value: 3 },
+  { label: t('page.scopeDeptChild'), value: 4 },
+  { label: t('page.scopeSelf'), value: 5 },
 ]
 
 const pageNum = ref(1)
@@ -219,7 +222,7 @@ function openEdit(record: RoleVo) {
 
 async function onSubmit() {
   if (!form.code || !form.name) {
-    message.warning('请填写角色编码和名称')
+    message.warning(t('page.roleRequired'))
     return
   }
   saving.value = true
@@ -240,7 +243,7 @@ async function onSubmit() {
     } else {
       await createRole(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.roleSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -261,7 +264,7 @@ function onAssignSubmit() {
   saving.value = true
   assignRoleMenus(currentAssignRole.value.id, checkedMenuKeys.value)
     .then(() => {
-      message.success('分配成功')
+      message.success(t('page.roleAssignSuccess'))
       assignOpen.value = false
       loadData()
     })
@@ -272,11 +275,11 @@ function onAssignSubmit() {
 
 function onDelete(record: RoleVo) {
   Modal.confirm({
-    title: '确认删除角色',
-    content: `确定删除角色 ${record.name} 吗？`,
+    title: t('page.roleDeleteTitle'),
+    content: t('page.roleDeleteConfirm', { name: record.name }),
     onOk: async () => {
       await deleteRole(record.id)
-      message.success('删除成功')
+      message.success(t('page.roleDeleted'))
       loadData()
     },
   })
@@ -290,11 +293,11 @@ onMounted(async () => {
 
 function dataScopeText(scope: number) {
   const map: Record<number, string> = {
-    1: '全部数据',
-    2: '自定义部门',
-    3: '本部门',
-    4: '本部门及以下',
-    5: '仅本人',
+    1: t('page.scopeAll'),
+    2: t('page.scopeCustom'),
+    3: t('page.scopeDept'),
+    4: t('page.scopeDeptChild'),
+    5: t('page.scopeSelf'),
   }
   return map[scope] || String(scope)
 }

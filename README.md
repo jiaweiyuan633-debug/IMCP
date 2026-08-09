@@ -1,23 +1,28 @@
-# Y15 双端管理脚手架
+# Y15 双端管理平台
 
-面向企业生产管理的“Java 业务后端 + Python AI 服务 + Vue3 管理端”全栈脚手架。已覆盖企业基础、工程能力、安全基线、可观测性、租户与工作流等生产级能力，同时保持精简结构，适合作为 Vibe Coding 快速二次开发的基线（按需移除代码生成器）。
+面向企业生产管理的全栈平台：管理员使用 **后台管理系统**，外部客户与访客访问 **Y15智能管理平台** 官网。仓库包含 Java 业务后端、Python AI 服务、Vue3 管理端与 Vue3 官网，可作为企业生产管理和 Vibe Coding 二次开发的基线（按需移除代码生成器）。
 
 ## 核心能力
 
-- 认证与安全：验证码、登录失败锁定、登录限流、JWT + Redis Token 管理、Token 刷新、个人资料编辑
+- 认证与安全：验证码、登录失败锁定、登录限流、JWT + Redis Token、Token 刷新、个人资料编辑
 - RBAC 权限：用户、角色、菜单、按钮权限、数据权限（部门级与自定义范围）
-- 企业基础：部门、岗位、数据字典、参数配置、通知公告
-- 工程能力：Quartz JDBC 持久化定时任务、文件上传（本地/MinIO）、用户 Excel 导入导出、文件元数据
-- 数据可靠性：全表审计字段、`version` 乐观锁、逻辑删除、Flyway 数据库版本管理
-- 可观测性：服务器监控、SQL 监控、登录/操作日志、Prometheus 指标、结构化日志与 `requestId/traceId`
-- 演进能力：租户隔离、简化工作流与审批日志、K8s 清单与 Helm Chart、全链路压测脚本
-- 交付质量：GitHub Actions 自动执行后端/前端/AI 测试与构建，冒烟脚本覆盖主流程
+- 企业基础：部门、岗位、数据字典、参数配置、通知公告、文件管理
+- 工程能力：Quartz JDBC 持久化定时任务、本地/MinIO 文件存储、Excel 导入导出、OpenAPI
+- 数据可靠性：全表审计字段、`version` 乐观锁、逻辑删除、Flyway V1-V14
+- 实时协作：SSE 实时通知、未读角标、服务器/SQL 告警规则与推送
+- 完整工作流：流程定义、审批节点、待办任务、审批日志
+- 多租户：租户管理、业务表 `tenant_id` 隔离、数据权限联动
+- 可观测性：服务器监控、SQL 监控、登录/操作日志、Prometheus、`requestId/traceId`
+- 前端体验：全量中英文国际化、暗黑模式、移动端响应式
+- 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
+- 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试，冒烟与压测脚本
 
 ## 技术栈
 
 | 端 | 技术 |
 | --- | --- |
-| 前端 | Vue 3、TypeScript、Vite 7、Ant Design Vue 4、Pinia、Vue Router、ECharts、vue-i18n、TanStack Query、Vitest |
+| 管理端 | Vue 3、TypeScript、Vite 7、Ant Design Vue 4、Pinia、Vue Router、ECharts、vue-i18n、TanStack Query、Vitest |
+| 官网 | Vue 3、Vite 7、lucide-vue-next |
 | Java 后端 | Spring Boot 3.3、Spring Security 6、MyBatis-Plus、Flyway、Quartz、Redis、JWT、EasyExcel、MinIO、Micrometer、Knife4j |
 | AI 服务 | FastAPI、Redis、httpx、pytest、Prometheus Client |
 | 基础设施 | MySQL 8、Redis 7、Docker Compose、Kubernetes、Helm |
@@ -25,8 +30,9 @@
 ## 仓库结构
 
 ```text
-frontend/    Vue3 管理端
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V9）
+frontend/    后台管理系统（Vue3 管理端）
+website/     Y15智能管理平台官网
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V14）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile
@@ -38,20 +44,28 @@ scripts/     启动、停止、冒烟、备份、恢复、压测、OpenAPI 脚�
 
 环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+、MySQL 8、Redis 7。
 
-```bash
-cd backend
-mvn spring-boot:run
+Windows 一键启动：
 
-cd ai-service
-uv sync
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-cd frontend
-pnpm install
-pnpm dev
+```powershell
+scripts/start-dev.ps1
 ```
 
-访问 http://localhost:5173 ，默认管理员：`admin / admin123`。MySQL/Redis 启动后，后端通过 Flyway 自动完成建表与基础数据初始化。
+手动启动：
+
+```bash
+cd backend && mvn spring-boot:run
+cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
+cd frontend && pnpm install && pnpm dev
+cd website && pnpm install && pnpm dev --port 5174
+```
+
+访问入口：
+
+- 后台管理系统：http://localhost:5173 ，默认管理员：`admin / admin123`
+- Y15智能管理平台官网：http://localhost:5174
+- 后端接口文档：http://localhost:8080/doc.html
+
+MySQL/Redis 启动后，后端通过 Flyway 自动完成建表与基础数据初始化。
 
 ## Docker Compose
 
@@ -60,7 +74,7 @@ cd docker
 docker compose up -d --build
 ```
 
-Compose 编排 MySQL、Redis、Java 后端、AI 服务、Nginx 前端五个服务。可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT` 覆盖主机端口，配置示例见 [docker/.env.example](docker/.env.example)。
+Compose 编排 MySQL、Redis、Java 后端、AI 服务、管理端、官网六个服务。可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT`、`WEBSITE_PORT` 覆盖主机端口，配置示例见 [docker/.env.example](docker/.env.example)。
 
 ## Kubernetes 与 Helm
 
@@ -84,6 +98,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 
 ```powershell
 scripts/start-dev.ps1
+scripts/stop-dev.ps1
 scripts/smoke.ps1
 scripts/backup.ps1
 scripts/restore.ps1

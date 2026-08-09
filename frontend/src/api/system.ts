@@ -382,6 +382,8 @@ export interface WorkflowVo {
   id: number
   processName: string
   bizType: string
+  processDefId?: number
+  currentNodeName?: string
   applicantName?: string
   content?: string
   status: string
@@ -391,6 +393,10 @@ export interface WorkflowVo {
 
 export function getWorkflowPage(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
   return request.get('/system/workflow', { params })
+}
+
+export function getWorkflowTasks(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/workflow/tasks', { params })
 }
 
 export function createWorkflow(data: Record<string, unknown>): Promise<number> {
@@ -403,5 +409,77 @@ export function approveWorkflow(id: number, remark?: string): Promise<void> {
 
 export function rejectWorkflow(id: number, remark?: string): Promise<void> {
   return request.put(`/system/workflow/${id}/reject`, { remark })
+}
+
+export interface WorkflowLogVo {
+  id: number
+  workflowId: number
+  action: string
+  operatorName?: string
+  remark?: string
+  createdAt?: string
+}
+
+export function getWorkflowLogs(id: number): Promise<WorkflowLogVo[]> {
+  return request.get(`/system/workflow/${id}/logs`)
+}
+
+export interface ProcessDefVo {
+  id: number
+  defName: string
+  defKey: string
+  description?: string
+  status: number
+  createdAt?: string
+}
+
+export interface ProcessNodeVo {
+  id?: number
+  nodeName: string
+  nodeKey: string
+  nodeOrder: number
+  approverRoleId?: number
+}
+
+export function getProcessDefPage(params: Record<string, unknown>): Promise<PageResult<ProcessDefVo>> {
+  return request.get('/system/workflow/def', { params })
+}
+
+export function getProcessDefOptions(): Promise<ProcessDefVo[]> {
+  return request.get('/system/workflow/def/options')
+}
+
+export function getProcessDefNodes(id: number): Promise<ProcessNodeVo[]> {
+  return request.get(`/system/workflow/def/${id}/nodes`)
+}
+
+export function createProcessDef(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/workflow/def', data)
+}
+
+export function updateProcessDef(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/workflow/def', data)
+}
+
+export function deleteProcessDef(id: number): Promise<void> {
+  return request.delete(`/system/workflow/def/${id}`)
+}
+
+export interface FileVo {
+  id: number
+  fileName: string
+  originalName?: string
+  url: string
+  size: number
+  storageType: string
+  createdAt?: string
+}
+
+export function getFilePage(params: Record<string, unknown>): Promise<PageResult<FileVo>> {
+  return request.get('/system/file', { params })
+}
+
+export function deleteFile(id: number): Promise<void> {
+  return request.delete(`/system/file/${id}`)
 }
 

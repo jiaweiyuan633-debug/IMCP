@@ -1,8 +1,8 @@
 <template>
-  <a-card title="岗位管理">
+  <a-card :title="t('page.postTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:post:add'" type="primary" @click="openCreate">新增岗位</a-button>
+      <a-button v-permission="'system:post:add'" type="primary" @click="openCreate">{{ t('page.postAdd') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -20,8 +20,8 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:post:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:post:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:post:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:post:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -29,24 +29,24 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑岗位' : '新增岗位'"
+      :title="editingId ? t('page.postEdit') : t('page.postAdd')"
       :loading="saving"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="岗位编码" required>
+        <a-form-item :label="t('page.postCode')" required>
           <a-input v-model:value="form.postCode" />
         </a-form-item>
-        <a-form-item label="岗位名称" required>
+        <a-form-item :label="t('page.postName')" required>
           <a-input v-model:value="form.postName" />
         </a-form-item>
-        <a-form-item label="排序">
+        <a-form-item :label="t('page.postSort')">
           <a-input-number v-model:value="form.sort" />
         </a-form-item>
-        <a-form-item label="描述">
+        <a-form-item :label="t('page.postDescription')">
           <a-textarea v-model:value="form.description" :rows="3" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.postStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
@@ -64,33 +64,36 @@ import StatusTag from '@/components/StatusTag.vue'
 import { createPost, deletePost, getPostPage, updatePost } from '@/api/system'
 import type { PostSaveRequest, PostVo } from '@/api/system'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '岗位编码', prop: 'postCode', placeholder: '请输入岗位编码' },
-  { label: '岗位名称', prop: 'postName', placeholder: '请输入岗位名称' },
+  { label: t('page.postCode'), prop: 'postCode', placeholder: `${t('common.inputPlaceholder')}${t('page.postCode')}` },
+  { label: t('page.postName'), prop: 'postName', placeholder: `${t('common.inputPlaceholder')}${t('page.postName')}` },
   {
-    label: '状态',
+    label: t('page.postStatus'),
     prop: 'status',
     type: 'select',
     options: [
-      { label: '启用', value: 1 },
-      { label: '停用', value: 0 },
+      { label: t('common.enabled'), value: 1 },
+      { label: t('common.disabled'), value: 0 },
     ],
   },
 ]
 
 const columns = [
-  { title: '岗位编码', dataIndex: 'postCode', key: 'postCode' },
-  { title: '岗位名称', dataIndex: 'postName', key: 'postName' },
-  { title: '描述', dataIndex: 'description', key: 'description' },
-  { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'actions', width: 130 },
+  { title: t('page.postCode'), dataIndex: 'postCode', key: 'postCode' },
+  { title: t('page.postName'), dataIndex: 'postName', key: 'postName' },
+  { title: t('page.postDescription'), dataIndex: 'description', key: 'description' },
+  { title: t('page.postSort'), dataIndex: 'sort', key: 'sort', width: 80 },
+  { title: t('page.postStatus'), key: 'status', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const pageNum = ref(1)
@@ -161,7 +164,7 @@ function openEdit(record: PostVo) {
 
 async function onSubmit() {
   if (!form.postCode || !form.postName) {
-    message.warning('请填写岗位编码和名称')
+    message.warning(t('page.postRequired'))
     return
   }
   saving.value = true
@@ -173,7 +176,7 @@ async function onSubmit() {
     } else {
       await createPost(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.postSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -183,11 +186,11 @@ async function onSubmit() {
 
 function onDelete(record: PostVo) {
   Modal.confirm({
-    title: '确认删除岗位',
-    content: `确定删除岗位 ${record.postName} 吗？`,
+    title: t('page.postDeleteTitle'),
+    content: t('page.postDeleteConfirm', { name: record.postName }),
     onOk: async () => {
       await deletePost(record.id)
-      message.success('删除成功')
+      message.success(t('page.postDeleted'))
       loadData()
     },
   })

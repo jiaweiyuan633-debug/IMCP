@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V9。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V14。
 
 ## 版本记录
 
@@ -15,6 +15,11 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V7 | 租户、简化工作流与菜单权限 |
 | V8 | 核心业务表审计字段与乐观锁 |
 | V9 | 租户隔离字段与工作流审批日志 |
+| V10 | 告警规则表与菜单权限 |
+| V11 | 文件管理菜单权限 |
+| V12 | 业务表租户隔离字段 |
+| V13 | 流程定义、流程节点与工作流引擎字段 |
+| V14 | 后台管理系统通知文案更新 |
 
 ## 表清单
 
@@ -50,6 +55,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_sql_log` | SQL 监控日志 |
 | `sys_job` | 定时任务，含审计字段、乐观锁 |
 | `sys_job_log` | 任务日志 |
+| `sys_alert_rule` | 服务器告警规则，含租户 |
 
 ### 业务与消息
 
@@ -58,8 +64,10 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_notice` | 通知公告，含审计字段、乐观锁 |
 | `sys_notice_read` | 通知已读 |
 | `sys_file` | 文件元数据，含租户、存储类型 |
-| `sys_workflow` | 简化工作流，含审计字段、乐观锁 |
+| `sys_workflow` | 工作流实例，含流程定义、当前节点、审计字段、乐观锁 |
 | `sys_workflow_log` | 工作流审批日志 |
+| `sys_process_def` | 流程定义，含租户、唯一流程标识 |
+| `sys_process_node` | 流程节点，含审批角色 |
 
 ### AI
 
@@ -73,11 +81,13 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 
 - 用户、角色、部门、岗位使用逻辑删除。
 - `created_by/updated_by` 由 `MyMetaObjectHandler` 自动填充，核心业务表带 `version` 乐观锁并由 `OptimisticLockerInnerInterceptor` 校验。
-- 租户隔离：`sys_user`、`sys_file` 带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
+- 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
 - 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
 - 权限、字典、参数支持 Redis 缓存，权限变更自动失效缓存。
 - 文件元数据统一写入 `sys_file`，存储后端支持本地目录与 MinIO。
 - SQL 日志阈值由 `SQL_LOG_THRESHOLD_MS` 控制，默认 50ms。
 - 定时任务使用 Quartz JDBC 存储，任务定义与执行日志持久化。
+- 工作流引擎包含流程定义、审批节点、待办任务与审批日志，支持按角色流转。
+- 通知实时推送使用 SSE，告警规则由定时任务检查并写入通知公告。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
 

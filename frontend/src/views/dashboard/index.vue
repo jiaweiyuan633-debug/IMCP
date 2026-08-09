@@ -10,12 +10,12 @@
     </a-row>
     <a-row :gutter="[16, 16]" style="margin-top: 16px">
       <a-col :xs="24" :lg="12">
-        <a-card title="AI 任务状态分布">
+        <a-card :title="t('page.dashboardAiTitle')">
           <div ref="pieRef" class="chart" />
         </a-card>
       </a-col>
       <a-col :xs="24" :lg="12">
-        <a-card title="基础数据统计">
+        <a-card :title="t('page.dashboardBaseTitle')">
           <div ref="barRef" class="chart" />
         </a-card>
       </a-col>
@@ -30,8 +30,10 @@ import { useQuery } from '@tanstack/vue-query'
 import { getDashboardStats } from '@/api/monitor'
 import type { DashboardStatsVo } from '@/api/monitor'
 import { useAppStore } from '@/stores/app'
+import { useI18n } from 'vue-i18n'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const { data: stats } = useQuery({
   queryKey: ['dashboard-stats'],
   queryFn: getDashboardStats,
@@ -44,12 +46,12 @@ let barChart: echarts.ECharts | null = null
 const statCards = computed(() => {
   const s = stats.value
   return [
-    { label: '用户数', value: s?.userCount ?? 0 },
-    { label: '角色数', value: s?.roleCount ?? 0 },
-    { label: '菜单数', value: s?.menuCount ?? 0 },
-    { label: 'AI 任务', value: s?.aiTaskTotal ?? 0 },
-    { label: '进行中', value: s?.aiTaskRunning ?? 0 },
-    { label: '日志数', value: (s?.loginLogCount ?? 0) + (s?.operLogCount ?? 0) },
+    { label: t('page.dashboardUsers'), value: s?.userCount ?? 0 },
+    { label: t('page.dashboardRoles'), value: s?.roleCount ?? 0 },
+    { label: t('page.dashboardMenus'), value: s?.menuCount ?? 0 },
+    { label: t('page.dashboardAiTasks'), value: s?.aiTaskTotal ?? 0 },
+    { label: t('page.dashboardRunning'), value: s?.aiTaskRunning ?? 0 },
+    { label: t('page.dashboardLogs'), value: (s?.loginLogCount ?? 0) + (s?.operLogCount ?? 0) },
   ]
 })
 
@@ -67,14 +69,14 @@ function renderCharts() {
     legend: { bottom: 0 },
     series: [
       {
-        name: 'AI 任务',
+        name: t('page.dashboardAiTasks'),
         type: 'pie',
         radius: ['42%', '68%'],
         data: [
-          { name: '成功', value: stats.value.aiTaskSucceeded },
-          { name: '失败', value: stats.value.aiTaskFailed },
-          { name: '进行中', value: stats.value.aiTaskRunning },
-          { name: '其他', value: Math.max(stats.value.aiTaskTotal - stats.value.aiTaskSucceeded - stats.value.aiTaskFailed - stats.value.aiTaskRunning, 0) },
+          { name: t('page.dashboardSucceeded'), value: stats.value.aiTaskSucceeded },
+          { name: t('page.dashboardFailed'), value: stats.value.aiTaskFailed },
+          { name: t('page.dashboardRunning'), value: stats.value.aiTaskRunning },
+          { name: t('page.dashboardOthers'), value: Math.max(stats.value.aiTaskTotal - stats.value.aiTaskSucceeded - stats.value.aiTaskFailed - stats.value.aiTaskRunning, 0) },
         ],
       },
     ],
@@ -83,16 +85,16 @@ function renderCharts() {
   barChart.setOption({
     tooltip: { trigger: 'axis' },
     grid: { left: 40, right: 20, top: 30, bottom: 30 },
-    xAxis: { type: 'category', data: ['用户', '角色', '菜单'] },
+    xAxis: { type: 'category', data: [t('page.dashboardUsersShort'), t('page.dashboardRolesShort'), t('page.dashboardMenusShort')] },
     yAxis: { type: 'value' },
     series: [
       {
         type: 'bar',
         barWidth: 36,
         data: [
-          { name: '用户', value: stats.value.userCount },
-          { name: '角色', value: stats.value.roleCount },
-          { name: '菜单', value: stats.value.menuCount },
+          { name: t('page.dashboardUsersShort'), value: stats.value.userCount },
+          { name: t('page.dashboardRolesShort'), value: stats.value.roleCount },
+          { name: t('page.dashboardMenusShort'), value: stats.value.menuCount },
         ],
       },
     ],

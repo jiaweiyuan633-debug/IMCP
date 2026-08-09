@@ -55,8 +55,11 @@ Java 后端统一响应结构：
 | 字典 | `/api/system/dict/type`、`/api/system/dict/data` | 字典类型与数据，`/data/type/{dictType}` 获取字典项 |
 | 参数 | `/api/system/config` | 参数配置 CRUD |
 | 通知公告 | `/api/system/notice` | 公告 CRUD、最新公告、未读数、单条已读、全部已读 |
+| 通知实时推送 | `/api/system/notice/stream` | SSE 实时通知流 |
 | 租户 | `/api/system/tenant` | 租户 CRUD |
-| 工作流 | `/api/system/workflow` | 发起、分页查询、通过、拒绝、审批日志 |
+| 文件管理 | `/api/system/file` | 文件分页、删除 |
+| 工作流 | `/api/system/workflow` | 发起、分页、待办任务、通过、拒绝、审批日志 |
+| 流程定义 | `/api/system/workflow/def` | 流程定义 CRUD、节点查询 |
 
 ## 监控
 
@@ -71,6 +74,7 @@ Java 后端统一响应结构：
 | 任务日志 | `/api/monitor/job/log` | 定时任务执行日志 |
 | 服务器监控 | `/api/monitor/server` | CPU、内存、磁盘、JVM 等指标 |
 | SQL 监控 | `/api/monitor/sql-log` | 慢 SQL 与 SQL 执行日志 |
+| 告警规则 | `/api/monitor/alert-rule` | 告警规则 CRUD、立即检查 |
 
 ## AI 与通用
 

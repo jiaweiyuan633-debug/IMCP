@@ -4,6 +4,7 @@ import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysOperLog;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
 import com.example.admin.security.SecurityUtils;
+import com.example.admin.common.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
@@ -53,6 +54,7 @@ public class OperLogAspect {
     private void saveLog(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
         try {
             SysOperLog operLogEntity = new SysOperLog();
+            operLogEntity.setTenantId(TenantContext.getTenantId());
             operLogEntity.setUserId(tryGetUserId());
             operLogEntity.setModule(operLog.module());
             operLogEntity.setAction(operLog.action());

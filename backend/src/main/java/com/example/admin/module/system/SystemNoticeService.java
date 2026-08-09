@@ -11,6 +11,7 @@ import com.example.admin.module.system.mapper.SysNoticeMapper;
 import com.example.admin.module.system.mapper.SysNoticeReadMapper;
 import com.example.admin.module.system.entity.SysNoticeRead;
 import com.example.admin.security.SecurityUtils;
+import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -23,6 +24,7 @@ public class SystemNoticeService {
 
     private final SysNoticeMapper noticeMapper;
     private final SysNoticeReadMapper noticeReadMapper;
+    private final NoticeSseService noticeSseService;
 
     public PageResult<SysNotice> page(long pageNum, long pageSize, String title, Integer type) {
         Page<SysNotice> page = new Page<>(pageNum, pageSize);
@@ -45,6 +47,7 @@ public class SystemNoticeService {
         notice.setId(null);
         notice.setCreatedBy(tryGetUserId());
         noticeMapper.insert(notice);
+        noticeSseService.publishAll(notice);
         return notice.getId();
     }
 
@@ -53,6 +56,7 @@ public class SystemNoticeService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "公告 ID 不能为空");
         }
         noticeMapper.updateById(notice);
+        noticeSseService.publishAll(notice);
     }
 
     public void delete(Long id) {
@@ -68,13 +72,13 @@ public class SystemNoticeService {
     }
 
     public void markRead(Long userId, Long noticeId) {
-        noticeReadMapper.markRead(userId, noticeId);
+        noticeReadMapper.markRead(TenantContext.getTenantId(), userId, noticeId);
     }
 
     public void markAllRead(Long userId) {
         List<SysNotice> notices = latest(100);
         for (SysNotice notice : notices) {
-            noticeReadMapper.markRead(userId, notice.getId());
+            noticeReadMapper.markRead(TenantContext.getTenantId(), userId, notice.getId());
         }
     }
 

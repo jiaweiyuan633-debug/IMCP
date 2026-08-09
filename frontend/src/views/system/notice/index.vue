@@ -1,8 +1,8 @@
 <template>
-  <a-card title="通知公告">
+  <a-card :title="t('page.noticeTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
-      <a-button v-permission="'system:notice:add'" type="primary" @click="openCreate">新增公告</a-button>
+      <a-button v-permission="'system:notice:add'" type="primary" @click="openCreate">{{ t('page.noticeAdd') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -17,7 +17,7 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'noticeType'">
           <a-tag :color="record.noticeType === 1 ? 'blue' : 'green'">
-            {{ record.noticeType === 1 ? '通知' : '公告' }}
+            {{ record.noticeType === 1 ? t('page.noticeNotice') : t('page.noticeAnnounce') }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'status'">
@@ -25,8 +25,8 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:notice:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:notice:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:notice:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:notice:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -34,22 +34,22 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑公告' : '新增公告'"
+      :title="editingId ? t('page.noticeEdit') : t('page.noticeAdd')"
       :loading="saving"
       width="560"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="公告标题" required>
+        <a-form-item :label="t('page.noticeTitleField')" required>
           <a-input v-model:value="form.noticeTitle" />
         </a-form-item>
-        <a-form-item label="类型">
+        <a-form-item :label="t('page.noticeType')">
           <a-select v-model:value="form.noticeType" :options="typeOptions" />
         </a-form-item>
-        <a-form-item label="内容">
+        <a-form-item :label="t('page.noticeContent')">
           <a-textarea v-model:value="form.noticeContent" :rows="5" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.noticeStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
@@ -67,36 +67,39 @@ import StatusTag from '@/components/StatusTag.vue'
 import { createNotice, deleteNotice, getNoticePage, updateNotice } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const searchFields: SearchField[] = [
-  { label: '标题', prop: 'title', placeholder: '请输入标题' },
+  { label: t('page.noticeTitleField'), prop: 'title', placeholder: `${t('common.inputPlaceholder')}${t('page.noticeTitleField')}` },
   {
-    label: '类型',
+    label: t('page.noticeType'),
     prop: 'type',
     type: 'select',
     options: [
-      { label: '通知', value: 1 },
-      { label: '公告', value: 2 },
+      { label: t('page.noticeNotice'), value: 1 },
+      { label: t('page.noticeAnnounce'), value: 2 },
     ],
   },
 ]
 
 const columns = [
-  { title: '标题', dataIndex: 'noticeTitle', key: 'noticeTitle' },
-  { title: '类型', key: 'noticeType', width: 90 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
-  { title: '操作', key: 'actions', width: 130 },
+  { title: t('page.noticeTitleField'), dataIndex: 'noticeTitle', key: 'noticeTitle' },
+  { title: t('page.noticeType'), key: 'noticeType', width: 90 },
+  { title: t('page.noticeStatus'), key: 'status', width: 90 },
+  { title: t('common.createdAt'), dataIndex: 'createdAt', key: 'createdAt' },
+  { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 
 const typeOptions = [
-  { label: '通知', value: 1 },
-  { label: '公告', value: 2 },
+  { label: t('page.noticeNotice'), value: 1 },
+  { label: t('page.noticeAnnounce'), value: 2 },
 ]
 
 const statusOptions = [
-  { label: '正常', value: 1 },
-  { label: '关闭', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const pageNum = ref(1)
@@ -164,7 +167,7 @@ function openEdit(record: NoticeVo) {
 
 async function onSubmit() {
   if (!form.noticeTitle) {
-    message.warning('请填写公告标题')
+    message.warning(t('page.noticeTitleRequired'))
     return
   }
   saving.value = true
@@ -174,7 +177,7 @@ async function onSubmit() {
     } else {
       await createNotice(form)
     }
-    message.success('保存成功')
+    message.success(t('page.noticeSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -184,11 +187,11 @@ async function onSubmit() {
 
 function onDelete(record: NoticeVo) {
   Modal.confirm({
-    title: '确认删除公告',
-    content: `确定删除公告 ${record.noticeTitle} 吗？`,
+    title: t('page.noticeDeleteTitle'),
+    content: t('page.noticeDeleteConfirm', { name: record.noticeTitle }),
     onOk: async () => {
       await deleteNotice(record.id)
-      message.success('删除成功')
+      message.success(t('page.noticeDeleted'))
       loadData()
     },
   })

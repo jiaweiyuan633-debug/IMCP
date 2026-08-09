@@ -1,5 +1,5 @@
 <template>
-  <a-card title="操作日志">
+  <a-card :title="t('page.monitorOperTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <ProTable
       v-model:page-num="pageNum"
@@ -28,18 +28,21 @@ import StatusTag from '@/components/StatusTag.vue'
 import { getOperLogPage } from '@/api/monitor'
 import type { OperLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
 
-const searchFields: SearchField[] = [{ label: '模块', prop: 'module', placeholder: '请输入模块' }]
+const { t } = useI18n()
+
+const searchFields: SearchField[] = [{ label: t('page.monitorModule'), prop: 'module', placeholder: `${t('common.inputPlaceholder')}${t('page.monitorModule')}` }]
 
 const columns = [
-  { title: '模块', dataIndex: 'module', key: 'module' },
-  { title: '操作', dataIndex: 'action', key: 'action' },
-  { title: '请求方式', dataIndex: 'requestMethod', key: 'requestMethod', width: 90 },
-  { title: '请求地址', dataIndex: 'requestUrl', key: 'requestUrl' },
-  { title: '结果', key: 'status', width: 90 },
-  { title: '耗时(ms)', dataIndex: 'durationMs', key: 'durationMs', width: 100 },
-  { title: 'IP', dataIndex: 'ip', key: 'ip', width: 120 },
-  { title: '操作时间', dataIndex: 'operTime', key: 'operTime' },
+  { title: t('page.monitorModule'), dataIndex: 'module', key: 'module' },
+  { title: t('page.monitorAction'), dataIndex: 'action', key: 'action' },
+  { title: t('page.monitorRequestUrl'), dataIndex: 'requestMethod', key: 'requestMethod', width: 90 },
+  { title: t('page.monitorRequestUrl'), dataIndex: 'requestUrl', key: 'requestUrl' },
+  { title: t('page.monitorStatus'), key: 'status', width: 90 },
+  { title: t('page.monitorDuration'), dataIndex: 'durationMs', key: 'durationMs', width: 100 },
+  { title: t('page.monitorIp'), dataIndex: 'ip', key: 'ip', width: 120 },
+  { title: t('page.monitorOperTime'), dataIndex: 'operTime', key: 'operTime' },
 ]
 
 const pageNum = ref(1)

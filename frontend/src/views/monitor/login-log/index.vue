@@ -1,5 +1,5 @@
 <template>
-  <a-card title="登录日志">
+  <a-card :title="t('page.monitorLoginTitle')">
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <ProTable
       v-model:page-num="pageNum"
@@ -28,16 +28,19 @@ import StatusTag from '@/components/StatusTag.vue'
 import { getLoginLogPage } from '@/api/monitor'
 import type { LoginLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
+import { useI18n } from 'vue-i18n'
 
-const searchFields: SearchField[] = [{ label: '用户名', prop: 'username', placeholder: '请输入用户名' }]
+const { t } = useI18n()
+
+const searchFields: SearchField[] = [{ label: t('page.monitorUsername'), prop: 'username', placeholder: `${t('common.inputPlaceholder')}${t('page.monitorUsername')}` }]
 
 const columns = [
-  { title: '用户名', dataIndex: 'username', key: 'username' },
-  { title: 'IP', dataIndex: 'ip', key: 'ip' },
-  { title: '浏览器', dataIndex: 'userAgent', key: 'userAgent' },
-  { title: '结果', key: 'status', width: 90 },
-  { title: '说明', dataIndex: 'message', key: 'message' },
-  { title: '登录时间', dataIndex: 'loginTime', key: 'loginTime' },
+  { title: t('page.monitorUsername'), dataIndex: 'username', key: 'username' },
+  { title: t('page.monitorIp'), dataIndex: 'ip', key: 'ip' },
+  { title: t('page.monitorUserAgent'), dataIndex: 'userAgent', key: 'userAgent' },
+  { title: t('page.monitorStatus'), key: 'status', width: 90 },
+  { title: t('page.monitorMessage'), dataIndex: 'message', key: 'message' },
+  { title: t('page.monitorLoginTime'), dataIndex: 'loginTime', key: 'loginTime' },
 ]
 
 const pageNum = ref(1)

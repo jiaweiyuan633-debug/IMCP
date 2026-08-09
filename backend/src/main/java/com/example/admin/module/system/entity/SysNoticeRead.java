@@ -13,6 +13,7 @@ public class SysNoticeRead {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long userId;
     private Long noticeId;
     private LocalDateTime readTime;

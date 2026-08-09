@@ -1,7 +1,7 @@
 <template>
-  <a-card title="菜单管理">
+  <a-card :title="t('page.menuTitle')">
     <div class="toolbar">
-      <a-button v-permission="'system:menu:add'" type="primary" @click="openCreate()">新增菜单</a-button>
+      <a-button v-permission="'system:menu:add'" type="primary" @click="openCreate()">{{ t('page.menuAdd') }}</a-button>
     </div>
     <a-table
       :columns="columns"
@@ -20,9 +20,9 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a v-permission="'system:menu:add'" @click="openCreate(record)">新增子级</a>
-            <a v-permission="'system:menu:edit'" @click="openEdit(record)">编辑</a>
-            <a v-permission="'system:menu:delete'" @click="onDelete(record)">删除</a>
+            <a v-permission="'system:menu:add'" @click="openCreate(record)">{{ t('page.menuAddChild') }}</a>
+            <a v-permission="'system:menu:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
+            <a v-permission="'system:menu:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
           </a-space>
         </template>
       </template>
@@ -30,13 +30,13 @@
 
     <ModalForm
       v-model:open="modalOpen"
-      :title="editingId ? '编辑菜单' : '新增菜单'"
+      :title="editingId ? t('page.menuEdit') : t('page.menuAdd')"
       :loading="saving"
       width="520"
       @ok="onSubmit"
     >
       <a-form layout="vertical" :model="form">
-        <a-form-item label="上级菜单">
+        <a-form-item :label="t('page.menuParent')">
           <a-tree-select
             v-model:value="form.parentId"
             :tree-data="parentTreeData"
@@ -44,31 +44,31 @@
             :field-names="{ label: 'name', value: 'id', children: 'children' }"
           />
         </a-form-item>
-        <a-form-item label="菜单名称" required>
+        <a-form-item :label="t('page.menuName')" required>
           <a-input v-model:value="form.name" />
         </a-form-item>
-        <a-form-item label="类型">
+        <a-form-item :label="t('page.menuType')">
           <a-select v-model:value="form.type" :options="typeOptions" />
         </a-form-item>
-        <a-form-item v-if="form.type !== 'button'" label="路由路径">
+        <a-form-item v-if="form.type !== 'button'" :label="t('page.menuRoute')">
           <a-input v-model:value="form.path" />
         </a-form-item>
-        <a-form-item v-if="form.type === 'menu'" label="组件路径">
-          <a-input v-model:value="form.component" placeholder="例如 system/user" />
+        <a-form-item v-if="form.type === 'menu'" :label="t('page.menuComponent')">
+          <a-input v-model:value="form.component" placeholder="e.g. system/user" />
         </a-form-item>
-        <a-form-item label="权限标识">
-          <a-input v-model:value="form.perm" placeholder="例如 system:user:add" />
+        <a-form-item :label="t('page.menuPerm')">
+          <a-input v-model:value="form.perm" placeholder="e.g. system:user:add" />
         </a-form-item>
-        <a-form-item label="图标">
+        <a-form-item :label="t('page.menuIcon')">
           <a-input v-model:value="form.icon" />
         </a-form-item>
-        <a-form-item label="排序">
+        <a-form-item :label="t('page.menuSort')">
           <a-input-number v-model:value="form.sort" />
         </a-form-item>
-        <a-form-item label="显示">
+        <a-form-item :label="t('page.menuVisible')">
           <a-select v-model:value="form.visible" :options="showOptions" />
         </a-form-item>
-        <a-form-item label="状态">
+        <a-form-item :label="t('page.menuStatus')">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
       </a-form>
@@ -84,33 +84,36 @@ import StatusTag from '@/components/StatusTag.vue'
 import { createMenu, deleteMenu, getMenuTree, updateMenu } from '@/api/system'
 import type { MenuSaveRequest } from '@/api/system'
 import type { MenuNode } from '@/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const columns = [
-  { title: '菜单名称', dataIndex: 'name', key: 'name' },
-  { title: '类型', key: 'type', width: 90 },
-  { title: '路由/组件', key: 'route', customRender: ({ record }: { record: MenuNode }) =>
+  { title: t('page.menuName'), dataIndex: 'name', key: 'name' },
+  { title: t('page.menuType'), key: 'type', width: 90 },
+  { title: `${t('page.menuRoute')}/${t('page.menuComponent')}`, key: 'route', customRender: ({ record }: { record: MenuNode }) =>
       record.component || record.path || '-' },
-  { title: '权限标识', dataIndex: 'perm', key: 'perm' },
-  { title: '图标', dataIndex: 'icon', key: 'icon' },
-  { title: '排序', dataIndex: 'sort', key: 'sort', width: 80 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'actions', width: 180 },
+  { title: t('page.menuPerm'), dataIndex: 'perm', key: 'perm' },
+  { title: t('page.menuIcon'), dataIndex: 'icon', key: 'icon' },
+  { title: t('page.menuSort'), dataIndex: 'sort', key: 'sort', width: 80 },
+  { title: t('page.menuStatus'), key: 'status', width: 90 },
+  { title: t('common.actions'), key: 'actions', width: 180 },
 ]
 
 const typeOptions = [
-  { label: '目录', value: 'dir' },
-  { label: '菜单', value: 'menu' },
-  { label: '按钮', value: 'button' },
+  { label: t('page.menuTypeDir'), value: 'dir' },
+  { label: t('page.menuTypeMenu'), value: 'menu' },
+  { label: t('page.menuTypeButton'), value: 'button' },
 ]
 
 const showOptions = [
-  { label: '显示', value: 1 },
-  { label: '隐藏', value: 0 },
+  { label: t('page.menuShow'), value: 1 },
+  { label: t('page.menuHide'), value: 0 },
 ]
 
 const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '禁用', value: 0 },
+  { label: t('common.enabled'), value: 1 },
+  { label: t('common.disabled'), value: 0 },
 ]
 
 const loading = ref(false)
@@ -132,7 +135,7 @@ const form = reactive({
 })
 
 const parentTreeData = computed<MenuNode[]>(() => [
-  { id: 0, parentId: 0, name: '根菜单', type: 'dir', sort: 0, visible: 1, status: 1, children: menuTreeData.value },
+  { id: 0, parentId: 0, name: t('page.menuRoot'), type: 'dir', sort: 0, visible: 1, status: 1, children: menuTreeData.value },
 ])
 
 async function loadData() {
@@ -145,7 +148,7 @@ async function loadData() {
 }
 
 function typeText(type: string) {
-  const map: Record<string, string> = { dir: '目录', menu: '菜单', button: '按钮' }
+  const map: Record<string, string> = { dir: t('page.menuTypeDir'), menu: t('page.menuTypeMenu'), button: t('page.menuTypeButton') }
   return map[type] || type
 }
 
@@ -185,7 +188,7 @@ function openEdit(record: MenuNode) {
 
 async function onSubmit() {
   if (!form.name) {
-    message.warning('请填写菜单名称')
+    message.warning(t('page.menuRequired'))
     return
   }
   saving.value = true
@@ -197,7 +200,7 @@ async function onSubmit() {
     } else {
       await createMenu(payload)
     }
-    message.success('保存成功')
+    message.success(t('page.menuSaved'))
     modalOpen.value = false
     loadData()
   } finally {
@@ -207,11 +210,11 @@ async function onSubmit() {
 
 function onDelete(record: MenuNode) {
   Modal.confirm({
-    title: '确认删除菜单',
-    content: `确定删除菜单 ${record.name} 吗？子菜单会一并删除。`,
+    title: t('page.menuDeleteTitle'),
+    content: t('page.menuDeleteConfirm', { name: record.name }),
     onOk: async () => {
       await deleteMenu(record.id)
-      message.success('删除成功')
+      message.success(t('page.menuDeleted'))
       loadData()
     },
   })

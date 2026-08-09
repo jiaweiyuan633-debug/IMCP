@@ -11,7 +11,7 @@ public class Knife4jConfig {
     @Bean
     public OpenAPI adminOpenApi() {
         return new OpenAPI().info(new Info()
-                .title("双端管理脚手架 API")
+                .title("后台管理系统 API")
                 .description("Spring Boot 后端接口文档")
                 .version("0.1.0"));
     }
