@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -28,6 +30,11 @@ public class TokenService {
     private final StringRedisTemplate redisTemplate;
     private final JwtProperties properties;
     private final ObjectMapper objectMapper;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void clearPermissionCacheOnStartup() {
+        evictAllPermissions();
+    }
 
     public void saveAccessToken(String accessJti, String refreshJti) {
         redisTemplate.opsForValue().set(
