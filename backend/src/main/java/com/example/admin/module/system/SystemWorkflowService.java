@@ -6,27 +6,42 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
-import com.example.admin.module.system.entity.SysWorkflow;
+import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.entity.SysProcessDef;
 import com.example.admin.module.system.entity.SysProcessNode;
-import com.example.admin.module.system.mapper.SysWorkflowMapper;
-import com.example.admin.module.system.mapper.SysWorkflowLogMapper;
+import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysWorkflow;
+import com.example.admin.module.system.entity.SysWorkflowLog;
+import com.example.admin.module.system.entity.SysNotice;
 import com.example.admin.module.system.mapper.SysProcessDefMapper;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
-import com.example.admin.module.system.mapper.SysUserRoleMapper;
-import com.example.admin.module.system.entity.SysUser;
 import com.example.admin.module.system.mapper.SysUserMapper;
-import com.example.admin.module.system.entity.SysWorkflowLog;
+import com.example.admin.module.system.mapper.SysUserRoleMapper;
+import com.example.admin.module.system.mapper.SysWorkflowLogMapper;
+import com.example.admin.module.system.mapper.SysWorkflowMapper;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
-import com.example.admin.common.TenantContext;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SystemWorkflowService {
@@ -37,6 +52,9 @@ public class SystemWorkflowService {
     private final SysProcessNodeMapper processNodeMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final SysUserMapper userMapper;
+    private final SystemNoticeService noticeService;
+    private final ObjectMapper objectMapper;
+    private final SpelExpressionParser spelParser = new SpelExpressionParser();
 
     public PageResult<SysWorkflow> page(long pageNum, long pageSize, String status) {
         Page<SysWorkflow> page = new Page<>(pageNum, pageSize);
@@ -55,21 +73,27 @@ public class SystemWorkflowService {
         if (def == null || def.getStatus() == null || def.getStatus() != 1) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义不可用");
         }
-        List<SysProcessNode> nodes = processNodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getProcessDefId, def.getId())
-                .orderByAsc(SysProcessNode::getNodeOrder));
-        if (nodes.isEmpty()) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义没有审批节点");
+        List<SysProcessNode> nodes = nodesOfDef(def.getId());
+        Map<String, Object> form = parseForm(workflow.getFormData());
+        int startOrder = nodes.stream()
+                .map(SysProcessNode::getNodeOrder)
+                .filter(order -> order != null)
+                .min(Integer::compareTo)
+                .orElse(0);
+        List<SysProcessNode> startNodes = selectNodes(nodes, startOrder, form);
+        if (startNodes.isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义没有可进入的起始节点");
         }
         LoginUser user = SecurityUtils.getLoginUser();
         workflow.setId(null);
         workflow.setProcessDefId(def.getId());
-        workflow.setCurrentNodeId(nodes.get(0).getId());
-        workflow.setCurrentNodeName(nodes.get(0).getNodeName());
+        applyCurrentNodes(workflow, startNodes);
         workflow.setApplicantId(user.getUserId());
         workflow.setApplicantName(user.getUsername());
         workflow.setStatus("PENDING");
         workflow.setTenantId(TenantContext.getTenantId());
+        workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
+        workflow.setTimeoutNotified(0);
         workflowMapper.insert(workflow);
         saveLog(workflow.getId(), "STARTED", "发起流程：" + def.getDefName());
         return workflow.getId();
@@ -78,50 +102,87 @@ public class SystemWorkflowService {
     public PageResult<SysWorkflow> taskPage(long pageNum, long pageSize) {
         Page<SysWorkflow> page = new Page<>(pageNum, pageSize);
         LoginUser user = SecurityUtils.getLoginUser();
+        LambdaQueryWrapper<SysWorkflow> wrapper = new LambdaQueryWrapper<SysWorkflow>()
+                .eq(SysWorkflow::getStatus, "PENDING");
         if (user.getRoles() != null && user.getRoles().contains("admin")) {
-            IPage<SysWorkflow> result = workflowMapper.selectPage(page, new LambdaQueryWrapper<SysWorkflow>()
-                    .eq(SysWorkflow::getStatus, "PENDING")
-                    .orderByDesc(SysWorkflow::getId));
-            return PageResult.of(result, result.getRecords());
+            wrapper.orderByDesc(SysWorkflow::getId);
+        } else {
+            List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getUserId());
+            List<SysProcessNode> nodes = roleIds.isEmpty() ? Collections.emptyList()
+                    : processNodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
+                            .eq(SysProcessNode::getTenantId, TenantContext.getTenantId())
+                            .and(q -> q.in(SysProcessNode::getApproverRoleId, roleIds)
+                                    .or().isNull(SysProcessNode::getApproverRoleId)));
+            wrapper.and(q -> {
+                for (SysProcessNode node : nodes) {
+                    q.or().apply("FIND_IN_SET({0}, current_node_ids) > 0", node.getId());
+                    q.or().in(SysWorkflow::getCurrentNodeId, node.getId());
+                }
+                q.or().eq(SysWorkflow::getAssigneeUserId, user.getUserId());
+            });
+            wrapper.orderByDesc(SysWorkflow::getId);
         }
-        List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(user.getUserId());
-        if (roleIds.isEmpty()) {
-            return PageResult.of(page, Collections.emptyList());
-        }
-        List<SysProcessNode> nodes = processNodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getTenantId, TenantContext.getTenantId())
-                .and(wrapper -> wrapper.in(SysProcessNode::getApproverRoleId, roleIds)
-                        .or().isNull(SysProcessNode::getApproverRoleId)));
-        List<Long> nodeIds = nodes.stream().map(SysProcessNode::getId).toList();
-        if (nodeIds.isEmpty()) {
-            return PageResult.of(page, Collections.emptyList());
-        }
-        IPage<SysWorkflow> result = workflowMapper.selectPage(page, new LambdaQueryWrapper<SysWorkflow>()
-                .eq(SysWorkflow::getStatus, "PENDING")
-                .and(wrapper -> wrapper.in(SysWorkflow::getCurrentNodeId, nodeIds)
-                        .or().eq(SysWorkflow::getAssigneeUserId, user.getUserId()))
-                .orderByDesc(SysWorkflow::getId));
+        IPage<SysWorkflow> result = workflowMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
+    public List<SysProcessNode> currentNodes(Long id) {
+        SysWorkflow workflow = getOrThrow(id);
+        List<Long> ids = parseIds(workflow.getCurrentNodeIds());
+        if (ids.isEmpty() && workflow.getCurrentNodeId() != null) {
+            ids = List.of(workflow.getCurrentNodeId());
+        }
+        if (ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return ids.stream()
+                .map(processNodeMapper::selectById)
+                .filter(node -> node != null)
+                .sorted(Comparator.comparing(SysProcessNode::getNodeOrder))
+                .toList();
+    }
+
     @Transactional
-    public void approve(Long id, String remark) {
+    public void approve(Long id, Long nodeId, String remark) {
         SysWorkflow workflow = getOrThrow(id);
         if (!"PENDING".equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
-        SysProcessNode next = nextNode(workflow);
-        if (next == null) {
-            workflow.setStatus("APPROVED");
-            workflow.setCurrentNodeId(null);
-            workflow.setCurrentNodeName(null);
-        } else {
-            workflow.setCurrentNodeId(next.getId());
-            workflow.setCurrentNodeName(next.getNodeName());
+        List<Long> currentIds = parseIds(workflow.getCurrentNodeIds());
+        if (currentIds.isEmpty() && workflow.getCurrentNodeId() != null) {
+            currentIds = new ArrayList<>(List.of(workflow.getCurrentNodeId()));
         }
-        workflow.setRemark(remark);
+        if (nodeId == null) {
+            if (currentIds.size() != 1) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请选择要审批的节点");
+            }
+            nodeId = currentIds.get(0);
+        }
+        if (!currentIds.contains(nodeId)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "节点不在当前待办中");
+        }
+        SysProcessNode node = processNodeMapper.selectById(nodeId);
+        currentIds.remove(nodeId);
+        saveLog(id, "APPROVED", (remark == null ? "审批通过" : remark) + "，节点：" + node.getNodeName());
+        if (!currentIds.isEmpty()) {
+            workflow.setCurrentNodeIds(joinIds(currentIds));
+            updateCurrentDisplay(workflow, currentIds);
+            workflowMapper.updateById(workflow);
+            return;
+        }
+        List<SysProcessNode> allNodes = nodesOfDef(workflow.getProcessDefId());
+        int currentOrder = node.getNodeOrder();
+        List<SysProcessNode> next = nextNodes(allNodes, currentOrder, parseForm(workflow.getFormData()));
+        if (next.isEmpty()) {
+            finishWorkflow(workflow, "APPROVED");
+            workflowMapper.updateById(workflow);
+            return;
+        }
+        applyCurrentNodes(workflow, next);
+        workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
+        workflow.setTimeoutNotified(0);
         workflowMapper.updateById(workflow);
-        saveLog(id, "APPROVED", remark == null ? "审批通过" : remark);
+        saveLog(id, "ADVANCED", "进入下一审批环节");
     }
 
     @Transactional
@@ -130,9 +191,7 @@ public class SystemWorkflowService {
         if (!"PENDING".equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
-        workflow.setStatus("REJECTED");
-        workflow.setCurrentNodeId(null);
-        workflow.setCurrentNodeName(null);
+        finishWorkflow(workflow, "REJECTED");
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "REJECTED", remark == null ? "审批拒绝" : remark);
@@ -149,11 +208,7 @@ public class SystemWorkflowService {
         if (!"PENDING".equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
-        workflow.setStatus("WITHDRAWN");
-        workflow.setCurrentNodeId(null);
-        workflow.setCurrentNodeName(null);
-        workflow.setAssigneeUserId(null);
-        workflow.setAssigneeName(null);
+        finishWorkflow(workflow, "WITHDRAWN");
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "WITHDRAWN", remark == null ? "发起人撤回" : remark);
@@ -181,6 +236,44 @@ public class SystemWorkflowService {
                 .orderByAsc(SysWorkflowLog::getId));
     }
 
+    @Scheduled(
+            initialDelayString = "${app.workflow-timeout-check-initial-delay-ms:60000}",
+            fixedDelayString = "${app.workflow-timeout-check-ms:60000}")
+    public void checkTimeoutReminders() {
+        List<SysWorkflow> pending = workflowMapper.selectList(new LambdaQueryWrapper<SysWorkflow>()
+                .eq(SysWorkflow::getStatus, "PENDING"));
+        try {
+            for (SysWorkflow workflow : pending) {
+                if (workflow.getCurrentNodeAssignedAt() == null
+                        || workflow.getTimeoutNotified() != null && workflow.getTimeoutNotified() == 1) {
+                    continue;
+                }
+                List<SysProcessNode> nodes = currentNodes(workflow.getId());
+                int timeoutHours = nodes.stream()
+                        .map(SysProcessNode::getTimeoutHours)
+                        .filter(hours -> hours != null)
+                        .min(Integer::compareTo)
+                        .orElse(48);
+                if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(LocalDateTime.now())) {
+                    continue;
+                }
+                TenantContext.setTenantId(workflow.getTenantId());
+                SysNotice notice = new SysNotice();
+                notice.setNoticeTitle("流程超时提醒");
+                notice.setNoticeType(1);
+                notice.setNoticeContent("流程「" + workflow.getProcessName() + "」在节点等待超过 " + timeoutHours + " 小时。");
+                notice.setStatus(1);
+                noticeService.create(notice);
+                workflow.setTimeoutNotified(1);
+                workflowMapper.updateById(workflow);
+            }
+        } catch (Exception exception) {
+            log.error("Workflow timeout check failed", exception);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
     private SysWorkflow getOrThrow(Long id) {
         SysWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
@@ -189,19 +282,102 @@ public class SystemWorkflowService {
         return workflow;
     }
 
-    private SysProcessNode nextNode(SysWorkflow workflow) {
-        if (workflow.getProcessDefId() == null || workflow.getCurrentNodeId() == null) {
-            return null;
+    private List<SysProcessNode> nodesOfDef(Long defId) {
+        return processNodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
+                .eq(SysProcessNode::getProcessDefId, defId)
+                .orderByAsc(SysProcessNode::getNodeOrder)
+                .orderByAsc(SysProcessNode::getId));
+    }
+
+    private List<SysProcessNode> nextNodes(List<SysProcessNode> allNodes, int currentOrder, Map<String, Object> form) {
+        int nextOrder = allNodes.stream()
+                .map(SysProcessNode::getNodeOrder)
+                .filter(order -> order > currentOrder)
+                .min(Integer::compareTo)
+                .orElse(-1);
+        if (nextOrder < 0) {
+            return Collections.emptyList();
         }
-        List<SysProcessNode> nodes = processNodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getProcessDefId, workflow.getProcessDefId())
-                .orderByAsc(SysProcessNode::getNodeOrder));
-        for (int i = 0; i < nodes.size(); i++) {
-            if (nodes.get(i).getId().equals(workflow.getCurrentNodeId())) {
-                return i + 1 < nodes.size() ? nodes.get(i + 1) : null;
+        return selectNodes(allNodes, nextOrder, form);
+    }
+
+    private List<SysProcessNode> selectNodes(List<SysProcessNode> allNodes, int order, Map<String, Object> form) {
+        return allNodes.stream()
+                .filter(node -> node.getNodeOrder() != null && node.getNodeOrder() == order)
+                .filter(node -> matchesCondition(node, form))
+                .toList();
+    }
+
+    private boolean matchesCondition(SysProcessNode node, Map<String, Object> form) {
+        if (!StringUtils.hasText(node.getConditionExpression())) {
+            return true;
+        }
+        try {
+            StandardEvaluationContext context = new StandardEvaluationContext();
+            context.setVariables(form);
+            Boolean result = spelParser.parseExpression(node.getConditionExpression())
+                    .getValue(context, Boolean.class);
+            return Boolean.TRUE.equals(result);
+        } catch (Exception exception) {
+            log.warn("Workflow condition evaluate failed: {}", node.getConditionExpression(), exception);
+            return false;
+        }
+    }
+
+    private Map<String, Object> parseForm(String formData) {
+        if (!StringUtils.hasText(formData)) {
+            return new HashMap<>();
+        }
+        try {
+            return objectMapper.readValue(formData, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (Exception exception) {
+            return new HashMap<>();
+        }
+    }
+
+    private void applyCurrentNodes(SysWorkflow workflow, List<SysProcessNode> nodes) {
+        List<Long> ids = nodes.stream().map(SysProcessNode::getId).toList();
+        workflow.setCurrentNodeIds(joinIds(ids));
+        updateCurrentDisplay(workflow, ids);
+    }
+
+    private void updateCurrentDisplay(SysWorkflow workflow, List<Long> ids) {
+        List<SysProcessNode> nodes = ids.stream()
+                .map(processNodeMapper::selectById)
+                .filter(node -> node != null)
+                .sorted(Comparator.comparing(SysProcessNode::getNodeOrder))
+                .toList();
+        workflow.setCurrentNodeId(nodes.isEmpty() ? null : nodes.get(0).getId());
+        workflow.setCurrentNodeName(nodes.stream().map(SysProcessNode::getNodeName).collect(Collectors.joining(", ")));
+    }
+
+    private List<Long> parseIds(String value) {
+        if (!StringUtils.hasText(value)) {
+            return new ArrayList<>();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (String part : value.split(",")) {
+            try {
+                ids.add(Long.valueOf(part.trim()));
+            } catch (NumberFormatException ignored) {
+                // skip invalid id
             }
         }
-        return null;
+        return ids;
+    }
+
+    private String joinIds(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    private void finishWorkflow(SysWorkflow workflow, String status) {
+        workflow.setStatus(status);
+        workflow.setCurrentNodeId(null);
+        workflow.setCurrentNodeName(null);
+        workflow.setCurrentNodeIds(null);
+        workflow.setAssigneeUserId(null);
+        workflow.setAssigneeName(null);
     }
 
     private void saveLog(Long workflowId, String action, String remark) {
@@ -216,4 +392,3 @@ public class SystemWorkflowService {
         workflowLogMapper.insert(log);
     }
 }
-

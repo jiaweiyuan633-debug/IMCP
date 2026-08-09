@@ -105,6 +105,9 @@
         <a-form-item :label="t('page.workflowContent')">
           <a-textarea v-model:value="workflowForm.content" :rows="4" />
         </a-form-item>
+        <a-form-item :label="t('page.workflowFormData')">
+          <a-textarea v-model:value="workflowForm.formData" :rows="3" placeholder='{"amount": 1000}' />
+        </a-form-item>
       </a-form>
     </ModalForm>
 
@@ -132,6 +135,9 @@
         <div v-for="(node, index) in defForm.nodes" :key="index" class="node-row">
           <a-input v-model:value="node.nodeName" :placeholder="t('page.workflowNodeName')" />
           <a-input v-model:value="node.nodeKey" :placeholder="t('page.workflowNodeKey')" />
+          <a-select v-model:value="node.nodeType" :options="nodeTypeOptions" :placeholder="t('page.workflowNodeType')" />
+          <a-input v-model:value="node.conditionExpression" placeholder="#amount > 1000" />
+          <a-input-number v-model:value="node.timeoutHours" :min="1" :placeholder="t('page.workflowNodeTimeout')" style="width: 100%" />
           <a-select v-model:value="node.approverRoleId" :options="roleOptions" allow-clear :placeholder="t('page.workflowNodeRole')" style="width: 160px" />
           <a-button type="text" danger @click="removeNode(index)">
             <DeleteOutlined />
@@ -143,6 +149,9 @@
 
     <a-modal v-model:open="approvalModalOpen" :title="approvalAction === 'approve' ? t('page.workflowApprovalTitle') : t('page.workflowRejectTitle')" :confirm-loading="approvalSaving" @ok="onApprovalSubmit">
       <a-form layout="vertical">
+        <a-form-item v-if="approvalAction === 'approve' && currentNodeOptions.length > 1" :label="t('page.workflowNodeName')" required>
+          <a-select v-model:value="selectedNodeId" :options="currentNodeOptions" />
+        </a-form-item>
         <a-form-item :label="t('page.workflowApprovalRemark')">
           <a-textarea v-model:value="approvalRemark" :rows="3" :placeholder="approvalAction === 'approve' ? t('page.workflowApprovePlaceholder') : t('page.workflowRejectPlaceholder')" />
         </a-form-item>
@@ -186,6 +195,7 @@ import {
   getRoleOptions,
   getUserPage,
   getWorkflowLogs,
+  getWorkflowCurrentNodes,
   getWorkflowPage,
   getWorkflowTasks,
   rejectWorkflow,
@@ -260,10 +270,20 @@ const defRecords = ref<ProcessDefVo[]>([])
 const processDefOptions = ref<ProcessDefVo[]>([])
 const roleOptions = ref<RoleOptionVo[]>([])
 const userOptions = ref<{ label: string; value: number }[]>([])
+const nodeTypeOptions = [
+  { label: t('page.workflowNodeApprove'), value: 'APPROVE' },
+  { label: t('page.workflowNodeCondition'), value: 'CONDITION' },
+]
 
 const workflowModalOpen = ref(false)
 const workflowSaving = ref(false)
-const workflowForm = reactive({ processDefId: undefined as number | undefined, processName: '', bizType: 'demo', content: '' })
+const workflowForm = reactive({
+  processDefId: undefined as number | undefined,
+  processName: '',
+  bizType: 'demo',
+  content: '',
+  formData: '',
+})
 
 const defModalOpen = ref(false)
 const defSaving = ref(false)
@@ -281,6 +301,8 @@ const approvalSaving = ref(false)
 const approvalAction = ref<'approve' | 'reject'>('approve')
 const approvalRemark = ref('')
 const approvalTarget = ref<WorkflowVo | null>(null)
+const currentNodeOptions = ref<{ label: string; value: number }[]>([])
+const selectedNodeId = ref<number | undefined>()
 const delegateModalOpen = ref(false)
 const delegateSaving = ref(false)
 const delegateUserId = ref<number | undefined>()
@@ -335,7 +357,13 @@ async function loadOptions() {
 }
 
 function openWorkflowCreate() {
-  Object.assign(workflowForm, { processDefId: processDefOptions.value[0]?.id, processName: '', bizType: 'demo', content: '' })
+  Object.assign(workflowForm, {
+    processDefId: processDefOptions.value[0]?.id,
+    processName: '',
+    bizType: 'demo',
+    content: '',
+    formData: '',
+  })
   workflowModalOpen.value = true
 }
 
@@ -359,7 +387,7 @@ async function onWorkflowSubmit() {
 function openDefCreate() {
   defEditingId.value = undefined
   Object.assign(defForm, { defName: '', defKey: '', description: '', status: 1 })
-  defForm.nodes = [{ nodeName: '', nodeKey: '', nodeOrder: 0, approverRoleId: undefined }]
+  defForm.nodes = [emptyNode(0)]
   defModalOpen.value = true
 }
 
@@ -372,12 +400,33 @@ async function openDefEdit(record: ProcessDefVo) {
     status: record.status,
   })
   const nodes = await getProcessDefNodes(record.id)
-  defForm.nodes = nodes.length ? nodes : [{ nodeName: '', nodeKey: '', nodeOrder: 0, approverRoleId: undefined }]
+  defForm.nodes = nodes.length ? nodes.map(normalizeNode) : [emptyNode(0)]
   defModalOpen.value = true
 }
 
 function addNode() {
-  defForm.nodes.push({ nodeName: '', nodeKey: '', nodeOrder: defForm.nodes.length, approverRoleId: undefined })
+  defForm.nodes.push(emptyNode(defForm.nodes.length))
+}
+
+function emptyNode(order: number): ProcessNodeVo {
+  return {
+    nodeName: '',
+    nodeKey: '',
+    nodeType: 'APPROVE',
+    conditionExpression: '',
+    timeoutHours: 48,
+    nodeOrder: order,
+    approverRoleId: undefined,
+  }
+}
+
+function normalizeNode(node: ProcessNodeVo): ProcessNodeVo {
+  return {
+    ...node,
+    nodeType: node.nodeType || 'APPROVE',
+    conditionExpression: node.conditionExpression || '',
+    timeoutHours: node.timeoutHours || 48,
+  }
 }
 
 function removeNode(index: number) {
@@ -421,10 +470,13 @@ function onDefDelete(record: ProcessDefVo) {
   })
 }
 
-function openApprove(record: WorkflowVo) {
+async function openApprove(record: WorkflowVo) {
   approvalAction.value = 'approve'
   approvalRemark.value = ''
   approvalTarget.value = record
+  const nodes = await getWorkflowCurrentNodes(record.id)
+  currentNodeOptions.value = nodes.map((node) => ({ label: node.nodeName, value: node.id as number }))
+  selectedNodeId.value = currentNodeOptions.value[0]?.value
   approvalModalOpen.value = true
 }
 
@@ -442,7 +494,7 @@ async function onApprovalSubmit() {
   approvalSaving.value = true
   try {
     if (approvalAction.value === 'approve') {
-      await approveWorkflow(approvalTarget.value.id, approvalRemark.value)
+      await approveWorkflow(approvalTarget.value.id, approvalRemark.value, selectedNodeId.value)
     } else {
       await rejectWorkflow(approvalTarget.value.id, approvalRemark.value)
     }

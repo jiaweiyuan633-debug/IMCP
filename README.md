@@ -10,7 +10,7 @@
 - 工程能力：Quartz JDBC 持久化定时任务、本地/MinIO 文件存储、Excel 导入导出、OpenAPI
 - 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V22
 - 实时协作：SSE Ticket 安全推送、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
-- 完整工作流：流程定义、审批节点、待办任务、撤回、转办、审批日志
+- 完整工作流：流程定义、条件/并行节点、表单数据、待办任务、撤回、转办、超时提醒、审批日志
 - 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式
@@ -32,7 +32,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V22）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V23）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile
