@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.MenuSaveRequest;
-import com.example.admin.module.system.entity.SysMenu;
+import com.example.admin.module.system.entity.SysMenuDO;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.vo.MenuVo;
 import lombok.RequiredArgsConstructor;
@@ -25,14 +25,14 @@ public class SystemMenuService {
     private final SysMenuMapper menuMapper;
 
     public List<MenuVo> tree() {
-        List<SysMenu> menus = menuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
-                .orderByAsc(SysMenu::getSort)
-                .orderByAsc(SysMenu::getId));
+        List<SysMenuDO> menus = menuMapper.selectList(new LambdaQueryWrapper<SysMenuDO>()
+                .orderByAsc(SysMenuDO::getSort)
+                .orderByAsc(SysMenuDO::getId));
         return buildTree(menus, ROOT_PARENT_ID);
     }
 
     public Long create(MenuSaveRequest request) {
-        SysMenu menu = toEntity(request);
+        SysMenuDO menu = toEntity(request);
         menuMapper.insert(menu);
         return menu.getId();
     }
@@ -49,11 +49,11 @@ public class SystemMenuService {
 
     public void delete(Long id) {
         menuMapper.deleteById(id);
-        menuMapper.delete(new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, id));
+        menuMapper.delete(new LambdaQueryWrapper<SysMenuDO>().eq(SysMenuDO::getParentId, id));
     }
 
-    private SysMenu toEntity(MenuSaveRequest request) {
-        SysMenu menu = new SysMenu();
+    private SysMenuDO toEntity(MenuSaveRequest request) {
+        SysMenuDO menu = new SysMenuDO();
         menu.setId(request.getId());
         menu.setParentId(request.getParentId() == null ? ROOT_PARENT_ID : request.getParentId());
         menu.setName(request.getName());
@@ -68,9 +68,9 @@ public class SystemMenuService {
         return menu;
     }
 
-    private List<MenuVo> buildTree(List<SysMenu> menus, Long parentId) {
+    private List<MenuVo> buildTree(List<SysMenuDO> menus, Long parentId) {
         List<MenuVo> result = new ArrayList<>();
-        for (SysMenu menu : menus) {
+        for (SysMenuDO menu : menus) {
             if (parentId.equals(menu.getParentId())) {
                 result.add(toVo(menu, buildTree(menus, menu.getId())));
             }
@@ -78,7 +78,7 @@ public class SystemMenuService {
         return result;
     }
 
-    private MenuVo toVo(SysMenu menu, List<MenuVo> children) {
+    private MenuVo toVo(SysMenuDO menu, List<MenuVo> children) {
         return MenuVo.builder()
                 .id(menu.getId())
                 .parentId(menu.getParentId())

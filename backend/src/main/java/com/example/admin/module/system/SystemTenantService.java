@@ -6,9 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
-import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.module.system.mapper.SysTenantMapper;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,17 +25,17 @@ public class SystemTenantService {
     private final SysTenantMapper tenantMapper;
     private final SysUserMapper userMapper;
 
-    public PageResult<SysTenant> page(long pageNum, long pageSize, String tenantName) {
-        Page<SysTenant> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<SysTenant> wrapper = new LambdaQueryWrapper<SysTenant>()
-                .like(StringUtils.hasText(tenantName), SysTenant::getTenantName, tenantName)
-                .orderByAsc(SysTenant::getId);
-        IPage<SysTenant> result = tenantMapper.selectPage(page, wrapper);
+    public PageResult<SysTenantDO> page(long pageNum, long pageSize, String tenantName) {
+        Page<SysTenantDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysTenantDO> wrapper = new LambdaQueryWrapper<SysTenantDO>()
+                .like(StringUtils.hasText(tenantName), SysTenantDO::getTenantName, tenantName)
+                .orderByAsc(SysTenantDO::getId);
+        IPage<SysTenantDO> result = tenantMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
     @Transactional
-    public Long create(SysTenant tenant) {
+    public Long create(SysTenantDO tenant) {
         tenant.setId(null);
         tenant.setUserLimit(tenant.getUserLimit() == null ? DEFAULT_USER_LIMIT : tenant.getUserLimit());
         tenant.setStorageLimitMb(tenant.getStorageLimitMb() == null
@@ -47,11 +47,11 @@ public class SystemTenantService {
     }
 
     @Transactional
-    public void update(SysTenant tenant) {
+    public void update(SysTenantDO tenant) {
         if (tenant.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "租户 ID 不能为空");
         }
-        SysTenant existing = tenantMapper.selectById(tenant.getId());
+        SysTenantDO existing = tenantMapper.selectById(tenant.getId());
         if (existing == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -86,7 +86,7 @@ public class SystemTenantService {
         if (adminUserId == null) {
             return;
         }
-        SysUser admin = userMapper.selectById(adminUserId);
+        SysUserDO admin = userMapper.selectById(adminUserId);
         if (admin == null || !tenantId.equals(admin.getTenantId())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "租户管理员必须是本租户下的用户");
         }

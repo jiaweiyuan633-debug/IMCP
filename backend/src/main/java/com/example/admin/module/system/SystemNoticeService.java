@@ -6,10 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
-import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.module.system.entity.SysNoticeDO;
 import com.example.admin.module.system.mapper.SysNoticeMapper;
 import com.example.admin.module.system.mapper.SysNoticeReadMapper;
-import com.example.admin.module.system.entity.SysNoticeRead;
+import com.example.admin.module.system.entity.SysNoticeReadDO;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -30,24 +30,24 @@ public class SystemNoticeService {
     private final SysNoticeReadMapper noticeReadMapper;
     private final NoticeSseService noticeSseService;
 
-    public PageResult<SysNotice> page(long pageNum, long pageSize, String title, Integer type) {
-        Page<SysNotice> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<SysNotice> wrapper = new LambdaQueryWrapper<SysNotice>()
-                .like(StringUtils.hasText(title), SysNotice::getNoticeTitle, title)
-                .eq(type != null, SysNotice::getNoticeType, type)
-                .orderByDesc(SysNotice::getId);
-        IPage<SysNotice> result = noticeMapper.selectPage(page, wrapper);
+    public PageResult<SysNoticeDO> page(long pageNum, long pageSize, String title, Integer type) {
+        Page<SysNoticeDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysNoticeDO> wrapper = new LambdaQueryWrapper<SysNoticeDO>()
+                .like(StringUtils.hasText(title), SysNoticeDO::getNoticeTitle, title)
+                .eq(type != null, SysNoticeDO::getNoticeType, type)
+                .orderByDesc(SysNoticeDO::getId);
+        IPage<SysNoticeDO> result = noticeMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
-    public List<SysNotice> latest(int limit) {
-        return noticeMapper.selectList(new LambdaQueryWrapper<SysNotice>()
-                .eq(SysNotice::getStatus, PUBLISHED)
-                .orderByDesc(SysNotice::getId)
+    public List<SysNoticeDO> latest(int limit) {
+        return noticeMapper.selectList(new LambdaQueryWrapper<SysNoticeDO>()
+                .eq(SysNoticeDO::getStatus, PUBLISHED)
+                .orderByDesc(SysNoticeDO::getId)
                 .last("LIMIT " + Math.min(Math.max(limit, MIN_LATEST_LIMIT), MAX_LATEST_LIMIT)));
     }
 
-    public Long create(SysNotice notice) {
+    public Long create(SysNoticeDO notice) {
         notice.setId(null);
         notice.setCreatedBy(tryGetUserId());
         noticeMapper.insert(notice);
@@ -55,7 +55,7 @@ public class SystemNoticeService {
         return notice.getId();
     }
 
-    public void update(SysNotice notice) {
+    public void update(SysNoticeDO notice) {
         if (notice.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "公告 ID 不能为空");
         }
@@ -68,10 +68,10 @@ public class SystemNoticeService {
     }
 
     public long unreadCount(Long userId) {
-        long total = noticeMapper.selectCount(new LambdaQueryWrapper<SysNotice>()
-                .eq(SysNotice::getStatus, PUBLISHED));
-        long read = noticeReadMapper.selectCount(new LambdaQueryWrapper<SysNoticeRead>()
-                .eq(SysNoticeRead::getUserId, userId));
+        long total = noticeMapper.selectCount(new LambdaQueryWrapper<SysNoticeDO>()
+                .eq(SysNoticeDO::getStatus, PUBLISHED));
+        long read = noticeReadMapper.selectCount(new LambdaQueryWrapper<SysNoticeReadDO>()
+                .eq(SysNoticeReadDO::getUserId, userId));
         return Math.max(total - read, 0);
     }
 

@@ -1,7 +1,7 @@
 package com.example.admin.module.monitor.job;
 
-import com.example.admin.module.monitor.entity.SysJobLog;
-import com.example.admin.module.monitor.entity.SysJob;
+import com.example.admin.module.monitor.entity.SysJobLogDO;
+import com.example.admin.module.monitor.entity.SysJobDO;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
 import com.example.admin.common.TenantContext;
@@ -19,6 +19,9 @@ import java.time.LocalDateTime;
 @Component
 @DisallowConcurrentExecution
 public class SysQuartzJob implements Job {
+
+    private static final int STATUS_SUCCESS = 1;
+    private static final int STATUS_FAILURE = 0;
 
     @Autowired
     private SysJobLogMapper jobLogMapper;
@@ -38,7 +41,7 @@ public class SysQuartzJob implements Job {
         String message = "执行成功";
         String error = null;
         boolean success = true;
-        SysJob job = jobMapper.selectById(jobId);
+        SysJobDO job = jobMapper.selectById(jobId);
         if (job != null && job.getTenantId() != null) {
             TenantContext.setTenantId(job.getTenantId());
         }
@@ -54,13 +57,13 @@ public class SysQuartzJob implements Job {
                 log.error("Job {} execute failed", jobId, exception);
             }
         } finally {
-            SysJobLog jobLog = new SysJobLog();
+            SysJobLogDO jobLog = new SysJobLogDO();
             jobLog.setTenantId(TenantContext.getTenantId());
             jobLog.setJobName(jobName);
             jobLog.setJobGroup(jobGroup);
             jobLog.setInvokeTarget(invokeTarget);
             jobLog.setJobMessage(message);
-            jobLog.setStatus(success ? 1 : 0);
+            jobLog.setStatus(success ? STATUS_SUCCESS : STATUS_FAILURE);
             jobLog.setExceptionInfo(error);
             jobLog.setStartTime(start);
             jobLog.setEndTime(LocalDateTime.now());

@@ -2,33 +2,34 @@ package com.example.admin.module.system.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.Version;
-import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_tenant")
-public class SysTenant {
+@TableName("sys_dept")
+public class SysDeptDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String tenantName;
-    private String tenantCode;
+    private Long tenantId;
+    private Long parentId;
+    private String ancestors;
+    private String deptName;
+    private Integer orderNum;
+    private String leader;
+    private String phone;
+    private String email;
     private Integer status;
-    private String contactName;
-    private String contactPhone;
-    private Integer userLimit;
-    private Long storageLimitMb;
-    private Long adminUserId;
-    @TableField(exist = false)
-    private Boolean clearAdminUserId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long updatedBy;
     @Version
     private Integer version;
+    @TableLogic
+    private Integer deleted;
 }
 

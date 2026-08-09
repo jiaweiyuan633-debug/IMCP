@@ -8,9 +8,9 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.dto.ProcessDefSaveRequest;
-import com.example.admin.module.system.entity.SysProcessDef;
-import com.example.admin.module.system.entity.SysProcessNode;
-import com.example.admin.module.system.entity.SysWorkflow;
+import com.example.admin.module.system.entity.SysProcessDefDO;
+import com.example.admin.module.system.entity.SysProcessNodeDO;
+import com.example.admin.module.system.entity.SysWorkflowDO;
 import com.example.admin.module.system.mapper.SysProcessDefMapper;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
 import com.example.admin.module.system.mapper.SysWorkflowMapper;
@@ -34,31 +34,31 @@ public class ProcessDefService {
     private final SysProcessNodeMapper nodeMapper;
     private final SysWorkflowMapper workflowMapper;
 
-    public PageResult<SysProcessDef> page(long pageNum, long pageSize, String defName, Integer status) {
-        Page<SysProcessDef> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<SysProcessDef> wrapper = new LambdaQueryWrapper<SysProcessDef>()
-                .like(StringUtils.hasText(defName), SysProcessDef::getDefName, defName)
-                .eq(status != null, SysProcessDef::getStatus, status)
-                .orderByDesc(SysProcessDef::getId);
-        IPage<SysProcessDef> result = defMapper.selectPage(page, wrapper);
+    public PageResult<SysProcessDefDO> page(long pageNum, long pageSize, String defName, Integer status) {
+        Page<SysProcessDefDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysProcessDefDO> wrapper = new LambdaQueryWrapper<SysProcessDefDO>()
+                .like(StringUtils.hasText(defName), SysProcessDefDO::getDefName, defName)
+                .eq(status != null, SysProcessDefDO::getStatus, status)
+                .orderByDesc(SysProcessDefDO::getId);
+        IPage<SysProcessDefDO> result = defMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
-    public List<SysProcessDef> listOptions() {
-        return defMapper.selectList(new LambdaQueryWrapper<SysProcessDef>()
-                .eq(SysProcessDef::getStatus, ENABLED)
-                .orderByDesc(SysProcessDef::getId));
+    public List<SysProcessDefDO> listOptions() {
+        return defMapper.selectList(new LambdaQueryWrapper<SysProcessDefDO>()
+                .eq(SysProcessDefDO::getStatus, ENABLED)
+                .orderByDesc(SysProcessDefDO::getId));
     }
 
-    public List<SysProcessNode> nodes(Long defId) {
-        return nodeMapper.selectList(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getProcessDefId, defId)
-                .orderByAsc(SysProcessNode::getNodeOrder));
+    public List<SysProcessNodeDO> nodes(Long defId) {
+        return nodeMapper.selectList(new LambdaQueryWrapper<SysProcessNodeDO>()
+                .eq(SysProcessNodeDO::getProcessDefId, defId)
+                .orderByAsc(SysProcessNodeDO::getNodeOrder));
     }
 
     @Transactional
     public Long create(ProcessDefSaveRequest request) {
-        SysProcessDef def = new SysProcessDef();
+        SysProcessDefDO def = new SysProcessDefDO();
         def.setTenantId(TenantContext.getTenantId());
         def.setDefName(request.getDefName());
         def.setDefKey(request.getDefKey());
@@ -75,7 +75,7 @@ public class ProcessDefService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "流程定义 ID 不能为空");
         }
-        SysProcessDef def = defMapper.selectById(request.getId());
+        SysProcessDefDO def = defMapper.selectById(request.getId());
         if (def == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -86,23 +86,23 @@ public class ProcessDefService {
         def.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         def.setUpdatedBy(tryGetUserId());
         defMapper.updateById(def);
-        nodeMapper.delete(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getProcessDefId, def.getId()));
+        nodeMapper.delete(new LambdaQueryWrapper<SysProcessNodeDO>()
+                .eq(SysProcessNodeDO::getProcessDefId, def.getId()));
         saveNodes(def.getId(), request.getNodes());
     }
 
     @Transactional
     public void delete(Long id) {
         ensureNoActiveInstances(id);
-        nodeMapper.delete(new LambdaQueryWrapper<SysProcessNode>()
-                .eq(SysProcessNode::getProcessDefId, id));
+        nodeMapper.delete(new LambdaQueryWrapper<SysProcessNodeDO>()
+                .eq(SysProcessNodeDO::getProcessDefId, id));
         defMapper.deleteById(id);
     }
 
     private void saveNodes(Long defId, List<ProcessDefSaveRequest.NodeItem> nodes) {
         int order = 0;
         for (ProcessDefSaveRequest.NodeItem item : nodes) {
-            SysProcessNode node = new SysProcessNode();
+            SysProcessNodeDO node = new SysProcessNodeDO();
             node.setTenantId(TenantContext.getTenantId());
             node.setProcessDefId(defId);
             node.setNodeName(item.getNodeName());
@@ -120,9 +120,9 @@ public class ProcessDefService {
     }
 
     private void ensureNoActiveInstances(Long defId) {
-        long active = workflowMapper.selectCount(new LambdaQueryWrapper<SysWorkflow>()
-                .eq(SysWorkflow::getProcessDefId, defId)
-                .eq(SysWorkflow::getStatus, WorkflowStatus.PENDING.name()));
+        long active = workflowMapper.selectCount(new LambdaQueryWrapper<SysWorkflowDO>()
+                .eq(SysWorkflowDO::getProcessDefId, defId)
+                .eq(SysWorkflowDO::getStatus, WorkflowStatus.PENDING.name()));
         if (active > 0) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "存在运行中的流程实例，不能修改或删除流程定义");
         }

@@ -1,6 +1,6 @@
 package com.example.admin.module.monitor.manager;
 
-import com.example.admin.module.monitor.entity.SysAlertRule;
+import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,7 +24,7 @@ class AlertWebhookManagerTest {
 
     @Test
     void sendsPayloadWhenWebhookConfigured() {
-        SysAlertRule rule = new SysAlertRule();
+        SysAlertRuleDO rule = new SysAlertRuleDO();
         rule.setRuleName("CPU 告警");
         rule.setWebhookUrl("https://example.com/hook");
 
@@ -35,7 +35,7 @@ class AlertWebhookManagerTest {
 
     @Test
     void skipsWebhookWhenNotConfigured() {
-        SysAlertRule rule = new SysAlertRule();
+        SysAlertRuleDO rule = new SysAlertRuleDO();
         rule.setRuleName("内存告警");
 
         alertWebhookManager.send(rule, "WARNING", 90.0);

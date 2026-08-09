@@ -2,7 +2,7 @@ package com.example.admin.module.monitor;
 
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
-import com.example.admin.module.system.entity.SysAuditLog;
+import com.example.admin.module.system.entity.SysAuditLogDO;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,7 +22,7 @@ public class MonitorAuditController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('monitor:audit:list')")
-    public Result<PageResult<SysAuditLog>> page(
+    public Result<PageResult<SysAuditLogDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String module,

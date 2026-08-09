@@ -2,7 +2,7 @@ package com.example.admin.module.system;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
-import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.module.system.mapper.SysTenantMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ class SystemTenantServiceTest {
 
     @Test
     void updateKeepsExistingQuotaWhenRequestOmitsQuota() {
-        SysTenant existing = new SysTenant();
+        SysTenantDO existing = new SysTenantDO();
         existing.setId(1L);
         existing.setTenantName("旧租户");
         existing.setTenantCode("old");
@@ -41,13 +41,13 @@ class SystemTenantServiceTest {
         existing.setStorageLimitMb(512L);
         when(tenantMapper.selectById(1L)).thenReturn(existing);
 
-        SysTenant request = new SysTenant();
+        SysTenantDO request = new SysTenantDO();
         request.setId(1L);
         request.setTenantName("新租户");
         request.setTenantCode("new");
         tenantService.update(request);
 
-        ArgumentCaptor<SysTenant> captor = ArgumentCaptor.forClass(SysTenant.class);
+        ArgumentCaptor<SysTenantDO> captor = ArgumentCaptor.forClass(SysTenantDO.class);
         verify(tenantMapper).updateById(captor.capture());
         assertEquals("新租户", captor.getValue().getTenantName());
         assertEquals(50, captor.getValue().getUserLimit());
@@ -56,7 +56,7 @@ class SystemTenantServiceTest {
 
     @Test
     void updateRejectsInvalidUserLimit() {
-        SysTenant existing = new SysTenant();
+        SysTenantDO existing = new SysTenantDO();
         existing.setId(1L);
         existing.setTenantName("旧租户");
         existing.setTenantCode("old");
@@ -64,7 +64,7 @@ class SystemTenantServiceTest {
         existing.setStorageLimitMb(512L);
         when(tenantMapper.selectById(1L)).thenReturn(existing);
 
-        SysTenant request = new SysTenant();
+        SysTenantDO request = new SysTenantDO();
         request.setId(1L);
         request.setTenantName("新租户");
         request.setTenantCode("new");
@@ -72,6 +72,6 @@ class SystemTenantServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> tenantService.update(request));
 
         assertEquals(ResultCode.PARAM_ERROR.getCode(), exception.getCode());
-        verify(tenantMapper, never()).updateById(any(SysTenant.class));
+        verify(tenantMapper, never()).updateById(any(SysTenantDO.class));
     }
 }

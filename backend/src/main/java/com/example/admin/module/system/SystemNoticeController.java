@@ -6,7 +6,7 @@ import com.example.admin.common.annotation.OperLog;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.SseTicketService;
-import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.module.system.entity.SysNoticeDO;
 import com.example.admin.security.SecurityUtils;
 import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class SystemNoticeController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:notice:list')")
-    public Result<PageResult<SysNotice>> page(
+    public Result<PageResult<SysNoticeDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String title,
@@ -44,7 +44,7 @@ public class SystemNoticeController {
     }
 
     @GetMapping("/latest")
-    public Result<List<SysNotice>> latest(@RequestParam(defaultValue = "5") int limit) {
+    public Result<List<SysNoticeDO>> latest(@RequestParam(defaultValue = "5") int limit) {
         return Result.success(noticeService.latest(limit));
     }
 
@@ -65,14 +65,14 @@ public class SystemNoticeController {
     @PostMapping
     @PreAuthorize("hasAuthority('system:notice:add')")
     @OperLog(module = "通知公告", action = "新增公告")
-    public Result<Long> create(@RequestBody SysNotice notice) {
+    public Result<Long> create(@RequestBody SysNoticeDO notice) {
         return Result.success(noticeService.create(notice));
     }
 
     @PutMapping
     @PreAuthorize("hasAuthority('system:notice:edit')")
     @OperLog(module = "通知公告", action = "编辑公告")
-    public Result<Void> update(@RequestBody SysNotice notice) {
+    public Result<Void> update(@RequestBody SysNoticeDO notice) {
         noticeService.update(notice);
         return Result.success();
     }

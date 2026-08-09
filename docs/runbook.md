@@ -15,7 +15,7 @@ scripts/load-test-multi.ps1
 
 ## 数据库
 
-- Flyway 自动迁移，当前版本 V1-V27。
+- Flyway 自动迁移，当前版本 V1-V28。
 - 禁止直接修改已执行的迁移脚本；变更必须新增 V 系列脚本。
 - 定期执行 `scripts/backup-drill.ps1` 验证备份可恢复。
 

@@ -5,9 +5,9 @@ import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.dto.WorkflowDelegateRequest;
 import jakarta.validation.Valid;
-import com.example.admin.module.system.entity.SysWorkflow;
-import com.example.admin.module.system.entity.SysWorkflowLog;
-import com.example.admin.module.system.entity.SysProcessNode;
+import com.example.admin.module.system.entity.SysWorkflowDO;
+import com.example.admin.module.system.entity.SysWorkflowLogDO;
+import com.example.admin.module.system.entity.SysProcessNodeDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +30,7 @@ public class SystemWorkflowController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<PageResult<SysWorkflow>> page(
+    public Result<PageResult<SysWorkflowDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String status) {
@@ -39,7 +39,7 @@ public class SystemWorkflowController {
 
     @GetMapping("/tasks")
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<PageResult<SysWorkflow>> tasks(
+    public Result<PageResult<SysWorkflowDO>> tasks(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize) {
         return Result.success(workflowService.taskPage(pageNum, pageSize));
@@ -47,7 +47,7 @@ public class SystemWorkflowController {
 
     @PostMapping
     @OperLog(module = "工作流", action = "发起流程")
-    public Result<Long> create(@RequestBody SysWorkflow workflow) {
+    public Result<Long> create(@RequestBody SysWorkflowDO workflow) {
         return Result.success(workflowService.create(workflow));
     }
 
@@ -85,13 +85,13 @@ public class SystemWorkflowController {
 
     @GetMapping("/{id}/logs")
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<List<SysWorkflowLog>> logs(@PathVariable Long id) {
+    public Result<List<SysWorkflowLogDO>> logs(@PathVariable Long id) {
         return Result.success(workflowService.logs(id));
     }
 
     @GetMapping("/{id}/nodes")
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<List<SysProcessNode>> currentNodes(@PathVariable Long id) {
+    public Result<List<SysProcessNodeDO>> currentNodes(@PathVariable Long id) {
         return Result.success(workflowService.currentNodes(id));
     }
 }

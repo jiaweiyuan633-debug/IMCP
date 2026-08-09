@@ -2,7 +2,7 @@ package com.example.admin.module.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
-import com.example.admin.module.system.entity.SysRole;
+import com.example.admin.module.system.entity.SysRoleDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 @Mapper
-public interface SysRoleMapper extends BaseMapper<SysRole> {
+public interface SysRoleMapper extends BaseMapper<SysRoleDO> {
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("""

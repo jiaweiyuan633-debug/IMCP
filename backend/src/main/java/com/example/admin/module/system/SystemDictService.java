@@ -10,8 +10,8 @@ import com.example.admin.module.system.dto.DictDataQuery;
 import com.example.admin.module.system.dto.DictDataSaveRequest;
 import com.example.admin.module.system.dto.DictTypeQuery;
 import com.example.admin.module.system.dto.DictTypeSaveRequest;
-import com.example.admin.module.system.entity.SysDictData;
-import com.example.admin.module.system.entity.SysDictType;
+import com.example.admin.module.system.entity.SysDictDataDO;
+import com.example.admin.module.system.entity.SysDictTypeDO;
 import com.example.admin.module.system.mapper.SysDictDataMapper;
 import com.example.admin.module.system.mapper.SysDictTypeMapper;
 import com.example.admin.module.system.vo.DictDataVo;
@@ -37,20 +37,20 @@ public class SystemDictService {
     private final SysDictDataMapper dataMapper;
 
     public PageResult<DictTypeVo> typePage(DictTypeQuery query) {
-        Page<SysDictType> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysDictType> wrapper = new LambdaQueryWrapper<SysDictType>()
-                .like(StringUtils.hasText(query.getDictName()), SysDictType::getDictName, query.getDictName())
-                .like(StringUtils.hasText(query.getDictType()), SysDictType::getDictType, query.getDictType())
-                .eq(query.getStatus() != null, SysDictType::getStatus, query.getStatus())
-                .orderByAsc(SysDictType::getId);
-        IPage<SysDictType> result = typeMapper.selectPage(page, wrapper);
+        Page<SysDictTypeDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysDictTypeDO> wrapper = new LambdaQueryWrapper<SysDictTypeDO>()
+                .like(StringUtils.hasText(query.getDictName()), SysDictTypeDO::getDictName, query.getDictName())
+                .like(StringUtils.hasText(query.getDictType()), SysDictTypeDO::getDictType, query.getDictType())
+                .eq(query.getStatus() != null, SysDictTypeDO::getStatus, query.getStatus())
+                .orderByAsc(SysDictTypeDO::getId);
+        IPage<SysDictTypeDO> result = typeMapper.selectPage(page, wrapper);
         List<DictTypeVo> records = result.getRecords().stream().map(this::toTypeVo).toList();
         return PageResult.of(result, records);
     }
 
     public Long typeCreate(DictTypeSaveRequest request) {
         checkTypeUnique(request.getDictType(), null);
-        SysDictType type = toTypeEntity(request);
+        SysDictTypeDO type = toTypeEntity(request);
         typeMapper.insert(type);
         return type.getId();
     }
@@ -65,34 +65,34 @@ public class SystemDictService {
 
     @Transactional
     public void typeDelete(Long id) {
-        SysDictType type = typeMapper.selectById(id);
+        SysDictTypeDO type = typeMapper.selectById(id);
         if (type == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         typeMapper.deleteById(id);
-        dataMapper.delete(new LambdaQueryWrapper<SysDictData>()
-                .eq(SysDictData::getDictType, type.getDictType()));
+        dataMapper.delete(new LambdaQueryWrapper<SysDictDataDO>()
+                .eq(SysDictDataDO::getDictType, type.getDictType()));
     }
 
     public PageResult<DictDataVo> dataPage(DictDataQuery query) {
-        Page<SysDictData> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysDictData> wrapper = new LambdaQueryWrapper<SysDictData>()
-                .eq(StringUtils.hasText(query.getDictType()), SysDictData::getDictType, query.getDictType())
-                .like(StringUtils.hasText(query.getDictLabel()), SysDictData::getDictLabel, query.getDictLabel())
-                .eq(query.getStatus() != null, SysDictData::getStatus, query.getStatus())
-                .orderByAsc(SysDictData::getDictSort)
-                .orderByAsc(SysDictData::getId);
-        IPage<SysDictData> result = dataMapper.selectPage(page, wrapper);
+        Page<SysDictDataDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysDictDataDO> wrapper = new LambdaQueryWrapper<SysDictDataDO>()
+                .eq(StringUtils.hasText(query.getDictType()), SysDictDataDO::getDictType, query.getDictType())
+                .like(StringUtils.hasText(query.getDictLabel()), SysDictDataDO::getDictLabel, query.getDictLabel())
+                .eq(query.getStatus() != null, SysDictDataDO::getStatus, query.getStatus())
+                .orderByAsc(SysDictDataDO::getDictSort)
+                .orderByAsc(SysDictDataDO::getId);
+        IPage<SysDictDataDO> result = dataMapper.selectPage(page, wrapper);
         List<DictDataVo> records = result.getRecords().stream().map(this::toDataVo).toList();
         return PageResult.of(result, records);
     }
 
     @Cacheable(value = "dictData", key = "#dictType")
     public List<DictDataVo> dataByType(String dictType) {
-        return dataMapper.selectList(new LambdaQueryWrapper<SysDictData>()
-                        .eq(SysDictData::getDictType, dictType)
-                        .eq(SysDictData::getStatus, ENABLED)
-                        .orderByAsc(SysDictData::getDictSort))
+        return dataMapper.selectList(new LambdaQueryWrapper<SysDictDataDO>()
+                        .eq(SysDictDataDO::getDictType, dictType)
+                        .eq(SysDictDataDO::getStatus, ENABLED)
+                        .orderByAsc(SysDictDataDO::getDictSort))
                 .stream()
                 .map(this::toDataVo)
                 .toList();
@@ -100,7 +100,7 @@ public class SystemDictService {
 
     @CacheEvict(value = "dictData", allEntries = true)
     public Long dataCreate(DictDataSaveRequest request) {
-        SysDictData data = toDataEntity(request);
+        SysDictDataDO data = toDataEntity(request);
         dataMapper.insert(data);
         return data.getId();
     }
@@ -119,15 +119,15 @@ public class SystemDictService {
     }
 
     private void checkTypeUnique(String dictType, Long excludeId) {
-        SysDictType exists = typeMapper.selectOne(new LambdaQueryWrapper<SysDictType>()
-                .eq(SysDictType::getDictType, dictType.trim()));
+        SysDictTypeDO exists = typeMapper.selectOne(new LambdaQueryWrapper<SysDictTypeDO>()
+                .eq(SysDictTypeDO::getDictType, dictType.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
             throw new BusinessException(ResultCode.DICT_TYPE_EXISTS);
         }
     }
 
-    private SysDictType toTypeEntity(DictTypeSaveRequest request) {
-        SysDictType type = new SysDictType();
+    private SysDictTypeDO toTypeEntity(DictTypeSaveRequest request) {
+        SysDictTypeDO type = new SysDictTypeDO();
         type.setId(request.getId());
         type.setDictName(request.getDictName());
         type.setDictType(request.getDictType().trim());
@@ -136,8 +136,8 @@ public class SystemDictService {
         return type;
     }
 
-    private SysDictData toDataEntity(DictDataSaveRequest request) {
-        SysDictData data = new SysDictData();
+    private SysDictDataDO toDataEntity(DictDataSaveRequest request) {
+        SysDictDataDO data = new SysDictDataDO();
         data.setId(request.getId());
         data.setDictType(request.getDictType());
         data.setDictLabel(request.getDictLabel());
@@ -150,7 +150,7 @@ public class SystemDictService {
         return data;
     }
 
-    private DictTypeVo toTypeVo(SysDictType type) {
+    private DictTypeVo toTypeVo(SysDictTypeDO type) {
         return DictTypeVo.builder()
                 .id(type.getId())
                 .dictName(type.getDictName())
@@ -161,7 +161,7 @@ public class SystemDictService {
                 .build();
     }
 
-    private DictDataVo toDataVo(SysDictData data) {
+    private DictDataVo toDataVo(SysDictDataDO data) {
         return DictDataVo.builder()
                 .id(data.getId())
                 .dictType(data.getDictType())

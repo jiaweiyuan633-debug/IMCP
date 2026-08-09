@@ -3,7 +3,7 @@ package com.example.admin.security;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.common.TenantContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -51,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         perms = menuMapper.selectPermsByUserId(userId);
                         tokenService.cachePermissions(userId, perms);
                     }
-                    SysUser user = userMapper.selectById(userId);
+                    SysUserDO user = userMapper.selectById(userId);
                     if (user == null || user.getStatus() == null || user.getStatus() != 1) {
                         SecurityContextHolder.clearContext();
                     } else {

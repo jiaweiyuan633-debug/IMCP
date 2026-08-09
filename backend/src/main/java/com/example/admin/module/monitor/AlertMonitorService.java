@@ -1,13 +1,13 @@
 package com.example.admin.module.monitor;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.admin.module.monitor.entity.SysAlertRule;
+import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import com.example.admin.module.monitor.manager.AlertWebhookManager;
 import com.example.admin.module.monitor.mapper.SysAlertRuleMapper;
 import com.example.admin.module.monitor.vo.ServerMonitorVo;
 import com.example.admin.module.system.NoticeSseService;
 import com.example.admin.module.system.SystemNoticeService;
-import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.module.system.entity.SysNoticeDO;
 import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,9 +50,9 @@ public class AlertMonitorService {
 
     public int checkNow() {
         ServerMonitorVo monitor = serverMonitorService.get();
-        List<SysAlertRule> rules = ruleMapper.selectAllEnabledIgnoreTenant();
+        List<SysAlertRuleDO> rules = ruleMapper.selectAllEnabledIgnoreTenant();
         int triggered = 0;
-        for (SysAlertRule rule : rules) {
+        for (SysAlertRuleDO rule : rules) {
             TenantContext.setTenantId(rule.getTenantId());
             try {
                 double value = readMetric(monitor, rule.getMetric());
@@ -76,9 +76,9 @@ public class AlertMonitorService {
         return triggered;
     }
 
-    private void sendNotice(SysAlertRule rule, double value) {
+    private void sendNotice(SysAlertRuleDO rule, double value) {
         String severity = rule.getSeverity() == null ? DEFAULT_SEVERITY : rule.getSeverity();
-        SysNotice notice = new SysNotice();
+        SysNoticeDO notice = new SysNoticeDO();
         notice.setNoticeTitle("[" + severity + "] " + rule.getRuleName());
         notice.setNoticeType(NOTICE_TYPE);
         notice.setNoticeContent(String.format(

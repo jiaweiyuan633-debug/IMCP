@@ -3,7 +3,7 @@ package com.example.admin.module.system;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
-import com.example.admin.module.system.entity.SysFile;
+import com.example.admin.module.system.entity.SysFileDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,7 +22,7 @@ public class SystemFileController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:file:list')")
-    public Result<PageResult<SysFile>> page(
+    public Result<PageResult<SysFileDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String fileName,

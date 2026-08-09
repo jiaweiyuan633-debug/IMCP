@@ -1,4 +1,4 @@
-package com.example.admin.module.system.entity;
+package com.example.admin.module.monitor.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -8,17 +8,19 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_login_log")
-public class SysLoginLog {
+@TableName("sys_job_log")
+public class SysJobLogDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long tenantId;
-    private String username;
-    private String ip;
-    private String userAgent;
+    private String jobName;
+    private String jobGroup;
+    private String invokeTarget;
+    private String jobMessage;
     private Integer status;
-    private String message;
-    private LocalDateTime loginTime;
+    private String exceptionInfo;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
 }
 

@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.DeptSaveRequest;
-import com.example.admin.module.system.entity.SysDept;
+import com.example.admin.module.system.entity.SysDeptDO;
 import com.example.admin.module.system.mapper.SysDeptMapper;
 import com.example.admin.module.system.vo.DeptVo;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +24,14 @@ public class SystemDeptService {
     private final SysDeptMapper deptMapper;
 
     public List<DeptVo> tree() {
-        List<SysDept> depts = deptMapper.selectList(new LambdaQueryWrapper<SysDept>()
-                .orderByAsc(SysDept::getOrderNum)
-                .orderByAsc(SysDept::getId));
+        List<SysDeptDO> depts = deptMapper.selectList(new LambdaQueryWrapper<SysDeptDO>()
+                .orderByAsc(SysDeptDO::getOrderNum)
+                .orderByAsc(SysDeptDO::getId));
         return buildTree(depts, ROOT_PARENT_ID);
     }
 
     public Long create(DeptSaveRequest request) {
-        SysDept dept = toEntity(request);
+        SysDeptDO dept = toEntity(request);
         dept.setAncestors(buildAncestors(request.getParentId()));
         deptMapper.insert(dept);
         return dept.getId();
@@ -41,7 +41,7 @@ public class SystemDeptService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "部门 ID 不能为空");
         }
-        SysDept dept = deptMapper.selectById(request.getId());
+        SysDeptDO dept = deptMapper.selectById(request.getId());
         if (dept == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -57,16 +57,16 @@ public class SystemDeptService {
     }
 
     public void delete(Long id) {
-        Long children = deptMapper.selectCount(new LambdaQueryWrapper<SysDept>()
-                .eq(SysDept::getParentId, id));
+        Long children = deptMapper.selectCount(new LambdaQueryWrapper<SysDeptDO>()
+                .eq(SysDeptDO::getParentId, id));
         if (children > 0) {
             throw new BusinessException(ResultCode.DEPT_HAS_CHILDREN);
         }
         deptMapper.deleteById(id);
     }
 
-    private SysDept toEntity(DeptSaveRequest request) {
-        SysDept dept = new SysDept();
+    private SysDeptDO toEntity(DeptSaveRequest request) {
+        SysDeptDO dept = new SysDeptDO();
         dept.setId(request.getId());
         dept.setParentId(request.getParentId() == null ? ROOT_PARENT_ID : request.getParentId());
         dept.setDeptName(request.getDeptName());
@@ -82,16 +82,16 @@ public class SystemDeptService {
         if (parentId == null || parentId == ROOT_PARENT_ID) {
             return "0";
         }
-        SysDept parent = deptMapper.selectById(parentId);
+        SysDeptDO parent = deptMapper.selectById(parentId);
         if (parent == null) {
             return "0";
         }
         return parent.getAncestors() + "," + parent.getId();
     }
 
-    private List<DeptVo> buildTree(List<SysDept> depts, Long parentId) {
+    private List<DeptVo> buildTree(List<SysDeptDO> depts, Long parentId) {
         List<DeptVo> result = new ArrayList<>();
-        for (SysDept dept : depts) {
+        for (SysDeptDO dept : depts) {
             if (parentId.equals(dept.getParentId())) {
                 result.add(toVo(dept, buildTree(depts, dept.getId())));
             }
@@ -99,7 +99,7 @@ public class SystemDeptService {
         return result;
     }
 
-    private DeptVo toVo(SysDept dept, List<DeptVo> children) {
+    private DeptVo toVo(SysDeptDO dept, List<DeptVo> children) {
         return DeptVo.builder()
                 .id(dept.getId())
                 .parentId(dept.getParentId())

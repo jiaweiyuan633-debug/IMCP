@@ -5,20 +5,19 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
-@TableName("ai_task_result")
-public class AiTaskResult {
+@TableName("ai_service_config")
+public class AiServiceConfigDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long tenantId;
-    private Long taskId;
-    private String resultType;
-    private String resultJson;
-    private String rawData;
-    private Long durationMs;
-    private LocalDateTime createdAt;
+    private String code;
+    private String name;
+    private String baseUrl;
+    private String apiKey;
+    private Integer timeoutSeconds;
+    private Integer enabled;
+    private Integer dailyLimit;
 }
 

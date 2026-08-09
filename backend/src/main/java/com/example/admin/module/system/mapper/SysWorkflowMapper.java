@@ -1,10 +1,10 @@
 package com.example.admin.module.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.example.admin.module.system.entity.SysWorkflow;
+import com.example.admin.module.system.entity.SysWorkflowDO;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
-public interface SysWorkflowMapper extends BaseMapper<SysWorkflow> {
+public interface SysWorkflowMapper extends BaseMapper<SysWorkflowDO> {
 }
 

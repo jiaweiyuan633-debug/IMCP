@@ -1,9 +1,9 @@
 package com.example.admin.common.aspect;
 
 import com.example.admin.common.annotation.OperLog;
-import com.example.admin.module.system.entity.SysOperLog;
+import com.example.admin.module.system.entity.SysOperLogDO;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
-import com.example.admin.module.system.entity.SysAuditLog;
+import com.example.admin.module.system.entity.SysAuditLogDO;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
@@ -35,6 +35,8 @@ public class OperLogAspect {
     private static final int MAX_PARAMS_LENGTH = 2000;
     private static final int MAX_RESULT_LENGTH = 2000;
     private static final int MAX_ERROR_LENGTH = 1000;
+    private static final int STATUS_SUCCESS = 1;
+    private static final int STATUS_FAILURE = 0;
 
     private final SysOperLogMapper operLogMapper;
     private final SysAuditLogMapper auditLogMapper;
@@ -58,14 +60,14 @@ public class OperLogAspect {
 
     private void saveLog(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
         try {
-            SysOperLog operLogEntity = new SysOperLog();
+            SysOperLogDO operLogEntity = new SysOperLogDO();
             operLogEntity.setTenantId(TenantContext.getTenantId());
             operLogEntity.setUserId(tryGetUserId());
             operLogEntity.setModule(operLog.module());
             operLogEntity.setAction(operLog.action());
             operLogEntity.setMethod(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
             operLogEntity.setDurationMs(System.currentTimeMillis() - start);
-            operLogEntity.setStatus(error == null ? 1 : 0);
+            operLogEntity.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
             operLogEntity.setOperTime(LocalDateTime.now());
             if (error != null) {
                 operLogEntity.setErrorMsg(truncate(error.getMessage(), MAX_ERROR_LENGTH));
@@ -88,8 +90,8 @@ public class OperLogAspect {
         }
     }
 
-    private void saveAuditLog(SysOperLog operLogEntity) {
-        SysAuditLog auditLog = new SysAuditLog();
+    private void saveAuditLog(SysOperLogDO operLogEntity) {
+        SysAuditLogDO auditLog = new SysAuditLogDO();
         auditLog.setTenantId(TenantContext.getTenantId());
         auditLog.setUserId(operLogEntity.getUserId());
         auditLog.setModule(operLogEntity.getModule());

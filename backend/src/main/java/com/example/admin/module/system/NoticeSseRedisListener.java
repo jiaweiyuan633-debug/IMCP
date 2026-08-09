@@ -2,7 +2,7 @@ package com.example.admin.module.system;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.example.admin.module.system.entity.SysNotice;
+import com.example.admin.module.system.entity.SysNoticeDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
@@ -20,9 +20,9 @@ public class NoticeSseRedisListener implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            SysNotice notice = objectMapper.readValue(
+            SysNoticeDO notice = objectMapper.readValue(
                     new String(message.getBody(), StandardCharsets.UTF_8),
-                    SysNotice.class);
+                    SysNoticeDO.class);
             noticeSseService.publishLocal(notice);
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             // ignore malformed broadcast

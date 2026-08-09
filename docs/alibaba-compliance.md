@@ -22,22 +22,20 @@
 | 工程结构 | 分层 | 新增 `ai/manager/AiTaskManager`，Service 不再直接依赖外部客户端 |
 | 工程结构 | Manager | 告警 Webhook 拆分 `AlertWebhookManager`，Service 只保留业务编排 |
 | 设计规约 | 文档 | 新增 `docs/architecture-conventions.md`，固化分层、命名、错误码、数据访问与测试规约 |
+| 命名规约 | DO 后缀 | `Sys*` 与 `Ai*` 数据库实体统一迁移为 `Sys*DO` / `Ai*DO` |
 | 编程规约 | 魔法值 | AI、租户、用户、登录限流、定时任务、告警、流程、菜单等业务默认值收敛为常量 |
 | 编程规约 | BigDecimal/日期/并发 | 复查无 `BigDecimal.equals` 等值比较、无 `SimpleDateFormat`/`Executors`/`java.sql.Date` |
+| MySQL | 主键 | V28 将所有自增主键统一为 `BIGINT UNSIGNED` |
 
 ## 残余整改项
 
 | 模块 | 条款 | 说明 |
 | --- | --- | --- |
-| 命名规约 | 实体类 DO 后缀 | 现有 `Sys*` 实体未统一改为 `Sys*DO`，改动面大，建议独立批次 |
-| 编程规约 | 魔法值清理 | 部分业务数字仍硬编码，逐步收敛常量 |
-| MySQL | 主键 UNSIGNED | 现有 `id BIGINT` 未改为 `BIGINT UNSIGNED`，需要评估迁移影响 |
-| 异常日志 | 外部 SDK 边界 | `SysFileService` 文件对象删除仍保留单点 `catch (Exception)`，避免 SDK 多异常类耦合 |
-| 编程规约 | 魔法值清理 | 少量低频服务仍有业务默认值硬编码，后续随模块重构继续收敛 |
+| 异常日志 | 外部 SDK 边界 | MinIO 删除与文件清理已按 SDK 已知异常精确捕获，不再使用 `catch (Exception)` |
 
 ## 后续建议
 
-- 新增实体统一使用 `DO` 后缀，DTO/VO 保持现有命名
+- 数据库实体统一使用 `DO` 后缀，DTO/VO 保持现有命名
 - 定期用 Ali 规约扫描插件做静态检查
 - 每次数据库变更都通过 Flyway，并同步更新本文档
 - 新错误码需同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包

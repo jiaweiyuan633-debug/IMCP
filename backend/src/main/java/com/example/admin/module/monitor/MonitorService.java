@@ -6,11 +6,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
 import com.example.admin.module.monitor.vo.DashboardStatsVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
-import com.example.admin.module.system.entity.SysLoginLog;
-import com.example.admin.module.system.entity.SysMenu;
-import com.example.admin.module.system.entity.SysOperLog;
-import com.example.admin.module.system.entity.SysRole;
-import com.example.admin.module.ai.entity.AiTask;
+import com.example.admin.module.system.entity.SysLoginLogDO;
+import com.example.admin.module.system.entity.SysMenuDO;
+import com.example.admin.module.system.entity.SysOperLogDO;
+import com.example.admin.module.system.entity.SysRoleDO;
+import com.example.admin.module.ai.entity.AiTaskDO;
 import com.example.admin.module.ai.AiTaskStatus;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
@@ -39,23 +39,23 @@ public class MonitorService {
     private final AiTaskMapper aiTaskMapper;
 
     @DataScope(tables = {"sys_login_log"})
-    public PageResult<SysLoginLog> loginLogPage(long pageNum, long pageSize, String username) {
-        Page<SysLoginLog> page = new Page<>(pageNum, pageSize, false);
-        LambdaQueryWrapper<SysLoginLog> wrapper = new LambdaQueryWrapper<SysLoginLog>()
-                .like(StringUtils.hasText(username), SysLoginLog::getUsername, username)
-                .orderByDesc(SysLoginLog::getId);
-        IPage<SysLoginLog> result = loginLogMapper.selectPage(page, wrapper);
+    public PageResult<SysLoginLogDO> loginLogPage(long pageNum, long pageSize, String username) {
+        Page<SysLoginLogDO> page = new Page<>(pageNum, pageSize, false);
+        LambdaQueryWrapper<SysLoginLogDO> wrapper = new LambdaQueryWrapper<SysLoginLogDO>()
+                .like(StringUtils.hasText(username), SysLoginLogDO::getUsername, username)
+                .orderByDesc(SysLoginLogDO::getId);
+        IPage<SysLoginLogDO> result = loginLogMapper.selectPage(page, wrapper);
         page.setTotal(loginLogMapper.selectCount(wrapper));
         return PageResult.of(result, result.getRecords());
     }
 
     @DataScope(tables = {"sys_oper_log"})
-    public PageResult<SysOperLog> operLogPage(long pageNum, long pageSize, String module) {
-        Page<SysOperLog> page = new Page<>(pageNum, pageSize, false);
-        LambdaQueryWrapper<SysOperLog> wrapper = new LambdaQueryWrapper<SysOperLog>()
-                .like(StringUtils.hasText(module), SysOperLog::getModule, module)
-                .orderByDesc(SysOperLog::getId);
-        IPage<SysOperLog> result = operLogMapper.selectPage(page, wrapper);
+    public PageResult<SysOperLogDO> operLogPage(long pageNum, long pageSize, String module) {
+        Page<SysOperLogDO> page = new Page<>(pageNum, pageSize, false);
+        LambdaQueryWrapper<SysOperLogDO> wrapper = new LambdaQueryWrapper<SysOperLogDO>()
+                .like(StringUtils.hasText(module), SysOperLogDO::getModule, module)
+                .orderByDesc(SysOperLogDO::getId);
+        IPage<SysOperLogDO> result = operLogMapper.selectPage(page, wrapper);
         page.setTotal(operLogMapper.selectCount(wrapper));
         return PageResult.of(result, result.getRecords());
     }
@@ -75,12 +75,12 @@ public class MonitorService {
     @DataScope(tables = {"sys_user", "sys_login_log", "sys_oper_log", "ai_task"})
     public DashboardStatsVo stats() {
         long aiTotal = aiTaskMapper.selectCount(null);
-        long aiSucceeded = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .eq(AiTask::getStatus, AiTaskStatus.SUCCEEDED.name()));
-        long aiFailed = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .eq(AiTask::getStatus, AiTaskStatus.FAILED.name()));
-        long aiRunning = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .in(AiTask::getStatus,
+        long aiSucceeded = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTaskDO>()
+                .eq(AiTaskDO::getStatus, AiTaskStatus.SUCCEEDED.name()));
+        long aiFailed = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTaskDO>()
+                .eq(AiTaskDO::getStatus, AiTaskStatus.FAILED.name()));
+        long aiRunning = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTaskDO>()
+                .in(AiTaskDO::getStatus,
                         AiTaskStatus.PENDING.name(),
                         AiTaskStatus.QUEUED.name(),
                         AiTaskStatus.RUNNING.name()));

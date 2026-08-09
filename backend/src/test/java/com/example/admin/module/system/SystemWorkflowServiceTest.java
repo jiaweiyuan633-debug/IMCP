@@ -1,8 +1,8 @@
 package com.example.admin.module.system;
 
-import com.example.admin.module.system.entity.SysProcessNode;
-import com.example.admin.module.system.entity.SysWorkflow;
-import com.example.admin.module.system.entity.SysWorkflowLog;
+import com.example.admin.module.system.entity.SysProcessNodeDO;
+import com.example.admin.module.system.entity.SysWorkflowDO;
+import com.example.admin.module.system.entity.SysWorkflowLogDO;
 import com.example.admin.module.system.mapper.SysProcessDefMapper;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
@@ -62,15 +62,15 @@ class SystemWorkflowServiceTest {
 
     @Test
     void approveAdvancesToNextNode() {
-        SysWorkflow workflow = new SysWorkflow();
+        SysWorkflowDO workflow = new SysWorkflowDO();
         workflow.setId(1L);
         workflow.setProcessDefId(5L);
         workflow.setStatus(WorkflowStatus.PENDING.name());
         workflow.setCurrentNodeIds("1");
         when(workflowMapper.selectById(1L)).thenReturn(workflow);
 
-        SysProcessNode first = node(1L, 1, "初审");
-        SysProcessNode second = node(2L, 2, "终审");
+        SysProcessNodeDO first = node(1L, 1, "初审");
+        SysProcessNodeDO second = node(2L, 2, "终审");
         when(processNodeMapper.selectById(1L)).thenReturn(first);
         when(processNodeMapper.selectById(2L)).thenReturn(second);
         when(processNodeMapper.selectList(any())).thenReturn(List.of(first, second));
@@ -80,16 +80,16 @@ class SystemWorkflowServiceTest {
             workflowService.approve(1L, 1L, "同意");
         }
 
-        ArgumentCaptor<SysWorkflow> captor = ArgumentCaptor.forClass(SysWorkflow.class);
+        ArgumentCaptor<SysWorkflowDO> captor = ArgumentCaptor.forClass(SysWorkflowDO.class);
         verify(workflowMapper).updateById(captor.capture());
         assertEquals("2", captor.getValue().getCurrentNodeIds());
         assertEquals("终审", captor.getValue().getCurrentNodeName());
-        verify(workflowLogMapper, times(2)).insert(any(SysWorkflowLog.class));
+        verify(workflowLogMapper, times(2)).insert(any(SysWorkflowLogDO.class));
     }
 
     @Test
     void rejectFinishesWorkflow() {
-        SysWorkflow workflow = new SysWorkflow();
+        SysWorkflowDO workflow = new SysWorkflowDO();
         workflow.setId(1L);
         workflow.setStatus(WorkflowStatus.PENDING.name());
         workflow.setCurrentNodeIds("1");
@@ -100,7 +100,7 @@ class SystemWorkflowServiceTest {
             workflowService.reject(1L, "不同意");
         }
 
-        ArgumentCaptor<SysWorkflow> captor = ArgumentCaptor.forClass(SysWorkflow.class);
+        ArgumentCaptor<SysWorkflowDO> captor = ArgumentCaptor.forClass(SysWorkflowDO.class);
         verify(workflowMapper).updateById(captor.capture());
         assertEquals(WorkflowStatus.REJECTED.name(), captor.getValue().getStatus());
         assertNull(captor.getValue().getCurrentNodeIds());
@@ -114,8 +114,8 @@ class SystemWorkflowServiceTest {
                 .build();
     }
 
-    private SysProcessNode node(Long id, int order, String name) {
-        SysProcessNode node = new SysProcessNode();
+    private SysProcessNodeDO node(Long id, int order, String name) {
+        SysProcessNodeDO node = new SysProcessNodeDO();
         node.setId(id);
         node.setNodeOrder(order);
         node.setNodeName(name);

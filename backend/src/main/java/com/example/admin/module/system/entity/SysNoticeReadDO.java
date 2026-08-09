@@ -1,4 +1,4 @@
-package com.example.admin.module.monitor.entity;
+package com.example.admin.module.system.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -8,17 +8,14 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_sql_log")
-public class SysSqlLog {
+@TableName("sys_notice_read")
+public class SysNoticeReadDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long tenantId;
-    private String sqlText;
-    private String method;
-    private Long durationMs;
-    private Integer success;
-    private String errorMsg;
-    private LocalDateTime createdAt;
+    private Long userId;
+    private Long noticeId;
+    private LocalDateTime readTime;
 }
 

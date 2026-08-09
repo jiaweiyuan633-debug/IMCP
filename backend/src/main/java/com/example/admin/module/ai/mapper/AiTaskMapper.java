@@ -2,7 +2,7 @@ package com.example.admin.module.ai.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
-import com.example.admin.module.ai.entity.AiTask;
+import com.example.admin.module.ai.entity.AiTaskDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
-public interface AiTaskMapper extends BaseMapper<AiTask> {
+public interface AiTaskMapper extends BaseMapper<AiTaskDO> {
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
@@ -20,7 +20,7 @@ public interface AiTaskMapper extends BaseMapper<AiTask> {
                    callback_url, created_by, created_at, updated_at
             FROM ai_task WHERE task_no = #{taskNo}
             """)
-    AiTask selectByTaskNoIgnoreTenant(@Param("taskNo") String taskNo);
+    AiTaskDO selectByTaskNoIgnoreTenant(@Param("taskNo") String taskNo);
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("SELECT DISTINCT tenant_id FROM ai_task")
@@ -38,6 +38,6 @@ public interface AiTaskMapper extends BaseMapper<AiTask> {
               AND tenant_id = #{tenantId}
             </script>
             """)
-    List<AiTask> selectTimeoutTasks(@Param("tenantId") Long tenantId, @Param("threshold") LocalDateTime threshold);
+    List<AiTaskDO> selectTimeoutTasks(@Param("tenantId") Long tenantId, @Param("threshold") LocalDateTime threshold);
 }
 

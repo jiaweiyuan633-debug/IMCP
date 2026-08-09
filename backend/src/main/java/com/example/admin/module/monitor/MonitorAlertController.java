@@ -4,7 +4,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.monitor.dto.AlertRuleSaveRequest;
-import com.example.admin.module.monitor.entity.SysAlertRule;
+import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,7 +28,7 @@ public class MonitorAlertController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('monitor:alert:list')")
-    public Result<PageResult<SysAlertRule>> page(
+    public Result<PageResult<SysAlertRuleDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String ruleName,

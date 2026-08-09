@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @TableName("sys_menu")
-public class SysMenu {
+public class SysMenuDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;

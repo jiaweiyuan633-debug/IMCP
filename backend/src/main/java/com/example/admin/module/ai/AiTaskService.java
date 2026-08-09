@@ -10,9 +10,9 @@ import com.example.admin.common.ResultCode;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
 import com.example.admin.module.ai.dto.AiTaskQuery;
-import com.example.admin.module.ai.entity.AiServiceConfig;
-import com.example.admin.module.ai.entity.AiTask;
-import com.example.admin.module.ai.entity.AiTaskResult;
+import com.example.admin.module.ai.entity.AiServiceConfigDO;
+import com.example.admin.module.ai.entity.AiTaskDO;
+import com.example.admin.module.ai.entity.AiTaskResultDO;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
@@ -73,8 +73,8 @@ public class AiTaskService {
 
     @Transactional
     public Long create(AiTaskCreateRequest request) {
-        AiServiceConfig config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfig>()
-                .eq(AiServiceConfig::getCode, request.getServiceCode()));
+        AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
+                .eq(AiServiceConfigDO::getCode, request.getServiceCode()));
         if (config == null || config.getEnabled() == null || config.getEnabled() != 1) {
             throw new BusinessException(ResultCode.AI_CONFIG_UNAVAILABLE);
         }
@@ -92,7 +92,7 @@ public class AiTaskService {
 
         String taskNo = TASK_NO_PREFIX + LocalDateTime.now().format(TASK_NO_FORMATTER)
                 + RandomUtil.randomNumbers(TASK_NO_RANDOM_DIGITS);
-        AiTask task = new AiTask();
+        AiTaskDO task = new AiTaskDO();
         task.setTenantId(TenantContext.getTenantId());
         task.setTaskNo(taskNo);
         task.setBizType(request.getBizType());
@@ -132,27 +132,27 @@ public class AiTaskService {
 
     @DataScope(tables = {"ai_task"})
     public PageResult<AiTaskVo> page(AiTaskQuery query) {
-        Page<AiTask> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
-        LambdaQueryWrapper<AiTask> wrapper = new LambdaQueryWrapper<AiTask>()
-                .eq(StringUtils.hasText(query.getStatus()), AiTask::getStatus, query.getStatus())
-                .eq(StringUtils.hasText(query.getBizType()), AiTask::getBizType, query.getBizType())
-                .orderByDesc(AiTask::getId);
-        IPage<AiTask> result = taskMapper.selectPage(page, wrapper);
+        Page<AiTaskDO> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
+        LambdaQueryWrapper<AiTaskDO> wrapper = new LambdaQueryWrapper<AiTaskDO>()
+                .eq(StringUtils.hasText(query.getStatus()), AiTaskDO::getStatus, query.getStatus())
+                .eq(StringUtils.hasText(query.getBizType()), AiTaskDO::getBizType, query.getBizType())
+                .orderByDesc(AiTaskDO::getId);
+        IPage<AiTaskDO> result = taskMapper.selectPage(page, wrapper);
         page.setTotal(taskMapper.selectCount(wrapper));
         List<AiTaskVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
     }
 
     public AiTaskVo detail(Long id) {
-        AiTask task = taskMapper.selectById(id);
+        AiTaskDO task = taskMapper.selectById(id);
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         checkDataScope(task);
         AiTaskVo vo = toVo(task);
-        AiTaskResult aiTaskResult = resultMapper.selectOne(new LambdaQueryWrapper<AiTaskResult>()
-                .eq(AiTaskResult::getTaskId, id)
-                .orderByDesc(AiTaskResult::getId)
+        AiTaskResultDO aiTaskResult = resultMapper.selectOne(new LambdaQueryWrapper<AiTaskResultDO>()
+                .eq(AiTaskResultDO::getTaskId, id)
+                .orderByDesc(AiTaskResultDO::getId)
                 .last("LIMIT 1"));
         if (aiTaskResult != null) {
             vo.setResult(toResultVo(aiTaskResult));
@@ -161,7 +161,7 @@ public class AiTaskService {
     }
 
     public void cancel(Long id) {
-        AiTask task = taskMapper.selectById(id);
+        AiTaskDO task = taskMapper.selectById(id);
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -176,13 +176,13 @@ public class AiTaskService {
 
     @Transactional
     public void handleCallback(AiCallbackRequest request, String token) {
-        AiTask task = taskMapper.selectByTaskNoIgnoreTenant(request.getTaskNo());
+        AiTaskDO task = taskMapper.selectByTaskNoIgnoreTenant(request.getTaskNo());
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "AI 任务不存在");
         }
         TenantContext.setTenantId(task.getTenantId());
-        AiServiceConfig config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfig>()
-                .eq(AiServiceConfig::getCode, task.getServiceCode()));
+        AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
+                .eq(AiServiceConfigDO::getCode, task.getServiceCode()));
         if (config == null || !StringUtils.hasText(config.getApiKey())
                 || !config.getApiKey().equals(token)) {
             throw new BusinessException(ResultCode.AI_CALLBACK_INVALID);
@@ -205,7 +205,7 @@ public class AiTaskService {
         taskMapper.updateById(task);
 
         if (AiTaskStatus.SUCCEEDED.name().equals(status)) {
-            AiTaskResult result = new AiTaskResult();
+            AiTaskResultDO result = new AiTaskResultDO();
             result.setTenantId(TenantContext.getTenantId());
             result.setTaskId(task.getId());
             result.setResultType(task.getBizType());
@@ -215,7 +215,7 @@ public class AiTaskService {
         }
     }
 
-    private AiTaskVo toVo(AiTask task) {
+    private AiTaskVo toVo(AiTaskDO task) {
         return AiTaskVo.builder()
                 .id(task.getId())
                 .taskNo(task.getTaskNo())
@@ -235,7 +235,7 @@ public class AiTaskService {
                 .build();
     }
 
-    private AiTaskResultVo toResultVo(AiTaskResult result) {
+    private AiTaskResultVo toResultVo(AiTaskResultDO result) {
         return AiTaskResultVo.builder()
                 .id(result.getId())
                 .taskId(result.getTaskId())
@@ -267,7 +267,7 @@ public class AiTaskService {
         }
     }
 
-    private void checkDataScope(AiTask task) {
+    private void checkDataScope(AiTaskDO task) {
         if (dataScopeHelper.isAdmin()) {
             return;
         }

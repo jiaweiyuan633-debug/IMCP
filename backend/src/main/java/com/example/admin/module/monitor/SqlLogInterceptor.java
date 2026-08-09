@@ -31,6 +31,9 @@ import java.util.Properties;
 })
 public class SqlLogInterceptor implements Interceptor {
 
+    private static final int SUCCESS_STATUS = 1;
+    private static final int FAILURE_STATUS = 0;
+
     private final JdbcTemplate jdbcTemplate;
 
     @Value("${app.sql-log-threshold-ms:50}")
@@ -75,7 +78,8 @@ public class SqlLogInterceptor implements Interceptor {
             String error = errorMsg != null && errorMsg.length() > 1000 ? errorMsg.substring(0, 1000) : errorMsg;
             jdbcTemplate.update(
                     "INSERT INTO sys_sql_log (tenant_id, sql_text, method, duration_ms, success, error_msg) VALUES (?, ?, ?, ?, ?, ?)",
-                    TenantContext.getTenantId(), sqlText, method, duration, success ? 1 : 0, error);
+                    TenantContext.getTenantId(), sqlText, method, duration,
+                    success ? SUCCESS_STATUS : FAILURE_STATUS, error);
         } catch (DataAccessException exception) {
             log.warn("Failed to save sql log", exception);
         }

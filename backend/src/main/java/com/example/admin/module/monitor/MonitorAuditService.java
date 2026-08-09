@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
-import com.example.admin.module.system.entity.SysAuditLog;
+import com.example.admin.module.system.entity.SysAuditLogDO;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,13 +23,13 @@ public class MonitorAuditService {
 
     private final SysAuditLogMapper auditLogMapper;
 
-    public PageResult<SysAuditLog> page(long pageNum, long pageSize, String module, Integer status) {
-        Page<SysAuditLog> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<SysAuditLog> wrapper = new LambdaQueryWrapper<SysAuditLog>()
-                .like(StringUtils.hasText(module), SysAuditLog::getModule, module)
-                .eq(status != null, SysAuditLog::getStatus, status)
-                .orderByDesc(SysAuditLog::getId);
-        IPage<SysAuditLog> result = auditLogMapper.selectPage(page, wrapper);
+    public PageResult<SysAuditLogDO> page(long pageNum, long pageSize, String module, Integer status) {
+        Page<SysAuditLogDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysAuditLogDO> wrapper = new LambdaQueryWrapper<SysAuditLogDO>()
+                .like(StringUtils.hasText(module), SysAuditLogDO::getModule, module)
+                .eq(status != null, SysAuditLogDO::getStatus, status)
+                .orderByDesc(SysAuditLogDO::getId);
+        IPage<SysAuditLogDO> result = auditLogMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
@@ -37,13 +37,13 @@ public class MonitorAuditService {
         response.setContentType("text/csv;charset=UTF-8");
         String fileName = URLEncoder.encode("audit-log.csv", StandardCharsets.UTF_8);
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + fileName);
-        List<SysAuditLog> records = auditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLog>()
-                .orderByDesc(SysAuditLog::getId)
+        List<SysAuditLogDO> records = auditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLogDO>()
+                .orderByDesc(SysAuditLogDO::getId)
                 .last("LIMIT 10000"));
         try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
             writer.write("\uFEFF");
             writer.write("id,module,action,userId,status,createdAt\n");
-            for (SysAuditLog record : records) {
+            for (SysAuditLogDO record : records) {
                 writer.write(String.join(",",
                         String.valueOf(record.getId()),
                         safe(record.getModule()),

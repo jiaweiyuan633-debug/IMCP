@@ -4,8 +4,8 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.dto.ProcessDefSaveRequest;
-import com.example.admin.module.system.entity.SysProcessDef;
-import com.example.admin.module.system.entity.SysProcessNode;
+import com.example.admin.module.system.entity.SysProcessDefDO;
+import com.example.admin.module.system.entity.SysProcessNodeDO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,7 +30,7 @@ public class SystemProcessDefController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<PageResult<SysProcessDef>> page(
+    public Result<PageResult<SysProcessDefDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String defName,
@@ -40,13 +40,13 @@ public class SystemProcessDefController {
 
     @GetMapping("/options")
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<List<SysProcessDef>> options() {
+    public Result<List<SysProcessDefDO>> options() {
         return Result.success(processDefService.listOptions());
     }
 
     @GetMapping("/{id}/nodes")
     @PreAuthorize("hasAuthority('system:workflow:list')")
-    public Result<List<SysProcessNode>> nodes(@PathVariable Long id) {
+    public Result<List<SysProcessNodeDO>> nodes(@PathVariable Long id) {
         return Result.success(processDefService.nodes(id));
     }
 

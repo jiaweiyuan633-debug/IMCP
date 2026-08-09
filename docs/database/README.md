@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V27。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V28。
 
 ## 版本记录
 
@@ -33,6 +33,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V25 | TOTP 密钥列扩容以支持加密存储 |
 | V26 | 关联表补齐 `created_at/updated_at` |
 | V27 | 登录日志、操作日志、工作流、AI 任务、公告、定时任务高频查询索引 |
+| V28 | 所有自增主键统一为 `BIGINT UNSIGNED` |
 
 ## 表清单
 

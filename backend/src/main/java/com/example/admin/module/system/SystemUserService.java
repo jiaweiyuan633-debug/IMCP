@@ -9,10 +9,10 @@ import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.UserExcelDTO;
 import com.example.admin.module.system.dto.UserQuery;
 import com.example.admin.module.system.dto.UserSaveRequest;
-import com.example.admin.module.system.entity.SysRole;
-import com.example.admin.module.system.entity.SysDept;
-import com.example.admin.module.system.entity.SysPost;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysRoleDO;
+import com.example.admin.module.system.entity.SysDeptDO;
+import com.example.admin.module.system.entity.SysPostDO;
+import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysDeptMapper;
 import com.example.admin.module.system.mapper.SysPostMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
@@ -21,13 +21,13 @@ import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserPostMapper;
 import com.example.admin.module.system.mapper.SysTenantMapper;
-import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.security.TokenService;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.system.vo.UserVo;
 import com.alibaba.excel.EasyExcel;
-import com.example.admin.module.system.entity.SysConfig;
+import com.example.admin.module.system.entity.SysConfigDO;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -66,36 +66,36 @@ public class SystemUserService {
 
     @DataScope(tables = {"sys_user"})
     public PageResult<UserVo> page(UserQuery query) {
-        Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .like(StringUtils.hasText(query.getUsername()), SysUser::getUsername, query.getUsername())
-                .like(StringUtils.hasText(query.getNickname()), SysUser::getNickname, query.getNickname())
-                .eq(query.getStatus() != null, SysUser::getStatus, query.getStatus())
-                .orderByDesc(SysUser::getId);
-        wrapper.eq(SysUser::getTenantId, TenantContext.getTenantId());
-        IPage<SysUser> result = userMapper.selectPage(page, wrapper);
+        Page<SysUserDO> page = new Page<>(query.getPageNum(), query.getPageSize(), false);
+        LambdaQueryWrapper<SysUserDO> wrapper = new LambdaQueryWrapper<SysUserDO>()
+                .like(StringUtils.hasText(query.getUsername()), SysUserDO::getUsername, query.getUsername())
+                .like(StringUtils.hasText(query.getNickname()), SysUserDO::getNickname, query.getNickname())
+                .eq(query.getStatus() != null, SysUserDO::getStatus, query.getStatus())
+                .orderByDesc(SysUserDO::getId);
+        wrapper.eq(SysUserDO::getTenantId, TenantContext.getTenantId());
+        IPage<SysUserDO> result = userMapper.selectPage(page, wrapper);
         page.setTotal(userMapper.selectCount(wrapper));
-        List<SysUser> users = result.getRecords();
-        List<Long> userIds = users.stream().map(SysUser::getId).toList();
+        List<SysUserDO> users = result.getRecords();
+        List<Long> userIds = users.stream().map(SysUserDO::getId).toList();
         if (userIds.isEmpty()) {
             return PageResult.of(result, List.of());
         }
-        Map<Long, SysDept> deptMap = users.stream()
-                .map(SysUser::getDeptId)
+        Map<Long, SysDeptDO> deptMap = users.stream()
+                .map(SysUserDO::getDeptId)
                 .filter(id -> id != null)
                 .distinct()
                 .toList()
                 .isEmpty() ? Map.of()
-                : deptMapper.selectBatchIds(users.stream().map(SysUser::getDeptId)
+                : deptMapper.selectBatchIds(users.stream().map(SysUserDO::getDeptId)
                         .filter(id -> id != null)
                         .distinct()
                         .toList())
                 .stream()
-                .collect(Collectors.toMap(SysDept::getId, Function.identity()));
+                .collect(Collectors.toMap(SysDeptDO::getId, Function.identity()));
         Map<Long, List<Long>> roleIdsByUser = groupByUser(userRoleMapper.selectByUserIds(userIds), "role_id", "roleId");
         Map<Long, List<Long>> postIdsByUser = groupByUser(userPostMapper.selectByUserIds(userIds), "post_id", "postId");
-        Map<Long, SysRole> roleMap = loadMap(roleIdsByUser, roleMapper::selectBatchIds);
-        Map<Long, SysPost> postMap = loadMap(postIdsByUser, postMapper::selectBatchIds);
+        Map<Long, SysRoleDO> roleMap = loadMap(roleIdsByUser, roleMapper::selectBatchIds);
+        Map<Long, SysPostDO> postMap = loadMap(postIdsByUser, postMapper::selectBatchIds);
         List<UserVo> records = users.stream()
                 .map(user -> toVo(
                         user,
@@ -111,7 +111,7 @@ public class SystemUserService {
     @Transactional
     public Long create(UserSaveRequest request) {
         boolean exists = userMapper.exists(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername().trim()));
+                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, request.getUsername().trim()));
         if (exists) {
             throw new BusinessException(ResultCode.USERNAME_EXISTS);
         }
@@ -119,7 +119,7 @@ public class SystemUserService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
         }
         checkTenantUserLimit();
-        SysUser user = new SysUser();
+        SysUserDO user = new SysUserDO();
         user.setTenantId(TenantContext.getTenantId());
         user.setUsername(request.getUsername().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -143,12 +143,12 @@ public class SystemUserService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户 ID 不能为空");
         }
-        SysUser user = userMapper.selectById(request.getId());
+        SysUserDO user = userMapper.selectById(request.getId());
         if (user == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        SysUser sameName = userMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername().trim()));
+        SysUserDO sameName = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, request.getUsername().trim()));
         if (sameName != null && !sameName.getId().equals(request.getId())) {
             throw new BusinessException(ResultCode.USERNAME_EXISTS);
         }
@@ -180,7 +180,7 @@ public class SystemUserService {
     }
 
     public void updateStatus(Long id, Integer status) {
-        SysUser user = userMapper.selectById(id);
+        SysUserDO user = userMapper.selectById(id);
         if (user == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -211,22 +211,22 @@ public class SystemUserService {
     }
 
     private UserVo toVo(
-            SysUser user,
-            Map<Long, SysDept> deptMap,
+            SysUserDO user,
+            Map<Long, SysDeptDO> deptMap,
             List<Long> roleIds,
             List<Long> postIds,
-            Map<Long, SysRole> roleMap,
-            Map<Long, SysPost> postMap) {
+            Map<Long, SysRoleDO> roleMap,
+            Map<Long, SysPostDO> postMap) {
         List<String> roleNames = roleIds.stream()
                 .map(id -> roleMap.get(id))
                 .filter(role -> role != null)
-                .map(SysRole::getName)
+                .map(SysRoleDO::getName)
                 .toList();
-        SysDept dept = user.getDeptId() == null ? null : deptMap.get(user.getDeptId());
+        SysDeptDO dept = user.getDeptId() == null ? null : deptMap.get(user.getDeptId());
         List<String> postNames = postIds.stream()
                 .map(id -> postMap.get(id))
                 .filter(post -> post != null)
-                .map(SysPost::getPostName)
+                .map(SysPostDO::getPostName)
                 .toList();
         boolean mask = !dataScopeHelper.isAdmin();
         return UserVo.builder()
@@ -282,10 +282,10 @@ public class SystemUserService {
 
     @SuppressWarnings("unchecked")
     private Long entityId(Object entity) {
-        if (entity instanceof SysRole role) {
+        if (entity instanceof SysRoleDO role) {
             return role.getId();
         }
-        if (entity instanceof SysPost post) {
+        if (entity instanceof SysPostDO post) {
             return post.getId();
         }
         throw new IllegalArgumentException("Unsupported entity");
@@ -298,8 +298,8 @@ public class SystemUserService {
 
     @DataScope(tables = {"sys_user"})
     public void exportUsers(HttpServletResponse response) throws IOException {
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .orderByDesc(SysUser::getId);
+        LambdaQueryWrapper<SysUserDO> wrapper = new LambdaQueryWrapper<SysUserDO>()
+                .orderByDesc(SysUserDO::getId);
         boolean mask = !dataScopeHelper.isAdmin();
         List<UserExcelDTO> rows = userMapper.selectList(wrapper).stream().map(user -> {
             UserExcelDTO dto = new UserExcelDTO();
@@ -330,12 +330,12 @@ public class SystemUserService {
             if (row.getUsername() == null || row.getUsername().isBlank()) {
                 continue;
             }
-            boolean exists = userMapper.exists(new LambdaQueryWrapper<SysUser>()
-                    .eq(SysUser::getUsername, row.getUsername().trim()));
+            boolean exists = userMapper.exists(new LambdaQueryWrapper<SysUserDO>()
+                    .eq(SysUserDO::getUsername, row.getUsername().trim()));
             if (exists) {
                 throw new BusinessException(ResultCode.USERNAME_EXISTS.getCode(), "导入失败，用户名已存在：" + row.getUsername());
             }
-            SysUser user = new SysUser();
+            SysUserDO user = new SysUserDO();
             checkTenantUserLimit();
             user.setTenantId(TenantContext.getTenantId());
             user.setUsername(row.getUsername().trim());
@@ -351,21 +351,21 @@ public class SystemUserService {
     }
 
     private String defaultPassword() {
-        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, "sys.user.initPassword"));
+        SysConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<SysConfigDO>()
+                .eq(SysConfigDO::getConfigKey, "sys.user.initPassword"));
         return config == null ? DEFAULT_INIT_PASSWORD : config.getConfigValue();
     }
 
     private void checkTenantUserLimit() {
         Long tenantId = TenantContext.getTenantId();
-        SysTenant tenant = tenantMapper.selectOne(new LambdaQueryWrapper<SysTenant>()
-                .eq(SysTenant::getId, tenantId)
+        SysTenantDO tenant = tenantMapper.selectOne(new LambdaQueryWrapper<SysTenantDO>()
+                .eq(SysTenantDO::getId, tenantId)
                 .last("FOR UPDATE"));
         if (tenant == null || tenant.getUserLimit() == null) {
             return;
         }
-        long current = userMapper.selectCount(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getTenantId, tenantId));
+        long current = userMapper.selectCount(new LambdaQueryWrapper<SysUserDO>()
+                .eq(SysUserDO::getTenantId, tenantId));
         if (current >= tenant.getUserLimit()) {
             throw new BusinessException(ResultCode.TENANT_LIMIT_EXCEEDED);
         }

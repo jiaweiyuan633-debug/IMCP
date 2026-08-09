@@ -3,9 +3,9 @@ package com.example.admin.module.ai;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
-import com.example.admin.module.ai.entity.AiServiceConfig;
-import com.example.admin.module.ai.entity.AiTask;
-import com.example.admin.module.ai.entity.AiTaskResult;
+import com.example.admin.module.ai.entity.AiServiceConfigDO;
+import com.example.admin.module.ai.entity.AiTaskDO;
+import com.example.admin.module.ai.entity.AiTaskResultDO;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
@@ -71,10 +71,10 @@ class AiTaskServiceTest {
         when(configMapper.selectOne(any())).thenReturn(enabledConfig());
         when(aiTaskManager.submit(any(), any(), any(), any(), any())).thenReturn(Map.of());
         doAnswer(invocation -> {
-            AiTask task = invocation.getArgument(0);
+            AiTaskDO task = invocation.getArgument(0);
             task.setId(11L);
             return 1;
-        }).when(taskMapper).insert(any(AiTask.class));
+        }).when(taskMapper).insert(any(AiTaskDO.class));
 
         AiTaskCreateRequest request = new AiTaskCreateRequest();
         request.setBizType("OCR");
@@ -87,20 +87,20 @@ class AiTaskServiceTest {
             assertEquals(11L, id);
         }
 
-        ArgumentCaptor<AiTask> captor = ArgumentCaptor.forClass(AiTask.class);
+        ArgumentCaptor<AiTaskDO> captor = ArgumentCaptor.forClass(AiTaskDO.class);
         verify(taskMapper).updateById(captor.capture());
         assertEquals(AiTaskStatus.QUEUED.name(), captor.getValue().getStatus());
     }
 
     @Test
     void callbackMarksTaskSucceededAndSavesResult() throws Exception {
-        AiTask task = new AiTask();
+        AiTaskDO task = new AiTaskDO();
         task.setId(2L);
         task.setTenantId(3L);
         task.setServiceCode("default");
         task.setStatus(AiTaskStatus.RUNNING.name());
         when(taskMapper.selectByTaskNoIgnoreTenant("T1")).thenReturn(task);
-        AiServiceConfig config = new AiServiceConfig();
+        AiServiceConfigDO config = new AiServiceConfigDO();
         config.setApiKey("secret");
         when(configMapper.selectOne(any())).thenReturn(config);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
@@ -113,15 +113,15 @@ class AiTaskServiceTest {
 
         aiTaskService.handleCallback(request, "secret");
 
-        ArgumentCaptor<AiTask> taskCaptor = ArgumentCaptor.forClass(AiTask.class);
+        ArgumentCaptor<AiTaskDO> taskCaptor = ArgumentCaptor.forClass(AiTaskDO.class);
         verify(taskMapper).updateById(taskCaptor.capture());
         assertEquals(AiTaskStatus.SUCCEEDED.name(), taskCaptor.getValue().getStatus());
         assertEquals(2, taskCaptor.getValue().getRetryCount());
-        verify(resultMapper).insert(any(AiTaskResult.class));
+        verify(resultMapper).insert(any(AiTaskResultDO.class));
     }
 
-    private AiServiceConfig enabledConfig() {
-        AiServiceConfig config = new AiServiceConfig();
+    private AiServiceConfigDO enabledConfig() {
+        AiServiceConfigDO config = new AiServiceConfigDO();
         config.setCode("default");
         config.setEnabled(1);
         return config;

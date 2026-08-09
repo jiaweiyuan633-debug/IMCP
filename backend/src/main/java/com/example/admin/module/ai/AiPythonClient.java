@@ -3,7 +3,7 @@ package com.example.admin.module.ai;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.RequestIdHolder;
 import com.example.admin.common.ResultCode;
-import com.example.admin.module.ai.entity.AiServiceConfig;
+import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -23,7 +23,7 @@ public class AiPythonClient {
     private final RestTemplate restTemplate;
 
     public Map<String, Object> createTask(
-            AiServiceConfig config,
+            AiServiceConfigDO config,
             String taskNo,
             String bizType,
             Map<String, Object> params,

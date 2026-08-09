@@ -5,8 +5,8 @@ import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.monitor.vo.DashboardStatsVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
-import com.example.admin.module.system.entity.SysLoginLog;
-import com.example.admin.module.system.entity.SysOperLog;
+import com.example.admin.module.system.entity.SysLoginLogDO;
+import com.example.admin.module.system.entity.SysOperLogDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,7 +27,7 @@ public class MonitorController {
 
     @GetMapping("/login-log")
     @PreAuthorize("hasAuthority('monitor:login-log:list')")
-    public Result<PageResult<SysLoginLog>> loginLogPage(
+    public Result<PageResult<SysLoginLogDO>> loginLogPage(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String username) {
@@ -36,7 +36,7 @@ public class MonitorController {
 
     @GetMapping("/oper-log")
     @PreAuthorize("hasAuthority('monitor:oper-log:list')")
-    public Result<PageResult<SysOperLog>> operLogPage(
+    public Result<PageResult<SysOperLogDO>> operLogPage(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String module) {

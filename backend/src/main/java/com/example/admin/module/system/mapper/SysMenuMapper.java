@@ -1,7 +1,7 @@
 package com.example.admin.module.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.example.admin.module.system.entity.SysMenu;
+import com.example.admin.module.system.entity.SysMenuDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import java.util.List;
 
 @Mapper
-public interface SysMenuMapper extends BaseMapper<SysMenu> {
+public interface SysMenuMapper extends BaseMapper<SysMenuDO> {
 
     @Select("""
             SELECT DISTINCT m.perm
@@ -45,6 +45,6 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
             ORDER BY sort, id
             """)
     @InterceptorIgnore(tenantLine = "true")
-    List<SysMenu> selectMenusByUserId(@Param("userId") Long userId);
+    List<SysMenuDO> selectMenusByUserId(@Param("userId") Long userId);
 }
 

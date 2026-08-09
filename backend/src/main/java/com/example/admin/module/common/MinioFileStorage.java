@@ -4,9 +4,9 @@ import cn.hutool.core.util.IdUtil;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.common.vo.UploadResponse;
-import com.example.admin.module.system.entity.SysFile;
+import com.example.admin.module.system.entity.SysFileDO;
 import com.example.admin.module.system.mapper.SysFileMapper;
-import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.module.system.mapper.SysTenantMapper;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.FileAccessService;
@@ -67,7 +67,7 @@ public class MinioFileStorage implements FileStorage {
                     .build());
         }
         String url = endpoint + "/" + bucket + "/" + fileName;
-        SysFile sysFile = new SysFile();
+        SysFileDO sysFile = new SysFileDO();
         sysFile.setTenantId(TenantContext.getTenantId());
         sysFile.setFileName(fileName);
         sysFile.setOriginalName(file.getOriginalFilename());
@@ -103,13 +103,13 @@ public class MinioFileStorage implements FileStorage {
 
     private void checkStorageQuota(long size) {
         Long tenantId = TenantContext.getTenantId();
-        SysTenant tenant = tenantMapper.selectById(tenantId);
+        SysTenantDO tenant = tenantMapper.selectById(tenantId);
         if (tenant == null || tenant.getStorageLimitMb() == null) {
             return;
         }
-        List<SysFile> files = fileMapper.selectList(new LambdaQueryWrapper<SysFile>()
-                .eq(SysFile::getTenantId, tenantId));
-        long used = files.stream().mapToLong(SysFile::getSize).sum();
+        List<SysFileDO> files = fileMapper.selectList(new LambdaQueryWrapper<SysFileDO>()
+                .eq(SysFileDO::getTenantId, tenantId));
+        long used = files.stream().mapToLong(SysFileDO::getSize).sum();
         long limit = tenant.getStorageLimitMb() * 1024L * 1024L;
         if (used + size > limit) {
             throw new BusinessException(ResultCode.STORAGE_LIMIT_EXCEEDED);

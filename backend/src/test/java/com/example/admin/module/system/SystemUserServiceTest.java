@@ -2,8 +2,8 @@ package com.example.admin.module.system;
 
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.dto.UserSaveRequest;
-import com.example.admin.module.system.entity.SysTenant;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysTenantDO;
+import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysDeptMapper;
 import com.example.admin.module.system.mapper.SysPostMapper;
@@ -81,10 +81,10 @@ class SystemUserServiceTest {
         when(tenantMapper.selectOne(any())).thenReturn(null);
         when(passwordEncoder.encode("abc12345")).thenReturn("encoded");
         doAnswer(invocation -> {
-            SysUser user = invocation.getArgument(0);
+            SysUserDO user = invocation.getArgument(0);
             user.setId(10L);
             return 1;
-        }).when(userMapper).insert(any(SysUser.class));
+        }).when(userMapper).insert(any(SysUserDO.class));
 
         UserSaveRequest request = new UserSaveRequest();
         request.setUsername("alice");

@@ -1,7 +1,7 @@
 package com.example.admin.module.monitor.job;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.admin.module.monitor.entity.SysJob;
+import com.example.admin.module.monitor.entity.SysJobDO;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -29,15 +29,15 @@ public class SysJobSchedulerService {
 
     @PostConstruct
     public void initJobs() {
-        List<SysJob> jobs = jobMapper.selectList(new LambdaQueryWrapper<SysJob>()
-                .eq(SysJob::getStatus, 1));
-        for (SysJob job : jobs) {
+        List<SysJobDO> jobs = jobMapper.selectList(new LambdaQueryWrapper<SysJobDO>()
+                .eq(SysJobDO::getStatus, 1));
+        for (SysJobDO job : jobs) {
             scheduleJob(job);
         }
         log.info("Loaded {} enabled scheduled jobs", jobs.size());
     }
 
-    public void scheduleJob(SysJob job) {
+    public void scheduleJob(SysJobDO job) {
         JobKey jobKey = jobKey(job);
         try {
             if (scheduler.checkExists(jobKey)) {
@@ -71,7 +71,7 @@ public class SysJobSchedulerService {
         }
     }
 
-    public void pauseJob(SysJob job) {
+    public void pauseJob(SysJobDO job) {
         try {
             scheduler.pauseJob(jobKey(job));
         } catch (SchedulerException | RuntimeException exception) {
@@ -79,7 +79,7 @@ public class SysJobSchedulerService {
         }
     }
 
-    public void resumeJob(SysJob job) {
+    public void resumeJob(SysJobDO job) {
         try {
             scheduler.resumeJob(jobKey(job));
         } catch (SchedulerException | RuntimeException exception) {
@@ -87,7 +87,7 @@ public class SysJobSchedulerService {
         }
     }
 
-    public void deleteJob(SysJob job) {
+    public void deleteJob(SysJobDO job) {
         try {
             scheduler.deleteJob(jobKey(job));
         } catch (SchedulerException | RuntimeException exception) {
@@ -95,7 +95,7 @@ public class SysJobSchedulerService {
         }
     }
 
-    public void runOnce(SysJob job) {
+    public void runOnce(SysJobDO job) {
         try {
             JobKey key = jobKey(job);
             if (!scheduler.checkExists(key)) {
@@ -107,7 +107,7 @@ public class SysJobSchedulerService {
         }
     }
 
-    private JobKey jobKey(SysJob job) {
+    private JobKey jobKey(SysJobDO job) {
         return JobKey.jobKey("job-" + job.getId(), job.getJobGroup());
     }
 }

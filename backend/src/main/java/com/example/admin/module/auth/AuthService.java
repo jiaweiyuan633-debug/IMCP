@@ -13,10 +13,10 @@ import com.example.admin.module.auth.vo.LoginConfigVo;
 import com.example.admin.module.auth.vo.TotpStatusVo;
 import com.example.admin.module.auth.vo.UserInfoVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
-import com.example.admin.module.system.entity.SysLoginLog;
-import com.example.admin.module.system.entity.SysConfig;
-import com.example.admin.module.system.entity.SysMenu;
-import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.entity.SysLoginLogDO;
+import com.example.admin.module.system.entity.SysConfigDO;
+import com.example.admin.module.system.entity.SysMenuDO;
+import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.mapper.SysLoginLogMapper;
 import com.example.admin.module.system.mapper.SysMenuMapper;
@@ -55,6 +55,8 @@ public class AuthService {
     private static final int MAX_LOGIN_FAILURES = 5;
     private static final long RATE_LIMIT_WINDOW_MINUTES = 1;
     private static final long FAILURE_LOCK_MINUTES = 10;
+    private static final int LOGIN_SUCCESS = 1;
+    private static final int LOGIN_FAILURE = 0;
 
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
@@ -78,8 +80,8 @@ public class AuthService {
             throw new BusinessException(ResultCode.CAPTCHA_ERROR);
         }
         String username = request.getUsername().trim();
-        SysUser user = userMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+        SysUserDO user = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, username));
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             saveLoginLog(httpRequest, username, false, "用户名或密码错误");
@@ -126,8 +128,8 @@ public class AuthService {
     }
 
     public LoginConfigVo loginConfig() {
-        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, CAPTCHA_CONFIG_KEY));
+        SysConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<SysConfigDO>()
+                .eq(SysConfigDO::getConfigKey, CAPTCHA_CONFIG_KEY));
         return LoginConfigVo.builder()
                 .captchaEnabled(config != null && Boolean.parseBoolean(config.getConfigValue()))
                 .build();
@@ -141,7 +143,7 @@ public class AuthService {
         }
 
         Long userId = Long.valueOf(claims.getSubject());
-        SysUser user = userMapper.selectById(userId);
+        SysUserDO user = userMapper.selectById(userId);
         if (user != null && user.getTenantId() != null) {
             TenantContext.setTenantId(user.getTenantId());
         }
@@ -179,7 +181,7 @@ public class AuthService {
 
     public UserInfoVo me() {
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        SysUser user = userMapper.selectById(loginUser.getUserId());
+        SysUserDO user = userMapper.selectById(loginUser.getUserId());
         if (user == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
@@ -190,7 +192,7 @@ public class AuthService {
     @Transactional
     public void changePassword(ChangePasswordRequest request) {
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        SysUser user = userMapper.selectById(loginUser.getUserId());
+        SysUserDO user = userMapper.selectById(loginUser.getUserId());
         if (user == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -203,7 +205,7 @@ public class AuthService {
 
     public void updateProfile(ProfileUpdateRequest request) {
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        SysUser user = userMapper.selectById(loginUser.getUserId());
+        SysUserDO user = userMapper.selectById(loginUser.getUserId());
         if (user == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -215,13 +217,13 @@ public class AuthService {
     }
 
     public TotpStatusVo totpStatus() {
-        SysUser user = getCurrentUser();
+        SysUserDO user = getCurrentUser();
         boolean enabled = user.getTotpEnabled() != null && user.getTotpEnabled() == 1;
         return TotpStatusVo.builder().enabled(enabled).build();
     }
 
     public TotpStatusVo setupTotp() {
-        SysUser user = getCurrentUser();
+        SysUserDO user = getCurrentUser();
         String secret = totpService.generateSecret();
         user.setTotpSecret(totpService.encrypt(secret));
         user.setTotpEnabled(0);
@@ -234,7 +236,7 @@ public class AuthService {
     }
 
     public void enableTotp(TotpCodeRequest request) {
-        SysUser user = getCurrentUser();
+        SysUserDO user = getCurrentUser();
         if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
             throw new BusinessException(ResultCode.TOTP_CODE_ERROR);
         }
@@ -243,7 +245,7 @@ public class AuthService {
     }
 
     public void disableTotp(TotpCodeRequest request) {
-        SysUser user = getCurrentUser();
+        SysUserDO user = getCurrentUser();
         if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
             throw new BusinessException(ResultCode.TOTP_CODE_ERROR);
         }
@@ -252,15 +254,15 @@ public class AuthService {
         userMapper.updateById(user);
     }
 
-    private SysUser getCurrentUser() {
-        SysUser user = userMapper.selectById(SecurityUtils.getUserId());
+    private SysUserDO getCurrentUser() {
+        SysUserDO user = userMapper.selectById(SecurityUtils.getUserId());
         if (user == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
         return user;
     }
 
-    private UserInfoVo toUserInfo(SysUser user, List<String> roles, List<String> perms, List<MenuVo> menus) {
+    private UserInfoVo toUserInfo(SysUserDO user, List<String> roles, List<String> perms, List<MenuVo> menus) {
         return UserInfoVo.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -272,13 +274,13 @@ public class AuthService {
                 .build();
     }
 
-    private List<MenuVo> buildMenuTree(List<SysMenu> menus) {
+    private List<MenuVo> buildMenuTree(List<SysMenuDO> menus) {
         return buildChildren(menus, 0L);
     }
 
-    private List<MenuVo> buildChildren(List<SysMenu> menus, Long parentId) {
+    private List<MenuVo> buildChildren(List<SysMenuDO> menus, Long parentId) {
         List<MenuVo> children = new ArrayList<>();
-        for (SysMenu menu : menus) {
+        for (SysMenuDO menu : menus) {
             if (parentId.equals(menu.getParentId())) {
                 children.add(MenuVo.builder()
                         .id(menu.getId())
@@ -308,13 +310,13 @@ public class AuthService {
     }
 
     private void saveLoginLog(HttpServletRequest request, String username, boolean success, String message) {
-        SysLoginLog loginLog = new SysLoginLog();
+        SysLoginLogDO loginLog = new SysLoginLogDO();
         loginLog.setTenantId(TenantContext.getTenantId());
         loginLog.setUsername(username);
         loginLog.setIp(request.getRemoteAddr());
         String userAgent = request.getHeader("User-Agent");
         loginLog.setUserAgent(userAgent != null && userAgent.length() > 255 ? userAgent.substring(0, 255) : userAgent);
-        loginLog.setStatus(success ? 1 : 0);
+        loginLog.setStatus(success ? LOGIN_SUCCESS : LOGIN_FAILURE);
         loginLog.setMessage(message);
         loginLog.setLoginTime(LocalDateTime.now());
         loginLogMapper.insert(loginLog);

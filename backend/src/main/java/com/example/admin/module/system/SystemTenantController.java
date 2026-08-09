@@ -3,7 +3,7 @@ package com.example.admin.module.system;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
-import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.entity.SysTenantDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,7 +25,7 @@ public class SystemTenantController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:tenant:list')")
-    public Result<PageResult<SysTenant>> page(
+    public Result<PageResult<SysTenantDO>> page(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String tenantName) {
@@ -35,14 +35,14 @@ public class SystemTenantController {
     @PostMapping
     @PreAuthorize("hasAuthority('system:tenant:add')")
     @OperLog(module = "租户管理", action = "新增租户")
-    public Result<Long> create(@RequestBody SysTenant tenant) {
+    public Result<Long> create(@RequestBody SysTenantDO tenant) {
         return Result.success(tenantService.create(tenant));
     }
 
     @PutMapping
     @PreAuthorize("hasAuthority('system:tenant:edit')")
     @OperLog(module = "租户管理", action = "编辑租户")
-    public Result<Void> update(@RequestBody SysTenant tenant) {
+    public Result<Void> update(@RequestBody SysTenantDO tenant) {
         tenantService.update(tenant);
         return Result.success();
     }

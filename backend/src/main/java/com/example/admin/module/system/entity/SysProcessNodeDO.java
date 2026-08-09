@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("sys_process_node")
-public class SysProcessNode {
+public class SysProcessNodeDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;

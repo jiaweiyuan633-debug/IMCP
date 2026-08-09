@@ -8,8 +8,8 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.monitor.dto.JobQuery;
 import com.example.admin.module.monitor.dto.JobSaveRequest;
-import com.example.admin.module.monitor.entity.SysJob;
-import com.example.admin.module.monitor.entity.SysJobLog;
+import com.example.admin.module.monitor.entity.SysJobDO;
+import com.example.admin.module.monitor.entity.SysJobLogDO;
 import com.example.admin.module.monitor.job.SysJobSchedulerService;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
@@ -34,19 +34,19 @@ public class MonitorJobService {
     private final SysJobLogMapper jobLogMapper;
     private final SysJobSchedulerService schedulerService;
 
-    public PageResult<SysJob> page(JobQuery query) {
-        Page<SysJob> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysJob> wrapper = new LambdaQueryWrapper<SysJob>()
-                .like(StringUtils.hasText(query.getJobName()), SysJob::getJobName, query.getJobName())
-                .like(StringUtils.hasText(query.getJobGroup()), SysJob::getJobGroup, query.getJobGroup())
-                .eq(query.getStatus() != null, SysJob::getStatus, query.getStatus())
-                .orderByDesc(SysJob::getId);
-        IPage<SysJob> result = jobMapper.selectPage(page, wrapper);
+    public PageResult<SysJobDO> page(JobQuery query) {
+        Page<SysJobDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysJobDO> wrapper = new LambdaQueryWrapper<SysJobDO>()
+                .like(StringUtils.hasText(query.getJobName()), SysJobDO::getJobName, query.getJobName())
+                .like(StringUtils.hasText(query.getJobGroup()), SysJobDO::getJobGroup, query.getJobGroup())
+                .eq(query.getStatus() != null, SysJobDO::getStatus, query.getStatus())
+                .orderByDesc(SysJobDO::getId);
+        IPage<SysJobDO> result = jobMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
     public Long create(JobSaveRequest request) {
-        SysJob job = toEntity(request);
+        SysJobDO job = toEntity(request);
         job.setCreatedBy(tryGetUserId());
         jobMapper.insert(job);
         if (job.getStatus() != null && job.getStatus() == ENABLED) {
@@ -59,7 +59,7 @@ public class MonitorJobService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "任务 ID 不能为空");
         }
-        SysJob job = toEntity(request);
+        SysJobDO job = toEntity(request);
         jobMapper.updateById(job);
         if (job.getStatus() != null && job.getStatus() == ENABLED) {
             schedulerService.scheduleJob(job);
@@ -70,7 +70,7 @@ public class MonitorJobService {
 
     @Transactional
     public void delete(Long id) {
-        SysJob job = jobMapper.selectById(id);
+        SysJobDO job = jobMapper.selectById(id);
         if (job == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -79,7 +79,7 @@ public class MonitorJobService {
     }
 
     public void changeStatus(Long id, Integer status) {
-        SysJob job = jobMapper.selectById(id);
+        SysJobDO job = jobMapper.selectById(id);
         if (job == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
@@ -93,24 +93,24 @@ public class MonitorJobService {
     }
 
     public void runOnce(Long id) {
-        SysJob job = jobMapper.selectById(id);
+        SysJobDO job = jobMapper.selectById(id);
         if (job == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         schedulerService.runOnce(job);
     }
 
-    public PageResult<SysJobLog> logPage(long pageNum, long pageSize, String jobName) {
-        Page<SysJobLog> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<SysJobLog> wrapper = new LambdaQueryWrapper<SysJobLog>()
-                .like(StringUtils.hasText(jobName), SysJobLog::getJobName, jobName)
-                .orderByDesc(SysJobLog::getId);
-        IPage<SysJobLog> result = jobLogMapper.selectPage(page, wrapper);
+    public PageResult<SysJobLogDO> logPage(long pageNum, long pageSize, String jobName) {
+        Page<SysJobLogDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysJobLogDO> wrapper = new LambdaQueryWrapper<SysJobLogDO>()
+                .like(StringUtils.hasText(jobName), SysJobLogDO::getJobName, jobName)
+                .orderByDesc(SysJobLogDO::getId);
+        IPage<SysJobLogDO> result = jobLogMapper.selectPage(page, wrapper);
         return PageResult.of(result, result.getRecords());
     }
 
-    private SysJob toEntity(JobSaveRequest request) {
-        SysJob job = new SysJob();
+    private SysJobDO toEntity(JobSaveRequest request) {
+        SysJobDO job = new SysJobDO();
         job.setId(request.getId());
         job.setJobName(request.getJobName());
         job.setJobGroup(request.getJobGroup());

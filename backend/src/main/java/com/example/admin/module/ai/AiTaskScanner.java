@@ -1,7 +1,7 @@
 package com.example.admin.module.ai;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.admin.module.ai.entity.AiTask;
+import com.example.admin.module.ai.entity.AiTaskDO;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +29,8 @@ public class AiTaskScanner {
         for (Long tenantId : tenantIds) {
             TenantContext.setTenantId(tenantId);
             try {
-                List<AiTask> tasks = taskMapper.selectTimeoutTasks(tenantId, threshold);
-                for (AiTask task : tasks) {
+                List<AiTaskDO> tasks = taskMapper.selectTimeoutTasks(tenantId, threshold);
+                for (AiTaskDO task : tasks) {
                     task.setStatus(AiTaskStatus.FAILED.name());
                     task.setErrorMsg(TIMEOUT_ERROR_MESSAGE);
                     task.setUpdatedAt(LocalDateTime.now());

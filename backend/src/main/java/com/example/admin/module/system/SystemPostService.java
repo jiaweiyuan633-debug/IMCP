@@ -8,7 +8,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.PostQuery;
 import com.example.admin.module.system.dto.PostSaveRequest;
-import com.example.admin.module.system.entity.SysPost;
+import com.example.admin.module.system.entity.SysPostDO;
 import com.example.admin.module.system.mapper.SysPostMapper;
 import com.example.admin.module.system.vo.PostOptionVo;
 import com.example.admin.module.system.vo.PostVo;
@@ -28,22 +28,22 @@ public class SystemPostService {
     private final SysPostMapper postMapper;
 
     public PageResult<PostVo> page(PostQuery query) {
-        Page<SysPost> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysPost> wrapper = new LambdaQueryWrapper<SysPost>()
-                .like(StringUtils.hasText(query.getPostCode()), SysPost::getPostCode, query.getPostCode())
-                .like(StringUtils.hasText(query.getPostName()), SysPost::getPostName, query.getPostName())
-                .eq(query.getStatus() != null, SysPost::getStatus, query.getStatus())
-                .orderByAsc(SysPost::getSort)
-                .orderByAsc(SysPost::getId);
-        IPage<SysPost> result = postMapper.selectPage(page, wrapper);
+        Page<SysPostDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysPostDO> wrapper = new LambdaQueryWrapper<SysPostDO>()
+                .like(StringUtils.hasText(query.getPostCode()), SysPostDO::getPostCode, query.getPostCode())
+                .like(StringUtils.hasText(query.getPostName()), SysPostDO::getPostName, query.getPostName())
+                .eq(query.getStatus() != null, SysPostDO::getStatus, query.getStatus())
+                .orderByAsc(SysPostDO::getSort)
+                .orderByAsc(SysPostDO::getId);
+        IPage<SysPostDO> result = postMapper.selectPage(page, wrapper);
         List<PostVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
     }
 
     public List<PostOptionVo> options() {
-        return postMapper.selectList(new LambdaQueryWrapper<SysPost>()
-                        .eq(SysPost::getStatus, ENABLED)
-                        .orderByAsc(SysPost::getSort))
+        return postMapper.selectList(new LambdaQueryWrapper<SysPostDO>()
+                        .eq(SysPostDO::getStatus, ENABLED)
+                        .orderByAsc(SysPostDO::getSort))
                 .stream()
                 .map(post -> PostOptionVo.builder()
                         .id(post.getId())
@@ -55,7 +55,7 @@ public class SystemPostService {
 
     public Long create(PostSaveRequest request) {
         checkCodeUnique(request.getPostCode(), null);
-        SysPost post = toEntity(request);
+        SysPostDO post = toEntity(request);
         postMapper.insert(post);
         return post.getId();
     }
@@ -73,15 +73,15 @@ public class SystemPostService {
     }
 
     private void checkCodeUnique(String postCode, Long excludeId) {
-        SysPost exists = postMapper.selectOne(new LambdaQueryWrapper<SysPost>()
-                .eq(SysPost::getPostCode, postCode.trim()));
+        SysPostDO exists = postMapper.selectOne(new LambdaQueryWrapper<SysPostDO>()
+                .eq(SysPostDO::getPostCode, postCode.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
             throw new BusinessException(ResultCode.POST_CODE_EXISTS);
         }
     }
 
-    private SysPost toEntity(PostSaveRequest request) {
-        SysPost post = new SysPost();
+    private SysPostDO toEntity(PostSaveRequest request) {
+        SysPostDO post = new SysPostDO();
         post.setId(request.getId());
         post.setPostCode(request.getPostCode().trim());
         post.setPostName(request.getPostName());
@@ -91,7 +91,7 @@ public class SystemPostService {
         return post;
     }
 
-    private PostVo toVo(SysPost post) {
+    private PostVo toVo(SysPostDO post) {
         return PostVo.builder()
                 .id(post.getId())
                 .postCode(post.getPostCode())

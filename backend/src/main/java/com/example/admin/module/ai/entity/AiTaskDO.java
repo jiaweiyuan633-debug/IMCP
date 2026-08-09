@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("ai_task")
-public class AiTask {
+public class AiTaskDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;

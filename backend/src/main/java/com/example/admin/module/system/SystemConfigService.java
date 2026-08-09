@@ -8,7 +8,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.ConfigQuery;
 import com.example.admin.module.system.dto.ConfigSaveRequest;
-import com.example.admin.module.system.entity.SysConfig;
+import com.example.admin.module.system.entity.SysConfigDO;
 import com.example.admin.module.system.mapper.SysConfigMapper;
 import com.example.admin.module.system.vo.ConfigVo;
 import lombok.RequiredArgsConstructor;
@@ -28,27 +28,27 @@ public class SystemConfigService {
     private final SysConfigMapper configMapper;
 
     public PageResult<ConfigVo> page(ConfigQuery query) {
-        Page<SysConfig> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysConfig> wrapper = new LambdaQueryWrapper<SysConfig>()
-                .like(StringUtils.hasText(query.getConfigName()), SysConfig::getConfigName, query.getConfigName())
-                .like(StringUtils.hasText(query.getConfigKey()), SysConfig::getConfigKey, query.getConfigKey())
-                .orderByAsc(SysConfig::getId);
-        IPage<SysConfig> result = configMapper.selectPage(page, wrapper);
+        Page<SysConfigDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysConfigDO> wrapper = new LambdaQueryWrapper<SysConfigDO>()
+                .like(StringUtils.hasText(query.getConfigName()), SysConfigDO::getConfigName, query.getConfigName())
+                .like(StringUtils.hasText(query.getConfigKey()), SysConfigDO::getConfigKey, query.getConfigKey())
+                .orderByAsc(SysConfigDO::getId);
+        IPage<SysConfigDO> result = configMapper.selectPage(page, wrapper);
         List<ConfigVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
     }
 
     @Cacheable(value = "configs", key = "#configKey")
     public String getByKey(String configKey) {
-        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, configKey));
+        SysConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<SysConfigDO>()
+                .eq(SysConfigDO::getConfigKey, configKey));
         return config == null ? null : config.getConfigValue();
     }
 
     @CacheEvict(value = "configs", allEntries = true)
     public Long create(ConfigSaveRequest request) {
         checkKeyUnique(request.getConfigKey(), null);
-        SysConfig config = toEntity(request);
+        SysConfigDO config = toEntity(request);
         configMapper.insert(config);
         return config.getId();
     }
@@ -68,15 +68,15 @@ public class SystemConfigService {
     }
 
     private void checkKeyUnique(String configKey, Long excludeId) {
-        SysConfig exists = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, configKey.trim()));
+        SysConfigDO exists = configMapper.selectOne(new LambdaQueryWrapper<SysConfigDO>()
+                .eq(SysConfigDO::getConfigKey, configKey.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
             throw new BusinessException(ResultCode.CONFIG_KEY_EXISTS);
         }
     }
 
-    private SysConfig toEntity(ConfigSaveRequest request) {
-        SysConfig config = new SysConfig();
+    private SysConfigDO toEntity(ConfigSaveRequest request) {
+        SysConfigDO config = new SysConfigDO();
         config.setId(request.getId());
         config.setConfigName(request.getConfigName());
         config.setConfigKey(request.getConfigKey().trim());
@@ -86,7 +86,7 @@ public class SystemConfigService {
         return config;
     }
 
-    private ConfigVo toVo(SysConfig config) {
+    private ConfigVo toVo(SysConfigDO config) {
         return ConfigVo.builder()
                 .id(config.getId())
                 .configName(config.getConfigName())

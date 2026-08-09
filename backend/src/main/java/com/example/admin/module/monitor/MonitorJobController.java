@@ -5,8 +5,8 @@ import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.monitor.dto.JobQuery;
 import com.example.admin.module.monitor.dto.JobSaveRequest;
-import com.example.admin.module.monitor.entity.SysJob;
-import com.example.admin.module.monitor.entity.SysJobLog;
+import com.example.admin.module.monitor.entity.SysJobDO;
+import com.example.admin.module.monitor.entity.SysJobLogDO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,7 +29,7 @@ public class MonitorJobController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('monitor:job:list')")
-    public Result<PageResult<SysJob>> page(JobQuery query) {
+    public Result<PageResult<SysJobDO>> page(JobQuery query) {
         return Result.success(jobService.page(query));
     }
 
@@ -74,7 +74,7 @@ public class MonitorJobController {
 
     @GetMapping("/log")
     @PreAuthorize("hasAuthority('monitor:job:list')")
-    public Result<PageResult<SysJobLog>> logPage(
+    public Result<PageResult<SysJobLogDO>> logPage(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String jobName) {

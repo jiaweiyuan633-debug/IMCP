@@ -8,17 +8,17 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_workflow_log")
-public class SysWorkflowLog {
+@TableName("sys_login_log")
+public class SysLoginLogDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long tenantId;
-    private Long workflowId;
-    private String action;
-    private Long operatorId;
-    private String operatorName;
-    private String remark;
-    private LocalDateTime createdAt;
+    private String username;
+    private String ip;
+    private String userAgent;
+    private Integer status;
+    private String message;
+    private LocalDateTime loginTime;
 }
 

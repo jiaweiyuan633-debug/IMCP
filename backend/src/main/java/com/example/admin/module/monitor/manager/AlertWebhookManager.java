@@ -1,6 +1,6 @@
 package com.example.admin.module.monitor.manager;
 
-import com.example.admin.module.monitor.entity.SysAlertRule;
+import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ public class AlertWebhookManager {
 
     private final RestTemplate restTemplate;
 
-    public void send(SysAlertRule rule, String severity, double value) {
+    public void send(SysAlertRuleDO rule, String severity, double value) {
         if (rule.getWebhookUrl() == null || rule.getWebhookUrl().isBlank()) {
             return;
         }

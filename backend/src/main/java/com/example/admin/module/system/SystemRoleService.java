@@ -8,7 +8,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.RoleQuery;
 import com.example.admin.module.system.dto.RoleSaveRequest;
-import com.example.admin.module.system.entity.SysRole;
+import com.example.admin.module.system.entity.SysRoleDO;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysRoleMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleDeptMapper;
@@ -37,22 +37,22 @@ public class SystemRoleService {
     private final TokenService tokenService;
 
     public PageResult<RoleVo> page(RoleQuery query) {
-        Page<SysRole> page = new Page<>(query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<SysRole>()
-                .like(StringUtils.hasText(query.getCode()), SysRole::getCode, query.getCode())
-                .like(StringUtils.hasText(query.getName()), SysRole::getName, query.getName())
-                .eq(query.getStatus() != null, SysRole::getStatus, query.getStatus())
-                .orderByAsc(SysRole::getSort)
-                .orderByAsc(SysRole::getId);
-        IPage<SysRole> result = roleMapper.selectPage(page, wrapper);
+        Page<SysRoleDO> page = new Page<>(query.getPageNum(), query.getPageSize());
+        LambdaQueryWrapper<SysRoleDO> wrapper = new LambdaQueryWrapper<SysRoleDO>()
+                .like(StringUtils.hasText(query.getCode()), SysRoleDO::getCode, query.getCode())
+                .like(StringUtils.hasText(query.getName()), SysRoleDO::getName, query.getName())
+                .eq(query.getStatus() != null, SysRoleDO::getStatus, query.getStatus())
+                .orderByAsc(SysRoleDO::getSort)
+                .orderByAsc(SysRoleDO::getId);
+        IPage<SysRoleDO> result = roleMapper.selectPage(page, wrapper);
         List<RoleVo> records = result.getRecords().stream().map(this::toVo).toList();
         return PageResult.of(result, records);
     }
 
     public List<RoleOptionVo> options() {
-        return roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                        .eq(SysRole::getStatus, ENABLED)
-                        .orderByAsc(SysRole::getSort))
+        return roleMapper.selectList(new LambdaQueryWrapper<SysRoleDO>()
+                        .eq(SysRoleDO::getStatus, ENABLED)
+                        .orderByAsc(SysRoleDO::getSort))
                 .stream()
                 .map(role -> RoleOptionVo.builder()
                         .id(role.getId())
@@ -65,11 +65,11 @@ public class SystemRoleService {
     @Transactional
     public Long create(RoleSaveRequest request) {
         boolean exists = roleMapper.exists(
-                new LambdaQueryWrapper<SysRole>().eq(SysRole::getCode, request.getCode().trim()));
+                new LambdaQueryWrapper<SysRoleDO>().eq(SysRoleDO::getCode, request.getCode().trim()));
         if (exists) {
             throw new BusinessException(ResultCode.ROLE_CODE_EXISTS);
         }
-        SysRole role = toEntity(request);
+        SysRoleDO role = toEntity(request);
         roleMapper.insert(role);
         if (request.getMenuIds() != null) {
             assignMenus(role.getId(), request.getMenuIds());
@@ -85,12 +85,12 @@ public class SystemRoleService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "角色 ID 不能为空");
         }
-        SysRole role = roleMapper.selectById(request.getId());
+        SysRoleDO role = roleMapper.selectById(request.getId());
         if (role == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        SysRole sameCode = roleMapper.selectOne(
-                new LambdaQueryWrapper<SysRole>().eq(SysRole::getCode, request.getCode().trim()));
+        SysRoleDO sameCode = roleMapper.selectOne(
+                new LambdaQueryWrapper<SysRoleDO>().eq(SysRoleDO::getCode, request.getCode().trim()));
         if (sameCode != null && !sameCode.getId().equals(request.getId())) {
             throw new BusinessException(ResultCode.ROLE_CODE_EXISTS);
         }
@@ -134,8 +134,8 @@ public class SystemRoleService {
         roleDeptMapper.insertBatch(roleId, deptIds);
     }
 
-    private SysRole toEntity(RoleSaveRequest request) {
-        SysRole role = new SysRole();
+    private SysRoleDO toEntity(RoleSaveRequest request) {
+        SysRoleDO role = new SysRoleDO();
         role.setCode(request.getCode().trim());
         role.setName(request.getName());
         role.setDescription(request.getDescription());
@@ -145,7 +145,7 @@ public class SystemRoleService {
         return role;
     }
 
-    private RoleVo toVo(SysRole role) {
+    private RoleVo toVo(SysRoleDO role) {
         List<Long> menuIds = roleMenuMapper.selectMenuIdsByRoleId(role.getId());
         return RoleVo.builder()
                 .id(role.getId())
