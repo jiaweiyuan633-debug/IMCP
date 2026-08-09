@@ -76,10 +76,7 @@ public class SystemNoticeService {
     }
 
     public void markAllRead(Long userId) {
-        List<SysNotice> notices = latest(100);
-        for (SysNotice notice : notices) {
-            noticeReadMapper.markRead(TenantContext.getTenantId(), userId, notice.getId());
-        }
+        noticeReadMapper.markAllRead(TenantContext.getTenantId(), userId);
     }
 
     private Long tryGetUserId() {

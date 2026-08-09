@@ -295,12 +295,13 @@ public class SystemUserService {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .orderByDesc(SysUser::getId);
         dataScopeHelper.apply(wrapper);
+        boolean mask = !dataScopeHelper.isAdmin();
         List<UserExcelDTO> rows = userMapper.selectList(wrapper).stream().map(user -> {
             UserExcelDTO dto = new UserExcelDTO();
             dto.setUsername(user.getUsername());
             dto.setNickname(user.getNickname());
-            dto.setEmail(user.getEmail());
-            dto.setPhone(user.getPhone());
+            dto.setEmail(mask ? maskEmail(user.getEmail()) : user.getEmail());
+            dto.setPhone(mask ? maskPhone(user.getPhone()) : user.getPhone());
             dto.setStatus(user.getStatus());
             return dto;
         }).toList();

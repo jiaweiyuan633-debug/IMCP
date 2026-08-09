@@ -1,0 +1,1 @@
+ALTER TABLE sys_user MODIFY COLUMN totp_secret VARCHAR(255) NULL;

@@ -85,7 +85,7 @@ public class AuthService {
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
         if (user.getTotpEnabled() != null && user.getTotpEnabled() == 1
-                && !totpService.verify(user.getTotpSecret(), request.getTotpCode())) {
+                && !totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getTotpCode())) {
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
         redisTemplate.delete("login:fail:" + username);
@@ -216,7 +216,7 @@ public class AuthService {
     public TotpStatusVo setupTotp() {
         SysUser user = getCurrentUser();
         String secret = totpService.generateSecret();
-        user.setTotpSecret(secret);
+        user.setTotpSecret(totpService.encrypt(secret));
         user.setTotpEnabled(0);
         userMapper.updateById(user);
         return TotpStatusVo.builder()
@@ -228,7 +228,7 @@ public class AuthService {
 
     public void enableTotp(TotpCodeRequest request) {
         SysUser user = getCurrentUser();
-        if (!totpService.verify(user.getTotpSecret(), request.getCode())) {
+        if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
         }
         user.setTotpEnabled(1);
@@ -237,7 +237,7 @@ public class AuthService {
 
     public void disableTotp(TotpCodeRequest request) {
         SysUser user = getCurrentUser();
-        if (!totpService.verify(user.getTotpSecret(), request.getCode())) {
+        if (!totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getCode())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
         }
         user.setTotpSecret(null);

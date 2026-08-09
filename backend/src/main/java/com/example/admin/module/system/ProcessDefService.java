@@ -10,8 +10,10 @@ import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.dto.ProcessDefSaveRequest;
 import com.example.admin.module.system.entity.SysProcessDef;
 import com.example.admin.module.system.entity.SysProcessNode;
+import com.example.admin.module.system.entity.SysWorkflow;
 import com.example.admin.module.system.mapper.SysProcessDefMapper;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
+import com.example.admin.module.system.mapper.SysWorkflowMapper;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class ProcessDefService {
 
     private final SysProcessDefMapper defMapper;
     private final SysProcessNodeMapper nodeMapper;
+    private final SysWorkflowMapper workflowMapper;
 
     public PageResult<SysProcessDef> page(long pageNum, long pageSize, String defName, Integer status) {
         Page<SysProcessDef> page = new Page<>(pageNum, pageSize);
@@ -72,6 +75,7 @@ public class ProcessDefService {
         if (def == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
+        ensureNoActiveInstances(def.getId());
         def.setDefName(request.getDefName());
         def.setDefKey(request.getDefKey());
         def.setDescription(request.getDescription());
@@ -85,6 +89,7 @@ public class ProcessDefService {
 
     @Transactional
     public void delete(Long id) {
+        ensureNoActiveInstances(id);
         nodeMapper.delete(new LambdaQueryWrapper<SysProcessNode>()
                 .eq(SysProcessNode::getProcessDefId, id));
         defMapper.deleteById(id);
@@ -105,6 +110,15 @@ public class ProcessDefService {
             node.setApproverRoleId(item.getApproverRoleId());
             nodeMapper.insert(node);
             order++;
+        }
+    }
+
+    private void ensureNoActiveInstances(Long defId) {
+        long active = workflowMapper.selectCount(new LambdaQueryWrapper<SysWorkflow>()
+                .eq(SysWorkflow::getProcessDefId, defId)
+                .eq(SysWorkflow::getStatus, "PENDING"));
+        if (active > 0) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "存在运行中的流程实例，不能修改或删除流程定义");
         }
     }
 

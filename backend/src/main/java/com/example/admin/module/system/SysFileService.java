@@ -9,6 +9,7 @@ import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
+import com.example.admin.common.FileAccessService;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.nio.file.Paths;
 public class SysFileService {
 
     private final SysFileMapper fileMapper;
+    private final FileAccessService fileAccessService;
 
     @Value("${app.upload-path:uploads}")
     private String uploadPath;
@@ -50,6 +52,7 @@ public class SysFileService {
                 .eq(StringUtils.hasText(storageType), SysFile::getStorageType, storageType)
                 .orderByDesc(SysFile::getId);
         IPage<SysFile> result = fileMapper.selectPage(page, wrapper);
+        result.getRecords().forEach(file -> file.setAccessToken(fileAccessService.issue(file.getUrl())));
         return PageResult.of(result, result.getRecords());
     }
 
@@ -65,7 +68,10 @@ public class SysFileService {
     private void deleteObject(SysFile file) {
         try {
             if ("minio".equalsIgnoreCase(file.getStorageType())) {
-                String object = file.getUrl().substring(file.getUrl().lastIndexOf('/') + 1);
+                String object = file.getObjectKey();
+                if (object == null || object.isBlank()) {
+                    object = file.getUrl().substring(file.getUrl().lastIndexOf('/') + 1);
+                }
                 MinioClient client = MinioClient.builder()
                         .endpoint(minioEndpoint)
                         .credentials(minioAccessKey, minioSecretKey)

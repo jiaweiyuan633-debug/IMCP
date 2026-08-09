@@ -142,6 +142,7 @@ public class AiTaskService {
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
+        checkDataScope(task);
         AiTaskVo vo = toVo(task);
         AiTaskResult aiTaskResult = resultMapper.selectOne(new LambdaQueryWrapper<AiTaskResult>()
                 .eq(AiTaskResult::getTaskId, id)
@@ -158,6 +159,7 @@ public class AiTaskService {
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
+        checkDataScope(task);
         if (isTerminal(task.getStatus())) {
             return;
         }
@@ -168,11 +170,11 @@ public class AiTaskService {
 
     @Transactional
     public void handleCallback(AiCallbackRequest request, String token) {
-        AiTask task = taskMapper.selectOne(new LambdaQueryWrapper<AiTask>()
-                .eq(AiTask::getTaskNo, request.getTaskNo()));
+        AiTask task = taskMapper.selectByTaskNoIgnoreTenant(request.getTaskNo());
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "AI 任务不存在");
         }
+        TenantContext.setTenantId(task.getTenantId());
         AiServiceConfig config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfig>()
                 .eq(AiServiceConfig::getCode, task.getServiceCode()));
         if (config == null || !StringUtils.hasText(config.getApiKey())
@@ -256,6 +258,19 @@ public class AiTaskService {
             return SecurityUtils.getUserId();
         } catch (Exception exception) {
             return null;
+        }
+    }
+
+    private void checkDataScope(AiTask task) {
+        if (dataScopeHelper.isAdmin()) {
+            return;
+        }
+        List<Long> allowedUserIds = dataScopeHelper.allowedUserIds();
+        if (allowedUserIds == null) {
+            return;
+        }
+        if (task.getCreatedBy() == null || !allowedUserIds.contains(task.getCreatedBy())) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
         }
     }
 

@@ -13,7 +13,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'originalName'">
-          <a :href="record.url" target="_blank" rel="noopener">{{ record.originalName || record.fileName }}</a>
+          <a :href="withToken(record.url, record.accessToken)" target="_blank" rel="noopener">{{ record.originalName || record.fileName }}</a>
         </template>
         <template v-else-if="column.key === 'size'">
           {{ formatSize(record.size) }}
@@ -128,9 +128,16 @@ function isImage(url: string): boolean {
 }
 
 function openPreview(record: FileVo) {
-  previewUrl.value = record.url
+  previewUrl.value = withToken(record.url, record.accessToken)
   previewName.value = record.originalName || record.fileName
   previewOpen.value = true
+}
+
+function withToken(url: string, token?: string): string {
+  if (!token) {
+    return url
+  }
+  return `${url}?token=${encodeURIComponent(token)}`
 }
 
 function onDelete(record: FileVo) {

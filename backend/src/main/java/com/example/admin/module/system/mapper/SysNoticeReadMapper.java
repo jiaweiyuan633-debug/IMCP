@@ -13,5 +13,14 @@ public interface SysNoticeReadMapper extends BaseMapper<SysNoticeRead> {
     @InterceptorIgnore(tenantLine = "true")
     @Insert("INSERT IGNORE INTO sys_notice_read (tenant_id, user_id, notice_id) VALUES (#{tenantId}, #{userId}, #{noticeId})")
     int markRead(@Param("tenantId") Long tenantId, @Param("userId") Long userId, @Param("noticeId") Long noticeId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Insert("""
+            INSERT IGNORE INTO sys_notice_read (tenant_id, user_id, notice_id, read_time)
+            SELECT #{tenantId}, #{userId}, id, NOW()
+            FROM sys_notice
+            WHERE status = 1 AND tenant_id = #{tenantId}
+            """)
+    int markAllRead(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 }
 

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,8 @@ public class SysTenant {
     private Integer userLimit;
     private Long storageLimitMb;
     private Long adminUserId;
+    @TableField(exist = false)
+    private Boolean clearAdminUserId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long updatedBy;

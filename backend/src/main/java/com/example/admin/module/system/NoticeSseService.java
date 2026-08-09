@@ -3,6 +3,8 @@ package com.example.admin.module.system;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.List;
@@ -14,6 +16,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class NoticeSseService {
 
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    public NoticeSseService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     public SseEmitter connect(Long userId) {
         SseEmitter emitter = new SseEmitter(0L);
@@ -25,6 +34,15 @@ public class NoticeSseService {
     }
 
     public void publishAll(Object payload) {
+        publishLocal(payload);
+        try {
+            redisTemplate.convertAndSend("notice:sse", objectMapper.writeValueAsString(payload));
+        } catch (Exception exception) {
+            log.warn("Failed to broadcast notice to redis", exception);
+        }
+    }
+
+    public void publishLocal(Object payload) {
         emitters.forEach((userId, list) -> publish(userId, payload));
     }
 

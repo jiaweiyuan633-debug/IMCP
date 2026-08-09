@@ -4,7 +4,12 @@ import cn.hutool.core.util.IdUtil;
 import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
+import com.example.admin.module.system.entity.SysTenant;
+import com.example.admin.module.system.mapper.SysTenantMapper;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
 import com.example.admin.security.SecurityUtils;
+import com.example.admin.common.FileAccessService;
 import com.example.admin.common.TenantContext;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
@@ -17,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +31,8 @@ import java.io.InputStream;
 public class MinioFileStorage implements FileStorage {
 
     private final SysFileMapper fileMapper;
+    private final SysTenantMapper tenantMapper;
+    private final FileAccessService fileAccessService;
 
     @Value("${app.storage.minio.endpoint}")
     private String endpoint;
@@ -39,6 +48,7 @@ public class MinioFileStorage implements FileStorage {
 
     @Override
     public UploadResponse store(MultipartFile file) throws Exception {
+        checkStorageQuota(file.getSize());
         MinioClient client = MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
@@ -61,6 +71,7 @@ public class MinioFileStorage implements FileStorage {
         sysFile.setFileName(fileName);
         sysFile.setOriginalName(file.getOriginalFilename());
         sysFile.setUrl(url);
+        sysFile.setObjectKey(fileName);
         sysFile.setSize(file.getSize());
         sysFile.setStorageType("minio");
         sysFile.setCreatedBy(tryGetUserId());
@@ -69,6 +80,7 @@ public class MinioFileStorage implements FileStorage {
                 .url(url)
                 .name(file.getOriginalFilename())
                 .size(file.getSize())
+                .accessToken(fileAccessService.issue(url))
                 .build();
     }
 
@@ -77,6 +89,21 @@ public class MinioFileStorage implements FileStorage {
             return SecurityUtils.getUserId();
         } catch (Exception exception) {
             return null;
+        }
+    }
+
+    private void checkStorageQuota(long size) {
+        Long tenantId = TenantContext.getTenantId();
+        SysTenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null || tenant.getStorageLimitMb() == null) {
+            return;
+        }
+        List<SysFile> files = fileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, tenantId));
+        long used = files.stream().mapToLong(SysFile::getSize).sum();
+        long limit = tenant.getStorageLimitMb() * 1024L * 1024L;
+        if (used + size > limit) {
+            throw new BusinessException(ResultCode.STORAGE_LIMIT_EXCEEDED);
         }
     }
 }
