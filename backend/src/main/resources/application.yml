@@ -87,3 +87,11 @@ app:
 
 knife4j:
   enable: true
+
+warm-flow:
+  enabled: true
+  banner: false
+  logic-delete: true
+  logic-delete-value: "1"
+  logic-not-delete-value: "0"
+  data-source-type: mysql

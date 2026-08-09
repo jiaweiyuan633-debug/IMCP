@@ -388,6 +388,8 @@ export default {
     workflowDefAdd: 'Add Definition',
     workflowDefEdit: 'Edit Definition',
     workflowDefNodes: 'Approval Nodes',
+    workflowPublish: 'Publish',
+    workflowUnpublish: 'Unpublish',
     workflowNodeName: 'Node Name',
     workflowNodeKey: 'Node Key',
     workflowNodeType: 'Node Type',

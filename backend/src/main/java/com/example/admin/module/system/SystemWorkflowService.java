@@ -276,7 +276,8 @@ public class SystemWorkflowService {
             fixedDelayString = "${app.workflow-timeout-check-ms:60000}")
     public void checkTimeoutReminders() {
         List<SysWorkflowDO> pending = workflowMapper.selectList(new LambdaQueryWrapper<SysWorkflowDO>()
-                .eq(SysWorkflowDO::getStatus, WorkflowStatus.PENDING.name()));
+                .eq(SysWorkflowDO::getStatus, WorkflowStatus.PENDING.name())
+                .isNull(SysWorkflowDO::getFlowInstanceId));
         try {
             for (SysWorkflowDO workflow : pending) {
                 try {

@@ -388,6 +388,8 @@ export default {
     workflowDefAdd: '新增流程定义',
     workflowDefEdit: '编辑流程定义',
     workflowDefNodes: '审批节点',
+    workflowPublish: '发布',
+    workflowUnpublish: '取消发布',
     workflowNodeName: '节点名称',
     workflowNodeKey: '节点标识',
     workflowNodeType: '节点类型',

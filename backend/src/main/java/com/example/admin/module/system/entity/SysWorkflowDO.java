@@ -1,6 +1,7 @@
 package com.example.admin.module.system.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
@@ -18,6 +19,8 @@ public class SysWorkflowDO {
     private String processName;
     private String bizType;
     private Long processDefId;
+    private Long flowInstanceId;
+    private Long flowDefId;
     private Long currentNodeId;
     private String currentNodeName;
     private String currentNodeIds;
@@ -37,5 +40,7 @@ public class SysWorkflowDO {
     private Long updatedBy;
     @Version
     private Integer version;
+    @TableField(exist = false)
+    private Long currentTaskId;
 }
 

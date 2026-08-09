@@ -434,6 +434,9 @@ export interface WorkflowVo {
   processName: string
   bizType: string
   processDefId?: number
+  flowInstanceId?: number
+  flowDefId?: number
+  currentTaskId?: number
   currentNodeName?: string
   currentNodeIds?: string
   formData?: string
@@ -447,31 +450,31 @@ export interface WorkflowVo {
 }
 
 export function getWorkflowPage(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
-  return request.get('/system/workflow', { params })
+  return request.get('/system/workflow-engine', { params })
 }
 
 export function getWorkflowTasks(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
-  return request.get('/system/workflow/tasks', { params })
+  return request.get('/system/workflow-engine/tasks', { params })
 }
 
 export function createWorkflow(data: Record<string, unknown>): Promise<number> {
-  return request.post('/system/workflow', data)
+  return request.post('/system/workflow-engine', data)
 }
 
-export function approveWorkflow(id: number, remark?: string, nodeId?: number): Promise<void> {
-  return request.put(`/system/workflow/${id}/approve`, { remark, nodeId })
+export function approveWorkflow(id: number, remark?: string, taskId?: number, nodeId?: number): Promise<void> {
+  return request.put(`/system/workflow-engine/${id}/approve`, { remark, taskId, nodeId })
 }
 
 export function rejectWorkflow(id: number, remark?: string): Promise<void> {
-  return request.put(`/system/workflow/${id}/reject`, { remark })
+  return request.put(`/system/workflow-engine/${id}/reject`, { remark })
 }
 
 export function withdrawWorkflow(id: number, remark?: string): Promise<void> {
-  return request.put(`/system/workflow/${id}/withdraw`, { remark })
+  return request.put(`/system/workflow-engine/${id}/withdraw`, { remark })
 }
 
 export function delegateWorkflow(id: number, delegateUserId: number): Promise<void> {
-  return request.put(`/system/workflow/${id}/delegate`, { delegateUserId })
+  return request.put(`/system/workflow-engine/${id}/delegate`, { delegateUserId })
 }
 
 export interface WorkflowLogVo {
@@ -484,7 +487,7 @@ export interface WorkflowLogVo {
 }
 
 export function getWorkflowLogs(id: number): Promise<WorkflowLogVo[]> {
-  return request.get(`/system/workflow/${id}/logs`)
+  return request.get(`/system/workflow-engine/${id}/logs`)
 }
 
 export interface ProcessDefVo {
@@ -498,6 +501,7 @@ export interface ProcessDefVo {
 
 export interface ProcessNodeVo {
   id?: number
+  taskId?: number
   nodeName: string
   nodeKey: string
   nodeType?: string
@@ -508,31 +512,39 @@ export interface ProcessNodeVo {
 }
 
 export function getWorkflowCurrentNodes(id: number): Promise<ProcessNodeVo[]> {
-  return request.get(`/system/workflow/${id}/nodes`)
+  return request.get(`/system/workflow-engine/${id}/nodes`)
 }
 
 export function getProcessDefPage(params: Record<string, unknown>): Promise<PageResult<ProcessDefVo>> {
-  return request.get('/system/workflow/def', { params })
+  return request.get('/system/workflow-engine/def', { params })
 }
 
 export function getProcessDefOptions(): Promise<ProcessDefVo[]> {
-  return request.get('/system/workflow/def/options')
+  return request.get('/system/workflow-engine/def/options')
 }
 
 export function getProcessDefNodes(id: number): Promise<ProcessNodeVo[]> {
-  return request.get(`/system/workflow/def/${id}/nodes`)
+  return request.get(`/system/workflow-engine/def/${id}/nodes`)
 }
 
 export function createProcessDef(data: Record<string, unknown>): Promise<number> {
-  return request.post('/system/workflow/def', data)
+  return request.post('/system/workflow-engine/def', data)
 }
 
 export function updateProcessDef(data: Record<string, unknown>): Promise<void> {
-  return request.put('/system/workflow/def', data)
+  return request.put('/system/workflow-engine/def', data)
 }
 
 export function deleteProcessDef(id: number): Promise<void> {
-  return request.delete(`/system/workflow/def/${id}`)
+  return request.delete(`/system/workflow-engine/def/${id}`)
+}
+
+export function publishProcessDef(id: number): Promise<void> {
+  return request.put(`/system/workflow-engine/def/${id}/publish`)
+}
+
+export function unpublishProcessDef(id: number): Promise<void> {
+  return request.put(`/system/workflow-engine/def/${id}/unpublish`)
 }
 
 export interface FileVo {

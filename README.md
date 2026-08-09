@@ -13,7 +13,7 @@
 - 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V31
 - 工程规范：阿里巴巴 Java 开发手册分批整改、统一错误码、日志脱敏、核心 Service 单测、Manager 分层
 - 实时协作：SSE Ticket + WebSocket 双通道、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
-- 完整工作流：流程定义、条件/并行节点、表单数据、待办任务、撤回、转办、超时提醒、审批日志
+- 完整工作流：基于 Warm-Flow 1.8.9 的流程定义、条件/并行节点、发布/取消发布、表单数据、待办任务、通过/驳回/撤回/转办、审批日志，存量 `sys_process_def` 启动时自动迁移兼容
 - 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式、PWA 离线缓存
@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | 1 | 统一文件服务 | 已完成 |
 | 2 | 消息中心 | 已完成 |
-| 3 | 工作流升级 Warm-Flow | 待执行 |
+| 3 | 工作流升级 Warm-Flow | 已完成 |
 | 4 | 多租户深化 | 待执行 |
 | 5 | AI 能力增强（模型网关 / Prompt / RAG + Milvus） | 待执行 |
 | 6 | 报表与大屏 | 待执行 |
@@ -54,7 +54,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V31）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V32）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile

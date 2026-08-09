@@ -82,6 +82,8 @@
             <template v-else-if="column.key === 'actions'">
               <a-space>
                 <a @click="openDefNodes(record)">{{ t('page.workflowDefNodes') }}</a>
+                <a v-if="record.status === 0" v-permission="'system:workflow:def:edit'" @click="onPublish(record)">{{ t('page.workflowPublish') }}</a>
+                <a v-if="record.status === 1" v-permission="'system:workflow:def:edit'" @click="onUnpublish(record)">{{ t('page.workflowUnpublish') }}</a>
                 <a v-permission="'system:workflow:def:edit'" @click="openDefEdit(record)">{{ t('common.edit') }}</a>
                 <a v-permission="'system:workflow:def:delete'" @click="onDefDelete(record)">{{ t('common.delete') }}</a>
               </a-space>
@@ -198,7 +200,9 @@ import {
   getWorkflowCurrentNodes,
   getWorkflowPage,
   getWorkflowTasks,
+  publishProcessDef,
   rejectWorkflow,
+  unpublishProcessDef,
   updateProcessDef,
   withdrawWorkflow,
 } from '@/api/system'
@@ -470,13 +474,29 @@ function onDefDelete(record: ProcessDefVo) {
   })
 }
 
+async function onPublish(record: ProcessDefVo) {
+  await publishProcessDef(record.id)
+  message.success(t('page.workflowOperationSuccess'))
+  loadDefs()
+  loadOptions()
+}
+
+async function onUnpublish(record: ProcessDefVo) {
+  await unpublishProcessDef(record.id)
+  message.success(t('page.workflowOperationSuccess'))
+  loadDefs()
+  loadOptions()
+}
+
 async function openApprove(record: WorkflowVo) {
   approvalAction.value = 'approve'
   approvalRemark.value = ''
   approvalTarget.value = record
   const nodes = await getWorkflowCurrentNodes(record.id)
-  currentNodeOptions.value = nodes.map((node) => ({ label: node.nodeName, value: node.id as number }))
-  selectedNodeId.value = currentNodeOptions.value[0]?.value
+  currentNodeOptions.value = nodes.map((node) => ({ label: node.nodeName, value: node.taskId ?? node.id as number }))
+  selectedNodeId.value = record.currentTaskId
+    ?? nodes.find((node) => node.taskId === record.currentTaskId)?.taskId
+    ?? currentNodeOptions.value[0]?.value
   approvalModalOpen.value = true
 }
 

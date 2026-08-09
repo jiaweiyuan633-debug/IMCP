@@ -13,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.dromara.warm.flow.core.exception.FlowException;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -56,6 +57,11 @@ public class GlobalExceptionHandler {
     public Result<Void> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         log.error("Data integrity violation, requestId={}", RequestIdHolder.get(), exception);
         return Result.error(ResultCode.INTERNAL_ERROR);
+    }
+
+    @ExceptionHandler(FlowException.class)
+    public Result<Void> handleFlowException(FlowException exception) {
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), exception.getMessage());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
