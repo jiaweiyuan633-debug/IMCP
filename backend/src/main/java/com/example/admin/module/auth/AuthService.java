@@ -7,8 +7,10 @@ import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.ProfileUpdateRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
+import com.example.admin.module.auth.dto.TotpCodeRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.LoginConfigVo;
+import com.example.admin.module.auth.vo.TotpStatusVo;
 import com.example.admin.module.auth.vo.UserInfoVo;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
 import com.example.admin.module.system.entity.SysLoginLog;
@@ -57,6 +59,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
+    private final TotpService totpService;
 
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String ip = httpRequest.getRemoteAddr();
@@ -80,6 +83,10 @@ public class AuthService {
         if (user.getStatus() == null || user.getStatus() != 1) {
             saveLoginLog(httpRequest, username, false, "账号已被禁用");
             throw new BusinessException(ResultCode.USER_DISABLED);
+        }
+        if (user.getTotpEnabled() != null && user.getTotpEnabled() == 1
+                && !totpService.verify(user.getTotpSecret(), request.getTotpCode())) {
+            throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
         redisTemplate.delete("login:fail:" + username);
 
@@ -198,6 +205,52 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         userMapper.updateById(user);
+    }
+
+    public TotpStatusVo totpStatus() {
+        SysUser user = getCurrentUser();
+        boolean enabled = user.getTotpEnabled() != null && user.getTotpEnabled() == 1;
+        return TotpStatusVo.builder().enabled(enabled).build();
+    }
+
+    public TotpStatusVo setupTotp() {
+        SysUser user = getCurrentUser();
+        String secret = totpService.generateSecret();
+        user.setTotpSecret(secret);
+        user.setTotpEnabled(0);
+        userMapper.updateById(user);
+        return TotpStatusVo.builder()
+                .enabled(false)
+                .secret(secret)
+                .otpauthUrl(totpService.buildOtpauthUrl(secret, user.getUsername()))
+                .build();
+    }
+
+    public void enableTotp(TotpCodeRequest request) {
+        SysUser user = getCurrentUser();
+        if (!totpService.verify(user.getTotpSecret(), request.getCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
+        }
+        user.setTotpEnabled(1);
+        userMapper.updateById(user);
+    }
+
+    public void disableTotp(TotpCodeRequest request) {
+        SysUser user = getCurrentUser();
+        if (!totpService.verify(user.getTotpSecret(), request.getCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "动态验证码错误");
+        }
+        user.setTotpSecret(null);
+        user.setTotpEnabled(0);
+        userMapper.updateById(user);
+    }
+
+    private SysUser getCurrentUser() {
+        SysUser user = userMapper.selectById(SecurityUtils.getUserId());
+        if (user == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        return user;
     }
 
     private UserInfoVo toUserInfo(SysUser user, List<String> roles, List<String> perms, List<MenuVo> menus) {

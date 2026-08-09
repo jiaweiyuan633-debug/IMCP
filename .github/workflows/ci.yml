@@ -72,3 +72,54 @@ jobs:
       - name: Website build
         working-directory: website
         run: pnpm build
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secrets scan
+        uses: gitleaks/gitleaks-action@v2
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: 1
+          severity: HIGH,CRITICAL
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: astral-sh/setup-uv@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - name: Build stack
+        working-directory: docker
+        run: docker compose build
+      - name: Start stack
+        working-directory: docker
+        run: docker compose up -d
+      - name: Wait for backend
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Run smoke E2E
+        run: pwsh -ExecutionPolicy Bypass -File scripts/smoke.ps1
+      - name: Stop stack
+        if: always()
+        working-directory: docker
+        run: docker compose down -v

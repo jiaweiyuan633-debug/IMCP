@@ -41,6 +41,7 @@ export interface LoginForm {
   password: string
   captchaId?: string
   captchaCode?: string
+  totpCode?: string
 }
 
 export interface LoginConfigVo {

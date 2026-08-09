@@ -63,6 +63,17 @@ Compose 内置：
 - 前端 Nginx 反向代理 `/api` 和 `/uploads`
 - 官网使用独立 Nginx 容器，默认端口 `8081`
 
+可观测性按需启用：
+
+```bash
+docker compose -f docker-compose.yml -f observability.yml up -d
+```
+
+- Prometheus：`http://localhost:9090`
+- Grafana：`http://localhost:3000`（默认 `admin/admin123`）
+- Loki：`http://localhost:3100`
+- Tempo：`http://localhost:3200`
+
 Docker Hub 拉取超时时，可先用 DaoCloud 镜像源拉取并打标准标签。
 
 ## 3. Kubernetes
@@ -105,6 +116,7 @@ scripts/stop-dev.ps1
 scripts/smoke.ps1
 scripts/backup.ps1
 scripts/restore.ps1
+scripts/backup-drill.ps1
 scripts/load-test.ps1
 scripts/load-test-multi.ps1
 scripts/fetch-openapi.ps1

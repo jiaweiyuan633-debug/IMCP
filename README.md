@@ -4,14 +4,14 @@
 
 ## 核心能力
 
-- 认证与安全：验证码、登录失败锁定、登录限流、JWT + Redis Token、Token 刷新、个人资料编辑
+- 认证与安全：验证码、登录失败锁定、登录限流、TOTP 2FA、API 全局限流、JWT + Redis Token、Token 刷新、个人资料编辑
 - RBAC 权限：用户、角色、菜单、按钮权限、数据权限（部门级与自定义范围）
 - 企业基础：部门、岗位、数据字典、参数配置、通知公告、文件管理
 - 工程能力：Quartz JDBC 持久化定时任务、本地/MinIO 文件存储、Excel 导入导出、OpenAPI
-- 数据可靠性：全表审计字段、审计日志、`version` 乐观锁、逻辑删除、Flyway V1-V19
+- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V22
 - 实时协作：SSE Ticket 安全推送、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
 - 完整工作流：流程定义、审批节点、待办任务、撤回、转办、审批日志
-- 多租户：租户管理、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
+- 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式
 - 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
@@ -32,7 +32,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V19）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V22）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile

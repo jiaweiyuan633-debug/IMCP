@@ -14,5 +14,6 @@ public class LoginRequest {
 
     private String captchaId;
     private String captchaCode;
+    private String totpCode;
 }
 

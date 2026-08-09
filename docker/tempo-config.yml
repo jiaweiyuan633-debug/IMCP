@@ -1,0 +1,21 @@
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/traces
+
+metrics_generator:
+  storage:
+    path: /tmp/tempo/metrics
+  registry:
+    default_histogram_bucket_boundaries: [0.1, 0.5, 1, 2, 5]

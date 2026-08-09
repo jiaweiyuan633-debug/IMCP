@@ -28,7 +28,10 @@
           <a-input-password v-model:value="form.apiKey" />
         </a-form-item>
         <a-form-item :label="t('page.aiTimeout')">
-          <a-input-number v-model:value="form.timeoutSeconds" :min="5" :max="300" />
+          <a-input-number v-model:value="form.timeoutSeconds" :min="5" :max="300" style="width: 100%" />
+        </a-form-item>
+        <a-form-item :label="t('page.aiDailyLimit')">
+          <a-input-number v-model:value="form.dailyLimit" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item :label="t('page.aiEnabled')">
           <a-switch v-model:checked="enabled" />
@@ -54,6 +57,7 @@ const columns = [
   { title: t('page.aiConfigName'), dataIndex: 'name', key: 'name' },
   { title: t('page.aiBaseUrl'), dataIndex: 'baseUrl', key: 'baseUrl' },
   { title: t('page.aiTimeout'), dataIndex: 'timeoutSeconds', key: 'timeoutSeconds', width: 100 },
+  { title: t('page.aiDailyLimit'), dataIndex: 'dailyLimit', key: 'dailyLimit', width: 110 },
   { title: t('page.aiEnabled'), key: 'enabled', width: 90 },
   { title: t('common.actions'), key: 'actions', width: 90 },
 ]
@@ -69,6 +73,7 @@ const form = reactive({
   baseUrl: '',
   apiKey: '',
   timeoutSeconds: 60,
+  dailyLimit: 1000,
 })
 
 async function loadData() {
@@ -87,6 +92,7 @@ function openEdit(record: AiConfigVo) {
     baseUrl: record.baseUrl,
     apiKey: record.apiKey || '',
     timeoutSeconds: record.timeoutSeconds,
+    dailyLimit: record.dailyLimit || 1000,
   })
   enabled.value = record.enabled === 1
   modalOpen.value = true
@@ -104,6 +110,7 @@ async function onSubmit() {
       baseUrl: form.baseUrl,
       apiKey: form.apiKey || undefined,
       timeoutSeconds: form.timeoutSeconds,
+      dailyLimit: form.dailyLimit,
       enabled: enabled.value ? 1 : 0,
     })
     message.success(t('page.aiConfigUpdated'))
@@ -116,5 +123,3 @@ async function onSubmit() {
 
 onMounted(loadData)
 </script>
-
-

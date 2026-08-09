@@ -14,5 +14,6 @@ public class AiConfigVo {
     private String apiKey;
     private Integer timeoutSeconds;
     private Integer enabled;
+    private Integer dailyLimit;
 }
 

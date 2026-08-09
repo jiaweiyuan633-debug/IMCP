@@ -38,22 +38,51 @@
           <a-button type="primary" html-type="submit" :loading="loading">{{ t('page.passwordConfirm') }}</a-button>
         </a-form>
       </a-card>
+      <a-card :title="t('page.totpTitle')" style="margin-top: 16px">
+        <a-space>
+          <a-tag :color="totpStatus.enabled ? 'green' : 'default'">
+            {{ totpStatus.enabled ? t('page.totpEnabled') : t('page.totpDisabled') }}
+          </a-tag>
+          <a-button v-if="!totpStatus.enabled" @click="onSetupTotp">{{ t('page.totpSetup') }}</a-button>
+          <a-button v-else danger @click="openDisableTotp">{{ t('page.totpDisable') }}</a-button>
+        </a-space>
+      </a-card>
     </a-col>
   </a-row>
+
+  <a-modal v-model:open="totpModalOpen" :title="t('page.totpTitle')" :confirm-loading="totpSaving" @ok="onTotpSubmit">
+    <a-form layout="vertical" :model="totpForm">
+      <template v-if="!totpStatus.enabled">
+        <a-form-item :label="t('page.totpSecretLabel')">
+          <a-input v-model:value="totpForm.secret" read-only />
+        </a-form-item>
+        <a-form-item :label="t('page.totpUrlLabel')">
+          <a-input v-model:value="totpForm.otpauthUrl" read-only />
+        </a-form-item>
+      </template>
+      <a-form-item :label="t('page.totpCodeLabel')" required>
+        <a-input v-model:value="totpForm.code" maxlength="6" />
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import FileUpload from '@/components/FileUpload.vue'
-import { updateProfile } from '@/api/auth'
+import { disableTotp, enableTotp, getTotpStatus, setupTotp, updateProfile } from '@/api/auth'
 import { useI18n } from 'vue-i18n'
 
 const userStore = useUserStore()
 const { t } = useI18n()
 const loading = ref(false)
 const savingProfile = ref(false)
+const totpSaving = ref(false)
+const totpModalOpen = ref(false)
+const totpStatus = reactive({ enabled: false })
+const totpForm = reactive({ secret: '', otpauthUrl: '', code: '' })
 const form = reactive({
   oldPassword: '',
   newPassword: '',
@@ -98,5 +127,45 @@ async function saveProfile() {
     savingProfile.value = false
   }
 }
+
+async function onSetupTotp() {
+  const data = await setupTotp()
+  totpForm.secret = data.secret || ''
+  totpForm.otpauthUrl = data.otpauthUrl || ''
+  totpForm.code = ''
+  totpModalOpen.value = true
+}
+
+function openDisableTotp() {
+  totpForm.secret = ''
+  totpForm.otpauthUrl = ''
+  totpForm.code = ''
+  totpModalOpen.value = true
+}
+
+async function onTotpSubmit() {
+  if (!totpForm.code) {
+    message.warning(`${t('common.inputPlaceholder')}${t('page.totpCodeLabel')}`)
+    return
+  }
+  totpSaving.value = true
+  try {
+    if (totpStatus.enabled) {
+      await disableTotp(totpForm.code)
+    } else {
+      await enableTotp(totpForm.code)
+    }
+    totpStatus.enabled = !totpStatus.enabled
+    totpModalOpen.value = false
+    message.success(t('page.totpSaved'))
+  } finally {
+    totpSaving.value = false
+  }
+}
+
+onMounted(async () => {
+  const status = await getTotpStatus()
+  totpStatus.enabled = status.enabled
+})
 </script>
 

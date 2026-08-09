@@ -1,0 +1,3 @@
+ALTER TABLE sys_user
+    ADD COLUMN totp_secret VARCHAR(64) NULL,
+    ADD COLUMN totp_enabled TINYINT NOT NULL DEFAULT 0;

@@ -189,4 +189,14 @@ export function getAuditLogPage(params: Record<string, unknown>): Promise<PageRe
   return request.get('/monitor/audit-log', { params })
 }
 
+export async function exportAuditLogs(): Promise<void> {
+  const data = (await request.get('/monitor/audit-log/export', { responseType: 'blob' })) as unknown as Blob
+  const url = URL.createObjectURL(data as Blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'audit-log.csv'
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 

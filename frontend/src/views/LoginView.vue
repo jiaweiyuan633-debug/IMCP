@@ -23,6 +23,9 @@
             <img v-if="captchaImage" :src="captchaImage" alt="captcha" class="captcha-image" @click="loadCaptcha" />
           </a-space>
         </a-form-item>
+        <a-form-item v-if="totpRequired" :label="t('login.totp')" name="totpCode">
+          <a-input v-model:value="form.totpCode" :placeholder="t('login.totpPlaceholder')" />
+        </a-form-item>
         <a-button type="primary" html-type="submit" block :loading="loading">{{ t('login.submit') }}</a-button>
       </a-form>
     </a-card>
@@ -49,6 +52,7 @@ const form = reactive<LoginForm>({
 })
 const captchaEnabled = ref(false)
 const captchaImage = ref('')
+const totpRequired = ref(false)
 
 async function loadCaptcha() {
   const data = await getCaptcha()
@@ -71,7 +75,12 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (error) {
-    message.error((error as Error).message || t('login.failed'))
+    if ((error as Error & { code?: number }).code === 1015) {
+      totpRequired.value = true
+      message.warning(t('login.totpRequired'))
+    } else {
+      message.error((error as Error).message || t('login.failed'))
+    }
   } finally {
     loading.value = false
   }

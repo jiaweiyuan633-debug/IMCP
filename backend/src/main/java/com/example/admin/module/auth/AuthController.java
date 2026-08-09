@@ -7,8 +7,10 @@ import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.ProfileUpdateRequest;
 import com.example.admin.module.auth.dto.RefreshRequest;
+import com.example.admin.module.auth.dto.TotpCodeRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.UserInfoVo;
+import com.example.admin.module.auth.vo.TotpStatusVo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +69,28 @@ public class AuthController {
     @PutMapping("/profile")
     public Result<Void> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
         authService.updateProfile(request);
+        return Result.success();
+    }
+
+    @GetMapping("/totp/status")
+    public Result<TotpStatusVo> totpStatus() {
+        return Result.success(authService.totpStatus());
+    }
+
+    @PostMapping("/totp/setup")
+    public Result<TotpStatusVo> setupTotp() {
+        return Result.success(authService.setupTotp());
+    }
+
+    @PostMapping("/totp/enable")
+    public Result<Void> enableTotp(@Valid @RequestBody TotpCodeRequest request) {
+        authService.enableTotp(request);
+        return Result.success();
+    }
+
+    @PostMapping("/totp/disable")
+    public Result<Void> disableTotp(@Valid @RequestBody TotpCodeRequest request) {
+        authService.disableTotp(request);
         return Result.success();
     }
 }
