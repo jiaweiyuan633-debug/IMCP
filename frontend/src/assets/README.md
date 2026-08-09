@@ -1,4 +1,4 @@
 # assets
 
-Static assets for the frontend.
+前端静态资源目录，用于存放图片、图标和全局样式资源。
 

@@ -1,15 +1,25 @@
 # 双端管理脚手架
 
-一套可运行的“Java 业务后端 + Python AI 服务 + Vue3 管理端”双端管理脚手架，支持本地开发和 Docker Compose 部署。
+面向企业生产管理的“Java 业务后端 + Python AI 服务 + Vue3 管理端”全栈脚手架，已从演示脚手架升级为企业级基线。
+
+## 核心能力
+
+- RBAC 权限：用户、角色、菜单、按钮权限、数据权限
+- 企业基础：部门、岗位、数据字典、参数配置
+- 工程能力：定时任务、文件上传、Excel 导入导出、通知公告
+- 可观测性：服务器监控、SQL 监控、Prometheus 指标、结构化日志、traceId
+- 安全基线：验证码、登录失败锁定、登录限流、上传内容校验
+- 演进预留：租户管理、简化工作流、K8s 清单、压测脚本
+- CI/CD：GitHub Actions 自动执行后端/前端/AI 测试与构建
 
 ## 技术栈
 
 | 端 | 技术 |
 | --- | --- |
-| 前端 | Vue 3、TypeScript、Vite 7、Ant Design Vue 4、Pinia、Vue Router、ECharts |
-| Java 后端 | Spring Boot 3.3、Spring Security 6、MyBatis-Plus、Flyway、Redis、JWT |
-| AI 服务 | FastAPI、Pydantic、Redis、httpx、pytest |
-| 基础设施 | MySQL 8、Redis 7（兼容 Memurai）、Docker Compose |
+| 前端 | Vue 3、TypeScript、Vite 7、Ant Design Vue 4、Pinia、Vue Router、ECharts、vue-i18n、TanStack Query、Vitest |
+| Java 后端 | Spring Boot 3.3、Spring Security 6、MyBatis-Plus、Flyway、Quartz、Redis、JWT、EasyExcel、Micrometer |
+| AI 服务 | FastAPI、Redis、httpx、pytest、Prometheus Client |
+| 基础设施 | MySQL 8、Redis 7、Docker Compose、Kubernetes |
 
 ## 仓库结构
 
@@ -19,37 +29,22 @@ backend/     Spring Boot 后端与 Flyway 脚本
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose 与 Nginx 配置
-scripts/     开发启动、停止与冒烟脚本
+k8s/         Kubernetes 清单
+scripts/     启动、停止、冒烟、备份、压测、OpenAPI 脚本
 ```
 
 ## 本地启动
 
-环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+（可用 uv 托管）、MySQL 8、Redis 7。
-
-1. 初始化数据库：
-
-```bash
-mysql -uroot -p -e "CREATE DATABASE admin_scaffold DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-```
-
-2. 启动后端：
+环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+、MySQL 8、Redis 7。
 
 ```bash
 cd backend
 mvn spring-boot:run
-```
 
-3. 启动 AI 服务：
-
-```bash
 cd ai-service
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
 
-4. 启动前端：
-
-```bash
 cd frontend
 pnpm install
 pnpm dev
@@ -57,31 +52,34 @@ pnpm dev
 
 访问 http://localhost:5173 ，默认管理员：`admin / admin123`。
 
-## Docker Compose 启动
+## Docker Compose
 
 ```bash
 cd docker
 docker compose up -d --build
 ```
 
-默认端口为 `3306/6379/8080/8000/80`。如果本机已有 MySQL/Redis 或开发服务占用端口，可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT` 覆盖主机端口。
+可通过 `MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT` 覆盖主机端口。
 
-该交付已在 Docker Desktop 完成全栈启动和 14 项冒烟验证。
+## Kubernetes
 
-服务地址：
+```bash
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/manifests.yaml
+```
 
-| 服务 | 地址 |
-| --- | --- |
-| 前端 | http://localhost |
-| Java 后端 | http://localhost:8080 |
-| AI 服务 | http://localhost:8000 |
-| 接口文档 | http://localhost:8080/doc.html |
+详见 [k8s/README.md](k8s/README.md)。
 
-## 冒烟测试
+## 测试与运维
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke.ps1
+scripts/smoke.ps1
+scripts/backup.ps1
+scripts/load-test.ps1
+scripts/fetch-openapi.ps1
 ```
+
+CI 流水线见 `.github/workflows/ci.yml`。
 
 ## 文档入口
 

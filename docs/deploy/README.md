@@ -1,142 +1,80 @@
 # 部署教程
 
-## 1. 本地开发部署
+## 1. 本地开发
 
-### 1.1 环境要求
+环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+、MySQL 8、Redis 7。
 
-| 依赖 | 版本 |
-| --- | --- |
-| JDK | 17+（推荐 21 LTS） |
-| Maven | 3.9+ |
-| Node.js | 20+ |
-| pnpm | 推荐 11 |
-| Python | 3.11+，或使用 uv |
-| MySQL | 8.0 |
-| Redis | 7.x，或 Memurai |
-
-### 1.2 数据库
-
-```sql
-CREATE DATABASE admin_scaffold
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+```bash
+cd backend && mvn spring-boot:run
+cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
+cd frontend && pnpm install && pnpm dev
 ```
 
-后端通过环境变量连接数据库和 Redis：
+后端通过环境变量连接基础设施：
 
 ```text
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=admin_scaffold
 DB_USERNAME=root
-DB_PASSWORD=your-password
+DB_PASSWORD=
 REDIS_HOST=localhost
 REDIS_PORT=6379
 CALLBACK_BASE_URL=http://127.0.0.1:8080
+AI_BASE_URL=http://127.0.0.1:8000
+SQL_LOG_THRESHOLD_MS=50
 ```
 
-### 1.3 启动三个服务
-
-后端：
-
-```bash
-cd backend
-mvn spring-boot:run
-```
-
-AI 服务：
-
-```bash
-cd ai-service
-uv sync
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-前端：
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-访问 http://localhost:5173 。
-
-## 2. Docker Compose 部署
+## 2. Docker Compose
 
 ```bash
 cd docker
 docker compose up -d --build
 ```
 
-默认使用本机 `3306/6379/8080/8000/80` 端口。如需避开本机已有服务，可覆盖主机端口：
+服务端口可覆盖：`MYSQL_PORT`、`REDIS_PORT`、`BACKEND_PORT`、`AI_PORT`、`FRONTEND_PORT`。
 
-```powershell
-$env:MYSQL_PORT='13306'
-$env:REDIS_PORT='16379'
-$env:BACKEND_PORT='18080'
-$env:AI_PORT='18000'
-$env:FRONTEND_PORT='18081'
-docker compose up -d --build
-```
+Compose 内置：
 
-Compose 已设置 `AI_BASE_URL=http://ai-service:8000`，Java 服务会自动使用该地址调用 Python 服务，不受数据库里默认 `localhost` 配置影响。
+- MySQL/Redis 健康检查
+- 后端通过 `CALLBACK_BASE_URL` 指向容器内服务
+- 前端 Nginx 反向代理 `/api` 和 `/uploads`
 
-如果 Docker Hub 拉取镜像超时，可先通过 DaoCloud 镜像源拉取并打上标准标签，再执行 `docker compose up -d --build`：
+Docker Hub 拉取超时时，可先用 DaoCloud 镜像源拉取并打标准标签。
+
+## 3. Kubernetes
 
 ```bash
-docker pull docker.m.daocloud.io/library/mysql:8.0
-docker tag docker.m.daocloud.io/library/mysql:8.0 mysql:8.0
-docker pull docker.m.daocloud.io/library/redis:7-alpine
-docker tag docker.m.daocloud.io/library/redis:7-alpine redis:7-alpine
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/manifests.yaml
 ```
 
-服务：
+生产环境建议替换镜像地址、使用 Secrets 保存密码、配置 HPA 与 HTTPS Ingress。
 
-| 服务 | 端口 | 说明 |
-| --- | --- | --- |
-| mysql | 3306 | 业务数据库 |
-| redis | 6379 | 缓存与任务状态 |
-| backend | 8080 | Java 服务 |
-| ai-service | 8000 | Python AI 服务 |
-| frontend | 80 | Nginx 托管前端 |
+## 4. 可观测性
 
-默认数据库密码为 `root123456`，生产环境务必通过环境变量覆盖。
-当前交付已在 Docker Desktop 完成全栈启动验证，冒烟脚本 `PASS=14 FAIL=0`。
+- 后端健康检查：`/actuator/health`
+- Prometheus 指标：`/actuator/prometheus`
+- AI 指标：`/api/v1/metrics`
+- 结构化日志包含 `requestId/traceId`
 
-## 3. 生产部署检查项
-
-- MySQL、Redis 必须设置强密码。
-- `JWT_SECRET` 必须替换为随机长密钥。
-- `CALLBACK_TOKEN` 必须与 `ai_service_config.api_key` 一致。
-- Java 与 Python 服务不要直接暴露到公网，前端通过 Nginx 反向代理 `/api`。
-- 日志持久化到磁盘或采集系统。
-- 数据库变更必须通过 Flyway 脚本执行。
-
-## 4. 一键脚本
-
-开发环境可使用：
+## 5. 运维脚本
 
 ```powershell
 scripts/start-dev.ps1
 scripts/stop-dev.ps1
-```
-
-冒烟验证：
-
-```powershell
 scripts/smoke.ps1
+scripts/backup.ps1
+scripts/restore.ps1
+scripts/load-test.ps1
+scripts/fetch-openapi.ps1
 ```
 
-## 5. 架构图
+## 6. 生产检查项
 
-```mermaid
-flowchart LR
-    U[浏览器 Vue3 前端] --> J[Java 业务服务 Spring Boot 3]
-    J --> M[(MySQL)]
-    J --> R[(Redis)]
-    J --> P[Python AI 服务 FastAPI]
-    P --> R
-    P --> A[AI 算法/模型]
-```
+- 修改 `JWT_SECRET`、MySQL/Redis 密码、AI 回调 Token
+- 开启 HTTPS 和 WAF
+- 配置 Prometheus + Grafana 告警
+- 定期备份并演练恢复
+- 所有数据库变更通过 Flyway 执行
 
