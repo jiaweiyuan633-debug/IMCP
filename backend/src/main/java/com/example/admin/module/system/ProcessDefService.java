@@ -116,7 +116,7 @@ public class ProcessDefService {
     private void ensureNoActiveInstances(Long defId) {
         long active = workflowMapper.selectCount(new LambdaQueryWrapper<SysWorkflow>()
                 .eq(SysWorkflow::getProcessDefId, defId)
-                .eq(SysWorkflow::getStatus, "PENDING"));
+                .eq(SysWorkflow::getStatus, WorkflowStatus.PENDING.name()));
         if (active > 0) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "存在运行中的流程实例，不能修改或删除流程定义");
         }

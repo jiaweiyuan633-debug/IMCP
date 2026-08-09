@@ -70,7 +70,7 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
     }
 
     private List<Table> tables(PlainSelect plainSelect) {
-        List<Table> tables = new ArrayList<>();
+        List<Table> tables = new ArrayList<>(4);
         if (plainSelect.getFromItem() instanceof Table table) {
             tables.add(table);
         }

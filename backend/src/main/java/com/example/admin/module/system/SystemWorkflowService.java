@@ -91,7 +91,7 @@ public class SystemWorkflowService {
         applyCurrentNodes(workflow, startNodes);
         workflow.setApplicantId(user.getUserId());
         workflow.setApplicantName(user.getUsername());
-        workflow.setStatus("PENDING");
+        workflow.setStatus(WorkflowStatus.PENDING.name());
         workflow.setTenantId(TenantContext.getTenantId());
         workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
         workflow.setTimeoutNotified(0);
@@ -104,7 +104,7 @@ public class SystemWorkflowService {
         Page<SysWorkflow> page = new Page<>(pageNum, pageSize);
         LoginUser user = SecurityUtils.getLoginUser();
         LambdaQueryWrapper<SysWorkflow> wrapper = new LambdaQueryWrapper<SysWorkflow>()
-                .eq(SysWorkflow::getStatus, "PENDING");
+                .eq(SysWorkflow::getStatus, WorkflowStatus.PENDING.name());
         if (user.getRoles() != null && user.getRoles().contains("admin")) {
             wrapper.orderByDesc(SysWorkflow::getId);
         } else {
@@ -146,7 +146,7 @@ public class SystemWorkflowService {
     @Transactional
     public void approve(Long id, Long nodeId, String remark) {
         SysWorkflow workflow = getOrThrow(id);
-        if (!"PENDING".equals(workflow.getStatus())) {
+        if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
         List<Long> currentIds = parseIds(workflow.getCurrentNodeIds());
@@ -176,7 +176,7 @@ public class SystemWorkflowService {
         int currentOrder = node.getNodeOrder();
         List<SysProcessNode> next = nextNodes(allNodes, currentOrder, parseForm(workflow.getFormData()));
         if (next.isEmpty()) {
-            finishWorkflow(workflow, "APPROVED");
+            finishWorkflow(workflow, WorkflowStatus.APPROVED.name());
             workflowMapper.updateById(workflow);
             return;
         }
@@ -190,11 +190,11 @@ public class SystemWorkflowService {
     @Transactional
     public void reject(Long id, String remark) {
         SysWorkflow workflow = getOrThrow(id);
-        if (!"PENDING".equals(workflow.getStatus())) {
+        if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
         checkCanOperate(workflow, currentIds(workflow));
-        finishWorkflow(workflow, "REJECTED");
+        finishWorkflow(workflow, WorkflowStatus.REJECTED.name());
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "REJECTED", remark == null ? "审批拒绝" : remark);
@@ -208,10 +208,10 @@ public class SystemWorkflowService {
         if (!isAdmin && !user.getUserId().equals(workflow.getApplicantId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-        if (!"PENDING".equals(workflow.getStatus())) {
+        if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
-        finishWorkflow(workflow, "WITHDRAWN");
+        finishWorkflow(workflow, WorkflowStatus.WITHDRAWN.name());
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "WITHDRAWN", remark == null ? "发起人撤回" : remark);
@@ -220,7 +220,7 @@ public class SystemWorkflowService {
     @Transactional
     public void delegate(Long id, Long delegateUserId) {
         SysWorkflow workflow = getOrThrow(id);
-        if (!"PENDING".equals(workflow.getStatus())) {
+        if (!WorkflowStatus.PENDING.name().equals(workflow.getStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
         }
         checkCanOperate(workflow, currentIds(workflow));
@@ -245,7 +245,7 @@ public class SystemWorkflowService {
             fixedDelayString = "${app.workflow-timeout-check-ms:60000}")
     public void checkTimeoutReminders() {
         List<SysWorkflow> pending = workflowMapper.selectList(new LambdaQueryWrapper<SysWorkflow>()
-                .eq(SysWorkflow::getStatus, "PENDING"));
+                .eq(SysWorkflow::getStatus, WorkflowStatus.PENDING.name()));
         try {
             for (SysWorkflow workflow : pending) {
                 try {

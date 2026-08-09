@@ -1,6 +1,5 @@
 package com.example.admin.module.ai;
 
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -17,6 +16,7 @@ import com.example.admin.module.ai.entity.AiTaskResult;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
+import com.example.admin.module.ai.manager.AiTaskManager;
 import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
@@ -36,7 +36,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.Duration;
-import java.util.Date;
+import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +47,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AiTaskService {
 
+    private static final DateTimeFormatter TASK_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
     private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
             AiTaskStatus.SUCCEEDED,
             AiTaskStatus.FAILED,
@@ -55,7 +56,7 @@ public class AiTaskService {
     private final AiTaskMapper taskMapper;
     private final AiTaskResultMapper resultMapper;
     private final AiServiceConfigMapper configMapper;
-    private final AiPythonClient pythonClient;
+    private final AiTaskManager aiTaskManager;
     private final ObjectMapper objectMapper;
     private final DataScopeHelper dataScopeHelper;
     private final StringRedisTemplate redisTemplate;
@@ -85,7 +86,7 @@ public class AiTaskService {
             }
         }
 
-        String taskNo = "AI" + DateUtil.format(new Date(), "yyyyMMddHHmmssSSS") + RandomUtil.randomNumbers(4);
+        String taskNo = "AI" + LocalDateTime.now().format(TASK_NO_FORMATTER) + RandomUtil.randomNumbers(4);
         AiTask task = new AiTask();
         task.setTenantId(TenantContext.getTenantId());
         task.setTaskNo(taskNo);
@@ -105,7 +106,7 @@ public class AiTaskService {
             if (StringUtils.hasText(aiBaseUrl)) {
                 config.setBaseUrl(aiBaseUrl);
             }
-            pythonClient.createTask(
+            aiTaskManager.submit(
                     config,
                     taskNo,
                     request.getBizType(),

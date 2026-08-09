@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -25,28 +26,30 @@ public class JwtUtil {
     }
 
     public String createAccessToken(String jti, Long userId, String username, List<String> roles, List<String> perms) {
-        Date now = new Date();
-        Date expiration = new Date(now.getTime() + properties.getAccessTokenExpireMinutes() * 60_000L);
+        Instant now = Instant.now();
+        Date nowDate = Date.from(now);
+        Date expiration = Date.from(now.plusMillis(properties.getAccessTokenExpireMinutes() * 60_000L));
         return Jwts.builder()
                 .id(jti)
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .claim("roles", roles)
                 .claim("perms", perms)
-                .issuedAt(now)
+                .issuedAt(nowDate)
                 .expiration(expiration)
                 .signWith(secretKey())
                 .compact();
     }
 
     public String createRefreshToken(String jti, Long userId, String username) {
-        Date now = new Date();
-        Date expiration = new Date(now.getTime() + properties.getRefreshTokenExpireDays() * 24 * 60 * 60_000L);
+        Instant now = Instant.now();
+        Date nowDate = Date.from(now);
+        Date expiration = Date.from(now.plusMillis(properties.getRefreshTokenExpireDays() * 24 * 60 * 60_000L));
         return Jwts.builder()
                 .id(jti)
                 .subject(String.valueOf(userId))
                 .claim("username", username)
-                .issuedAt(now)
+                .issuedAt(nowDate)
                 .expiration(expiration)
                 .signWith(secretKey())
                 .compact();

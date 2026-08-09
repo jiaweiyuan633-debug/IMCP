@@ -100,7 +100,7 @@ public class TokenService {
 
     public List<OnlineUserVo> listOnlineUsers() {
         Set<String> keys = redisTemplate.keys(ONLINE_KEY + "*");
-        List<OnlineUserVo> onlineUsers = new ArrayList<>();
+        List<OnlineUserVo> onlineUsers = new ArrayList<>(16);
         if (keys == null) {
             return onlineUsers;
         }

@@ -14,7 +14,12 @@ import java.util.List;
 public interface AiTaskMapper extends BaseMapper<AiTask> {
 
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM ai_task WHERE task_no = #{taskNo}")
+    @Select("""
+            SELECT id, tenant_id, task_no, biz_type, biz_id, service_code, status,
+                   params_json, error_msg, retry_count, max_retry, timeout_seconds,
+                   callback_url, created_by, created_at, updated_at
+            FROM ai_task WHERE task_no = #{taskNo}
+            """)
     AiTask selectByTaskNoIgnoreTenant(@Param("taskNo") String taskNo);
 
     @InterceptorIgnore(tenantLine = "true")
@@ -24,7 +29,10 @@ public interface AiTaskMapper extends BaseMapper<AiTask> {
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
             <script>
-            SELECT * FROM ai_task
+            SELECT id, tenant_id, task_no, biz_type, biz_id, service_code, status,
+                   params_json, error_msg, retry_count, max_retry, timeout_seconds,
+                   callback_url, created_by, created_at, updated_at
+            FROM ai_task
             WHERE status IN ('PENDING', 'QUEUED', 'RUNNING')
               AND updated_at &lt; #{threshold}
               AND tenant_id = #{tenantId}
