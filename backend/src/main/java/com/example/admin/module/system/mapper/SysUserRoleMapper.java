@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ public interface SysUserRoleMapper {
             </foreach>
             </script>
             """)
+    @InterceptorIgnore(tenantLine = "true")
     List<Map<String, Object>> selectByUserIds(@Param("userIds") Collection<Long> userIds);
 }
 

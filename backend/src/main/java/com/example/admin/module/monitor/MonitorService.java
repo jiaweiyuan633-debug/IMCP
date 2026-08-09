@@ -16,6 +16,7 @@ import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.common.TenantContext;
 import com.example.admin.security.TokenService;
 import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.module.system.entity.SysUser;
@@ -111,7 +112,10 @@ public class MonitorService {
         if (userIds == null) {
             return;
         }
-        List<String> usernames = userMapper.selectBatchIds(userIds).stream()
+        List<String> usernames = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, userIds)
+                        .eq(SysUser::getTenantId, TenantContext.getTenantId()))
+                .stream()
                 .map(SysUser::getUsername)
                 .toList();
         wrapper.in(SysLoginLog::getUsername, usernames);

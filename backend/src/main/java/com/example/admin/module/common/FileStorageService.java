@@ -8,6 +8,7 @@ import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.entity.SysFile;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.security.SecurityUtils;
+import com.example.admin.common.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class FileStorageService implements FileStorage {
         String url = "/uploads/" + datePath + "/" + fileName;
 
         SysFile sysFile = new SysFile();
+        sysFile.setTenantId(TenantContext.getTenantId());
         sysFile.setFileName(fileName);
         sysFile.setOriginalName(originalName);
         sysFile.setUrl(url);

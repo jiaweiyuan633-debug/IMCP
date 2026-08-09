@@ -1,0 +1,27 @@
+images:
+  backend: admin-backend:latest
+  ai: ai-service:latest
+  frontend: frontend:latest
+
+replicas:
+  backend: 2
+  ai: 2
+  frontend: 2
+
+config:
+  dbHost: mysql
+  dbPort: "3306"
+  dbName: admin_scaffold
+  dbUser: root
+  redisHost: redis
+  redisPort: "6379"
+  callbackBaseUrl: http://admin-backend:8080
+  aiBaseUrl: http://ai-service:8000
+
+secret:
+  dbPassword: root123456
+  jwtSecret: change-me
+
+ingress:
+  host: admin.example.com
+

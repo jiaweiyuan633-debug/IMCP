@@ -8,18 +8,16 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_file")
-public class SysFile {
+@TableName("sys_workflow_log")
+public class SysWorkflowLog {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long tenantId;
-    private String fileName;
-    private String originalName;
-    private String url;
-    private Long size;
-    private String storageType;
-    private Long createdBy;
+    private Long workflowId;
+    private String action;
+    private Long operatorId;
+    private String operatorName;
+    private String remark;
     private LocalDateTime createdAt;
 }
 

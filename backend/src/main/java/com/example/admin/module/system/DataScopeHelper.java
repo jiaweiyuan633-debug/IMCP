@@ -8,6 +8,7 @@ import com.example.admin.module.system.mapper.SysRoleDeptMapper;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
+import com.example.admin.common.TenantContext;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -67,7 +68,8 @@ public class DataScopeHelper {
             return List.of(-1L);
         }
         return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                        .in(SysUser::getDeptId, deptIds))
+                        .in(SysUser::getDeptId, deptIds)
+                        .eq(SysUser::getTenantId, TenantContext.getTenantId()))
                 .stream()
                 .map(SysUser::getId)
                 .toList();
