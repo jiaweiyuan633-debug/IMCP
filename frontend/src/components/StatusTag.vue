@@ -37,6 +37,8 @@ const text = computed(() => {
     SUCCEEDED: '成功',
     FAILED: '失败',
     CANCELLED: '已取消',
+    APPROVED: '已通过',
+    REJECTED: '已拒绝',
   }
   return map[value] || value
 })

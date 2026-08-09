@@ -344,3 +344,56 @@ export function deleteNotice(id: number): Promise<void> {
   return request.delete(`/system/notice/${id}`)
 }
 
+export interface TenantVo {
+  id: number
+  tenantName: string
+  tenantCode: string
+  status: number
+  contactName?: string
+  contactPhone?: string
+  createdAt?: string
+}
+
+export function getTenantPage(params: Record<string, unknown>): Promise<PageResult<TenantVo>> {
+  return request.get('/system/tenant', { params })
+}
+
+export function createTenant(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/tenant', data)
+}
+
+export function updateTenant(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/tenant', data)
+}
+
+export function deleteTenant(id: number): Promise<void> {
+  return request.delete(`/system/tenant/${id}`)
+}
+
+export interface WorkflowVo {
+  id: number
+  processName: string
+  bizType: string
+  applicantName?: string
+  content?: string
+  status: string
+  remark?: string
+  createdAt?: string
+}
+
+export function getWorkflowPage(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/workflow', { params })
+}
+
+export function createWorkflow(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/workflow', data)
+}
+
+export function approveWorkflow(id: number, remark?: string): Promise<void> {
+  return request.put(`/system/workflow/${id}/approve`, { remark })
+}
+
+export function rejectWorkflow(id: number, remark?: string): Promise<void> {
+  return request.put(`/system/workflow/${id}/reject`, { remark })
+}
+
