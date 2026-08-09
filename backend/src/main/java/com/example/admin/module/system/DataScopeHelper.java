@@ -63,6 +63,25 @@ public class DataScopeHelper {
         return List.of(loginUser.getUserId());
     }
 
+    public List<String> allowedUsernames() {
+        if (isAdmin()) {
+            return null;
+        }
+        List<Long> userIds = allowedUserIds();
+        if (userIds == null) {
+            return null;
+        }
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, userIds)
+                        .eq(SysUser::getTenantId, TenantContext.getTenantId()))
+                .stream()
+                .map(SysUser::getUsername)
+                .toList();
+    }
+
     private List<Long> userIdsByDepts(List<Long> deptIds) {
         if (deptIds == null || deptIds.isEmpty() || deptIds.contains(null)) {
             return List.of(-1L);
