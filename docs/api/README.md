@@ -42,6 +42,10 @@
 | GET/POST/PUT/DELETE | `/api/system/role`、`/api/system/role/{id}` | 角色管理 |
 | PUT | `/api/system/role/{id}/menus` | 分配菜单权限 |
 | GET/POST/PUT/DELETE | `/api/system/menu`、`/api/system/menu/tree` | 菜单管理 |
+| GET/POST/PUT/DELETE | `/api/system/dept`、`/api/system/dept/tree` | 部门管理 |
+| GET/POST/PUT/DELETE | `/api/system/post`、`/api/system/post/options` | 岗位管理 |
+| GET/POST/PUT/DELETE | `/api/system/dict/type`、`/api/system/dict/data` | 字典管理 |
+| GET/POST/PUT/DELETE | `/api/system/config` | 参数配置 |
 
 ## 监控接口
 

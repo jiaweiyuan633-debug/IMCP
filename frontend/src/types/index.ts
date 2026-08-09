@@ -50,6 +50,8 @@ export interface PageResult<T> {
 
 export interface UserVo {
   id: number
+  deptId?: number
+  deptName?: string
   username: string
   nickname?: string
   avatar?: string
@@ -60,6 +62,8 @@ export interface UserVo {
   createdAt?: string
   roleIds: number[]
   roleNames: string[]
+  postIds: number[]
+  postNames: string[]
 }
 
 export interface RoleVo {
@@ -77,6 +81,24 @@ export interface RoleOptionVo {
   id: number
   code: string
   name: string
+}
+
+export interface DeptVo {
+  id: number
+  parentId: number
+  deptName: string
+  orderNum: number
+  leader?: string
+  phone?: string
+  email?: string
+  status: number
+  children?: DeptVo[]
+}
+
+export interface PostOptionVo {
+  id: number
+  postCode: string
+  postName: string
 }
 
 export interface SearchField {

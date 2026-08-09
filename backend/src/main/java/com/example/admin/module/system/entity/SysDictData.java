@@ -2,31 +2,26 @@ package com.example.admin.module.system.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_user")
-public class SysUser {
+@TableName("sys_dict_data")
+public class SysDictData {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long deptId;
-    private String username;
-    private String password;
-    private String nickname;
-    private String avatar;
-    private String email;
-    private String phone;
+    private String dictType;
+    private String dictLabel;
+    private String dictValue;
+    private Integer dictSort;
+    private String listClass;
+    private Integer isDefault;
     private Integer status;
-    private LocalDateTime lastLoginTime;
-    private Long createdBy;
+    private String remark;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    @TableLogic
-    private Integer deleted;
 }
 

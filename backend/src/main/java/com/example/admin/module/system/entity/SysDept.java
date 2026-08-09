@@ -9,21 +9,19 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_user")
-public class SysUser {
+@TableName("sys_dept")
+public class SysDept {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long deptId;
-    private String username;
-    private String password;
-    private String nickname;
-    private String avatar;
-    private String email;
+    private Long parentId;
+    private String ancestors;
+    private String deptName;
+    private Integer orderNum;
+    private String leader;
     private String phone;
+    private String email;
     private Integer status;
-    private LocalDateTime lastLoginTime;
-    private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @TableLogic
