@@ -27,6 +27,9 @@
         <template v-else-if="column.key === 'enabled'">
           <a-switch :checked="record.enabled === 1" @change="(checked: boolean) => toggleEnabled(record, checked)" />
         </template>
+        <template v-else-if="column.key === 'severity'">
+          <a-tag :color="severityColor(record.severity || 'WARNING')">{{ record.severity || 'WARNING' }}</a-tag>
+        </template>
         <template v-else-if="column.key === 'actions'">
           <a-space>
             <a v-permission="'monitor:alert:edit'" @click="openEdit(record)">{{ t('common.edit') }}</a>
@@ -57,6 +60,15 @@
         </a-form-item>
         <a-form-item :label="t('page.aiEnabled')">
           <a-switch v-model:checked="form.enabled" :checked-value="1" :un-checked-value="0" />
+        </a-form-item>
+        <a-form-item :label="t('page.monitorAlertSeverity')">
+          <a-select v-model:value="form.severity" :options="severityOptions" />
+        </a-form-item>
+        <a-form-item :label="t('page.monitorAlertSilence')">
+          <a-input-number v-model:value="form.silenceMinutes" :min="1" :max="1440" style="width: 100%" />
+        </a-form-item>
+        <a-form-item :label="t('page.monitorAlertWebhook')">
+          <a-input v-model:value="form.webhookUrl" placeholder="https://example.com/hook" />
         </a-form-item>
         <a-form-item :label="t('page.monitorAlertRemark')">
           <a-textarea v-model:value="form.remark" :rows="3" />
@@ -103,6 +115,8 @@ const columns = [
   { title: t('page.monitorAlertMetric'), key: 'metric', width: 140 },
   { title: t('page.monitorAlertOperator'), key: 'operator', width: 80 },
   { title: t('page.monitorAlertThreshold'), dataIndex: 'threshold', key: 'threshold', width: 100 },
+  { title: t('page.monitorAlertSeverity'), key: 'severity', width: 100 },
+  { title: t('page.monitorAlertSilence'), dataIndex: 'silenceMinutes', key: 'silenceMinutes', width: 90 },
   { title: t('page.monitorJobStatus'), key: 'enabled', width: 80 },
   { title: t('page.monitorAlertRemark'), dataIndex: 'remark', key: 'remark' },
   { title: t('common.actions'), key: 'actions', width: 130 },
@@ -120,8 +134,24 @@ const operatorOptions = [
   { label: '<', value: 'lt' },
 ]
 
+const severityOptions = [
+  { label: 'INFO', value: 'INFO' },
+  { label: 'WARNING', value: 'WARNING' },
+  { label: 'CRITICAL', value: 'CRITICAL' },
+]
+
 function metricLabel(metric: string): string {
   return metricOptions.find((item) => item.value === metric)?.label || metric
+}
+
+function severityColor(severity: string): string {
+  if (severity === 'CRITICAL') {
+    return 'red'
+  }
+  if (severity === 'INFO') {
+    return 'blue'
+  }
+  return 'orange'
 }
 
 const pageNum = ref(1)
@@ -139,6 +169,9 @@ const form = reactive({
   operator: 'gt',
   threshold: 80,
   enabled: 1,
+  severity: 'WARNING',
+  silenceMinutes: 10,
+  webhookUrl: '',
   remark: '',
 })
 
@@ -174,7 +207,17 @@ function onReset() {
 
 function openCreate() {
   editingId.value = undefined
-  Object.assign(form, { ruleName: '', metric: 'CPU_USAGE', operator: 'gt', threshold: 80, enabled: 1, remark: '' })
+  Object.assign(form, {
+    ruleName: '',
+    metric: 'CPU_USAGE',
+    operator: 'gt',
+    threshold: 80,
+    enabled: 1,
+    severity: 'WARNING',
+    silenceMinutes: 10,
+    webhookUrl: '',
+    remark: '',
+  })
   modalOpen.value = true
 }
 
@@ -186,6 +229,9 @@ function openEdit(record: AlertRuleVo) {
     operator: record.operator,
     threshold: record.threshold,
     enabled: record.enabled,
+    severity: record.severity || 'WARNING',
+    silenceMinutes: record.silenceMinutes || 10,
+    webhookUrl: record.webhookUrl || '',
     remark: record.remark || '',
   })
   modalOpen.value = true
@@ -219,6 +265,9 @@ async function toggleEnabled(record: AlertRuleVo, checked: boolean) {
     operator: record.operator,
     threshold: record.threshold,
     enabled: checked ? 1 : 0,
+    severity: record.severity || 'WARNING',
+    silenceMinutes: record.silenceMinutes || 10,
+    webhookUrl: record.webhookUrl,
     remark: record.remark,
   })
   message.success(t('page.monitorJobStatusUpdated'))

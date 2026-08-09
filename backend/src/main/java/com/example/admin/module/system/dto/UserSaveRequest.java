@@ -2,6 +2,7 @@ package com.example.admin.module.system.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -16,7 +17,9 @@ public class UserSaveRequest {
     @Size(max = 50, message = "用户名长度不能超过 50")
     private String username;
 
-    @Size(min = 6, max = 32, message = "密码长度需为 6-32 位")
+    @Pattern(
+            regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,32}$",
+            message = "密码需 8-32 位，且同时包含字母和数字")
     private String password;
 
     @Size(max = 50, message = "昵称长度不能超过 50")

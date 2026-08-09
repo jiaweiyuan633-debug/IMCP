@@ -2,6 +2,7 @@ package com.example.admin.module.ai;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.RequestIdHolder;
+import com.example.admin.common.ResultCode;
 import com.example.admin.module.ai.entity.AiServiceConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
@@ -45,7 +46,7 @@ public class AiPythonClient {
                     Map.class);
             return response.getBody() == null ? Map.of() : response.getBody();
         } catch (RestClientException exception) {
-            throw new BusinessException(1010, "AI 服务不可用");
+            throw new BusinessException(ResultCode.AI_SERVICE_UNAVAILABLE);
         }
     }
 }

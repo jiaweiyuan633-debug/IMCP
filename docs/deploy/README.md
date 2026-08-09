@@ -95,6 +95,7 @@ Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%�
 - 结构化日志包含 `requestId/traceId`
 - 监控页面：服务器监控、SQL 监控、登录/操作日志、定时任务日志
 - 告警规则：CPU/内存/JVM/磁盘阈值触发后写入通知公告，并通过 SSE 实时推送
+- 审计日志：操作参数与结果自动落库，可在后台审计日志页查询
 
 ## 5. 运维脚本
 
@@ -117,6 +118,7 @@ scripts/fetch-openapi.ps1
 - 配置 Prometheus + Grafana 告警
 - 定期备份并演练恢复
 - 所有数据库变更通过 Flyway 执行
+- 当前数据库版本 V1-V19，升级时避免直接修改已执行迁移脚本
 - 多租户生产环境前确认租户标识传递、数据权限与备份粒度策略
 - 官网域名与后台域名分离，启用 HTTPS 后配置 CDN 与转化埋点
 

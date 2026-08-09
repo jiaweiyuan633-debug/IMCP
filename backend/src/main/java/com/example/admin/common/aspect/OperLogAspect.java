@@ -3,6 +3,8 @@ package com.example.admin.common.aspect;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysOperLog;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
+import com.example.admin.module.system.entity.SysAuditLog;
+import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +35,7 @@ public class OperLogAspect {
     private static final int MAX_ERROR_LENGTH = 1000;
 
     private final SysOperLogMapper operLogMapper;
+    private final SysAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
 
     @Around("@annotation(operLog)")
@@ -77,9 +80,23 @@ public class OperLogAspect {
             operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs())));
             operLogEntity.setResult(toJson(result));
             operLogMapper.insert(operLogEntity);
+            saveAuditLog(operLogEntity);
         } catch (Exception exception) {
             log.warn("Failed to write oper log", exception);
         }
+    }
+
+    private void saveAuditLog(SysOperLog operLogEntity) {
+        SysAuditLog auditLog = new SysAuditLog();
+        auditLog.setTenantId(TenantContext.getTenantId());
+        auditLog.setUserId(operLogEntity.getUserId());
+        auditLog.setModule(operLogEntity.getModule());
+        auditLog.setAction(operLogEntity.getAction());
+        auditLog.setParams(operLogEntity.getParams());
+        auditLog.setResult(operLogEntity.getResult());
+        auditLog.setStatus(operLogEntity.getStatus());
+        auditLog.setCreatedAt(LocalDateTime.now());
+        auditLogMapper.insert(auditLog);
     }
 
     private List<Object> filterArgs(Object[] args) {

@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V14。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V19。
 
 ## 版本记录
 
@@ -20,6 +20,11 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V12 | 业务表租户隔离字段 |
 | V13 | 流程定义、流程节点与工作流引擎字段 |
 | V14 | 后台管理系统通知文案更新 |
+| V15 | 告警规则分级、静默期与 Webhook |
+| V16 | 工作流转办与撤回字段 |
+| V17 | 角色、部门、岗位、字典、参数租户隔离 |
+| V18 | 审计日志表 |
+| V19 | 审计日志菜单权限 |
 
 ## 表清单
 
@@ -56,6 +61,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_job` | 定时任务，含审计字段、乐观锁 |
 | `sys_job_log` | 任务日志 |
 | `sys_alert_rule` | 服务器告警规则，含租户 |
+| `sys_audit_log` | 审计日志，含租户、操作参数与结果 |
 
 ### 业务与消息
 
@@ -89,5 +95,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - 定时任务使用 Quartz JDBC 存储，任务定义与执行日志持久化。
 - 工作流引擎包含流程定义、审批节点、待办任务与审批日志，支持按角色流转。
 - 通知实时推送使用 SSE，告警规则由定时任务检查并写入通知公告。
+- SSE 使用一次性 Ticket 建立连接，避免 Token 出现在 URL。
+- 告警支持 `INFO/WARNING/CRITICAL` 分级、静默期与 Webhook 推送。
+- 工作流支持发起人撤回和审批转办。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
 

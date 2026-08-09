@@ -19,6 +19,12 @@ public class MybatisPlusConfig {
 
     private static final Set<String> TENANT_TABLES = Set.of(
             "sys_user",
+            "sys_role",
+            "sys_dept",
+            "sys_post",
+            "sys_dict_type",
+            "sys_dict_data",
+            "sys_config",
             "sys_file",
             "sys_notice",
             "sys_notice_read",
@@ -30,6 +36,7 @@ public class MybatisPlusConfig {
             "sys_process_node",
             "sys_login_log",
             "sys_oper_log",
+            "sys_audit_log",
             "sys_sql_log",
             "sys_alert_rule",
             "ai_service_config",

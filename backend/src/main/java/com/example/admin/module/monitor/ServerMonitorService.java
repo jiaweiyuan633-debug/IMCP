@@ -15,7 +15,22 @@ import java.util.List;
 @Service
 public class ServerMonitorService {
 
-    public ServerMonitorVo get() {
+    private static final long CACHE_MS = 5000L;
+
+    private volatile ServerMonitorVo cached;
+    private volatile long cachedAt;
+
+    public synchronized ServerMonitorVo get() {
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cachedAt < CACHE_MS) {
+            return cached;
+        }
+        cached = collect();
+        cachedAt = now;
+        return cached;
+    }
+
+    private ServerMonitorVo collect() {
         OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
         MemoryUsage heap = memoryBean.getHeapMemoryUsage();
@@ -32,12 +47,19 @@ public class ServerMonitorService {
             // keep unknown
         }
 
+        double cpu = osBean.getCpuLoad();
+        if (cpu < 0) {
+            double load = Math.max(osBean.getSystemLoadAverage(), 0);
+            cpu = load / Math.max(osBean.getAvailableProcessors(), 1);
+        }
+        double cpuPercent = Math.round(Math.min(Math.max(cpu, 0), 1) * 10000.0) / 100.0;
+
         return ServerMonitorVo.builder()
                 .osName(osBean.getName())
                 .osArch(osBean.getArch())
                 .hostName(hostName)
                 .cpuCores(osBean.getAvailableProcessors())
-                .cpuLoad(Math.max(osBean.getSystemLoadAverage(), 0))
+                .cpuLoad(cpuPercent)
                 .memTotal(memTotal)
                 .memUsed(memUsed)
                 .memUsagePercent(percent(memUsed, memTotal))

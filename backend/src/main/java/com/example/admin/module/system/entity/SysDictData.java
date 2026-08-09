@@ -14,6 +14,7 @@ public class SysDictData {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private String dictType;
     private String dictLabel;
     private String dictValue;

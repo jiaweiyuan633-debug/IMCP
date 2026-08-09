@@ -14,6 +14,8 @@ import com.example.admin.module.system.mapper.SysWorkflowLogMapper;
 import com.example.admin.module.system.mapper.SysProcessDefMapper;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
 import com.example.admin.module.system.mapper.SysUserRoleMapper;
+import com.example.admin.module.system.entity.SysUser;
+import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.module.system.entity.SysWorkflowLog;
 import com.example.admin.security.LoginUser;
 import com.example.admin.security.SecurityUtils;
@@ -34,6 +36,7 @@ public class SystemWorkflowService {
     private final SysProcessDefMapper processDefMapper;
     private final SysProcessNodeMapper processNodeMapper;
     private final SysUserRoleMapper userRoleMapper;
+    private final SysUserMapper userMapper;
 
     public PageResult<SysWorkflow> page(long pageNum, long pageSize, String status) {
         Page<SysWorkflow> page = new Page<>(pageNum, pageSize);
@@ -95,7 +98,8 @@ public class SystemWorkflowService {
         }
         IPage<SysWorkflow> result = workflowMapper.selectPage(page, new LambdaQueryWrapper<SysWorkflow>()
                 .eq(SysWorkflow::getStatus, "PENDING")
-                .in(SysWorkflow::getCurrentNodeId, nodeIds)
+                .and(wrapper -> wrapper.in(SysWorkflow::getCurrentNodeId, nodeIds)
+                        .or().eq(SysWorkflow::getAssigneeUserId, user.getUserId()))
                 .orderByDesc(SysWorkflow::getId));
         return PageResult.of(result, result.getRecords());
     }
@@ -132,6 +136,43 @@ public class SystemWorkflowService {
         workflow.setRemark(remark);
         workflowMapper.updateById(workflow);
         saveLog(id, "REJECTED", remark == null ? "审批拒绝" : remark);
+    }
+
+    @Transactional
+    public void withdraw(Long id, String remark) {
+        SysWorkflow workflow = getOrThrow(id);
+        LoginUser user = SecurityUtils.getLoginUser();
+        boolean isAdmin = user.getRoles() != null && user.getRoles().contains("admin");
+        if (!isAdmin && !user.getUserId().equals(workflow.getApplicantId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        if (!"PENDING".equals(workflow.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+        }
+        workflow.setStatus("WITHDRAWN");
+        workflow.setCurrentNodeId(null);
+        workflow.setCurrentNodeName(null);
+        workflow.setAssigneeUserId(null);
+        workflow.setAssigneeName(null);
+        workflow.setRemark(remark);
+        workflowMapper.updateById(workflow);
+        saveLog(id, "WITHDRAWN", remark == null ? "发起人撤回" : remark);
+    }
+
+    @Transactional
+    public void delegate(Long id, Long delegateUserId) {
+        SysWorkflow workflow = getOrThrow(id);
+        if (!"PENDING".equals(workflow.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前流程已结束");
+        }
+        SysUser target = userMapper.selectById(delegateUserId);
+        if (target == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        workflow.setAssigneeUserId(target.getId());
+        workflow.setAssigneeName(target.getUsername());
+        workflowMapper.updateById(workflow);
+        saveLog(id, "DELEGATED", "转办给 " + target.getUsername());
     }
 
     public List<SysWorkflowLog> logs(Long id) {

@@ -73,6 +73,21 @@ Check '操作日志接口' ($operLog.code -eq 0)
 $stats = Invoke-Api -Method Get -Url "$BaseUrl/api/monitor/stats" -Headers $adminHeaders
 Check '看板统计接口' ($stats.code -eq 0)
 
+$filePage = Invoke-Api -Method Get -Url "$BaseUrl/api/system/file?pageNum=1&pageSize=5" -Headers $adminHeaders
+Check '文件管理接口' ($filePage.code -eq 0)
+
+$alertPage = Invoke-Api -Method Get -Url "$BaseUrl/api/monitor/alert-rule?pageNum=1&pageSize=5" -Headers $adminHeaders
+Check '告警规则接口' ($alertPage.code -eq 0)
+
+$workflowDefPage = Invoke-Api -Method Get -Url "$BaseUrl/api/system/workflow/def?pageNum=1&pageSize=5" -Headers $adminHeaders
+Check '流程定义接口' ($workflowDefPage.code -eq 0)
+
+$sseTicket = Invoke-Api -Method Get -Url "$BaseUrl/api/system/notice/ticket" -Headers $adminHeaders
+Check 'SSE Ticket 接口' ($sseTicket.code -eq 0 -and $sseTicket.data.Length -gt 0)
+
+$auditPage = Invoke-Api -Method Get -Url "$BaseUrl/api/monitor/audit-log?pageNum=1&pageSize=5" -Headers $adminHeaders
+Check '审计日志接口' ($auditPage.code -eq 0)
+
 $summaryTask = Invoke-Api -Method Post -Url "$BaseUrl/api/ai/tasks" -Headers $adminHeaders -Body @{
     bizType = 'text_summary'
     params = @{ content = '冒烟测试：Java 创建任务，Python 异步执行并回调 Java。' }

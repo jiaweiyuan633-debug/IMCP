@@ -3,6 +3,9 @@ package com.example.admin.module.system;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
+import com.example.admin.common.SseTicketService;
 import com.example.admin.module.system.entity.SysNotice;
 import com.example.admin.security.SecurityUtils;
 import org.springframework.http.MediaType;
@@ -28,6 +31,7 @@ public class SystemNoticeController {
 
     private final SystemNoticeService noticeService;
     private final NoticeSseService noticeSseService;
+    private final SseTicketService sseTicketService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('system:notice:list')")
@@ -44,9 +48,18 @@ public class SystemNoticeController {
         return Result.success(noticeService.latest(limit));
     }
 
+    @GetMapping("/ticket")
+    public Result<String> sseTicket() {
+        return Result.success(sseTicketService.issue(SecurityUtils.getUserId()));
+    }
+
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream() {
-        return noticeSseService.connect(SecurityUtils.getUserId());
+    public SseEmitter stream(@RequestParam String ticket) {
+        Long userId = sseTicketService.consume(ticket);
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        return noticeSseService.connect(userId);
     }
 
     @PostMapping

@@ -143,6 +143,7 @@ import {
   AlertOutlined,
   ApiOutlined,
   ApartmentOutlined,
+  AuditOutlined,
   BarChartOutlined,
   BellOutlined,
   BookOutlined,
@@ -183,9 +184,8 @@ import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getLatestNotices, getUnreadNoticeCount } from '@/api/system'
+import { getLatestNotices, getNoticeSseTicket, getUnreadNoticeCount } from '@/api/system'
 import type { NoticeVo } from '@/api/system'
-import { getAccessToken } from '@/utils/auth'
 import { API_BASE_URL } from '@/utils/env'
 
 const route = useRoute()
@@ -225,6 +225,7 @@ const iconMap: Record<string, Component> = {
   AlertOutlined,
   ApiOutlined,
   ApartmentOutlined,
+  AuditOutlined,
   BarChartOutlined,
   BookOutlined,
   CarryOutOutlined,
@@ -331,20 +332,25 @@ function onNoticeClick() {
 }
 
 function startNoticeStream() {
-  const token = getAccessToken()
-  if (!token || noticeStream) {
+  if (noticeStream) {
     return
   }
-  const source = new EventSource(`${API_BASE_URL}/system/notice/stream?token=${encodeURIComponent(token)}`)
-  source.addEventListener('notice', async () => {
-    latestNotices.value = await getLatestNotices()
-    unreadCount.value = await getUnreadNoticeCount()
-  })
-  source.onerror = () => {
-    source.close()
-    noticeStream = null
-  }
-  noticeStream = source
+  getNoticeSseTicket()
+    .then((ticket) => {
+      const source = new EventSource(`${API_BASE_URL}/system/notice/stream?ticket=${encodeURIComponent(ticket)}`)
+      source.addEventListener('notice', async () => {
+        latestNotices.value = await getLatestNotices()
+        unreadCount.value = await getUnreadNoticeCount()
+      })
+      source.onerror = () => {
+        source.close()
+        noticeStream = null
+      }
+      noticeStream = source
+    })
+    .catch(() => {
+      noticeStream = null
+    })
 }
 </script>
 

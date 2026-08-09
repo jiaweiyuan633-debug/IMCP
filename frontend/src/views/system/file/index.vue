@@ -24,10 +24,16 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'actions'">
-          <a v-permission="'system:file:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
+          <a-space>
+            <a v-if="isImage(record.url)" @click="openPreview(record)">{{ t('common.preview') }}</a>
+            <a v-permission="'system:file:delete'" @click="onDelete(record)">{{ t('common.delete') }}</a>
+          </a-space>
         </template>
       </template>
     </ProTable>
+    <a-modal v-model:open="previewOpen" :title="previewName" :footer="null" width="720">
+      <img :src="previewUrl" alt="preview" class="preview-image" />
+    </a-modal>
   </a-card>
 </template>
 
@@ -72,6 +78,9 @@ const total = ref(0)
 const loading = ref(false)
 const records = ref<FileVo[]>([])
 const searchModel = reactive<Record<string, unknown>>({})
+const previewOpen = ref(false)
+const previewUrl = ref('')
+const previewName = ref('')
 
 async function loadData() {
   loading.value = true
@@ -114,6 +123,16 @@ function formatSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+function isImage(url: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0])
+}
+
+function openPreview(record: FileVo) {
+  previewUrl.value = record.url
+  previewName.value = record.originalName || record.fileName
+  previewOpen.value = true
+}
+
 function onDelete(record: FileVo) {
   Modal.confirm({
     title: t('page.fileDeleteTitle'),
@@ -132,5 +151,11 @@ loadData()
 <style scoped>
 .toolbar {
   margin-bottom: 16px;
+}
+
+.preview-image {
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
 }
 </style>

@@ -15,6 +15,7 @@ public class SysDept {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long tenantId;
     private Long parentId;
     private String ancestors;
     private String deptName;

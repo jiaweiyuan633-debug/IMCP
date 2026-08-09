@@ -65,6 +65,9 @@ public class AlertRuleService {
         rule.setOperator(request.getOperator());
         rule.setThreshold(request.getThreshold());
         rule.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
+        rule.setSeverity(request.getSeverity() == null ? "WARNING" : request.getSeverity());
+        rule.setSilenceMinutes(request.getSilenceMinutes() == null ? 10 : request.getSilenceMinutes());
+        rule.setWebhookUrl(request.getWebhookUrl());
         rule.setRemark(request.getRemark());
         return rule;
     }

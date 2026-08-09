@@ -1,6 +1,6 @@
 # Y15 双端管理平台
 
-面向企业生产管理的全栈平台：管理员使用 **后台管理系统**，外部客户与访客访问 **Y15智能管理平台** 官网。仓库包含 Java 业务后端、Python AI 服务、Vue3 管理端与 Vue3 官网，可作为企业生产管理和 Vibe Coding 二次开发的基线（按需移除代码生成器）。
+面向企业生产管理的全栈平台：管理员使用 **后台管理系统**，外部客户与访客访问 **Y15智能管理平台** 官网。仓库包含 Java 业务后端、Python AI 服务、Vue3 管理端与 Vue3 官网，可作为企业生产管理和 Vibe Coding 二次开发的基线。
 
 ## 核心能力
 
@@ -8,11 +8,11 @@
 - RBAC 权限：用户、角色、菜单、按钮权限、数据权限（部门级与自定义范围）
 - 企业基础：部门、岗位、数据字典、参数配置、通知公告、文件管理
 - 工程能力：Quartz JDBC 持久化定时任务、本地/MinIO 文件存储、Excel 导入导出、OpenAPI
-- 数据可靠性：全表审计字段、`version` 乐观锁、逻辑删除、Flyway V1-V14
-- 实时协作：SSE 实时通知、未读角标、服务器/SQL 告警规则与推送
-- 完整工作流：流程定义、审批节点、待办任务、审批日志
-- 多租户：租户管理、业务表 `tenant_id` 隔离、数据权限联动
-- 可观测性：服务器监控、SQL 监控、登录/操作日志、Prometheus、`requestId/traceId`
+- 数据可靠性：全表审计字段、审计日志、`version` 乐观锁、逻辑删除、Flyway V1-V19
+- 实时协作：SSE Ticket 安全推送、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
+- 完整工作流：流程定义、审批节点、待办任务、撤回、转办、审批日志
+- 多租户：租户管理、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
+- 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式
 - 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
 - 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试，冒烟与压测脚本
@@ -32,7 +32,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     Y15智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V14）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V19）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 docker/      Docker Compose、Nginx 与各端 Dockerfile

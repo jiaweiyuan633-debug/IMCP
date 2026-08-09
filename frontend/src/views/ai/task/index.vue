@@ -71,10 +71,11 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { cancelAiTask, createAiTask, getAiTaskDetail, getAiTaskPage } from '@/api/ai'
+import { cancelAiTask, createAiTask, getAiSseTicket, getAiTaskDetail, getAiTaskPage } from '@/api/ai'
 import type { AiTaskVo } from '@/api/ai'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { API_BASE_URL } from '@/utils/env'
 
 const { t } = useI18n()
 
@@ -122,7 +123,7 @@ const createForm = reactive({
   bizType: 'text_summary',
   paramsText: '{"content":"Please enter the text to analyze","max_length":200}',
 })
-let pollTimer: ReturnType<typeof setInterval> | null = null
+let taskStream: EventSource | null = null
 
 const prettyResult = computed(() => {
   const raw = detail.value?.result?.resultJson
@@ -193,18 +194,38 @@ async function onCreate() {
 
 async function openDetail(record: AiTaskVo) {
   detailOpen.value = true
-  stopPolling()
+  closeTaskStream()
   await loadDetail(record.id)
   if (detail.value && !isTerminal(detail.value.status)) {
-    pollTimer = setInterval(() => loadDetail(record.id), 2000)
+    startTaskStream(record.id)
   }
+}
+
+async function startTaskStream(id: number) {
+  const ticket = await getAiSseTicket()
+  const source = new EventSource(`${API_BASE_URL}/ai/tasks/${id}/stream?ticket=${encodeURIComponent(ticket)}`)
+  source.addEventListener('task', (event) => {
+    try {
+      const data = JSON.parse((event as MessageEvent).data) as AiTaskVo
+      detail.value = data
+      if (isTerminal(data.status)) {
+        closeTaskStream()
+      }
+    } catch {
+      // ignore malformed events
+    }
+  })
+  source.onerror = () => {
+    closeTaskStream()
+  }
+  taskStream = source
 }
 
 async function loadDetail(id: number) {
   const data = await getAiTaskDetail(id)
   detail.value = data
   if (isTerminal(data.status)) {
-    stopPolling()
+    closeTaskStream()
   }
 }
 
@@ -212,10 +233,10 @@ function isTerminal(status: string) {
   return ['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(status)
 }
 
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
+function closeTaskStream() {
+  if (taskStream) {
+    taskStream.close()
+    taskStream = null
   }
 }
 
@@ -231,7 +252,7 @@ function onCancel(record: AiTaskVo) {
   })
 }
 
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(closeTaskStream)
 loadData()
 </script>
 

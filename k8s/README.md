@@ -20,7 +20,7 @@ kubectl apply -f k8s/manifests.yaml
 
 ## Helm Chart
 
-Chart 位于 `k8s/helm/admin-scaffold`，提供 ConfigMap、Secret、Deployment、Service、HPA 和 Ingress：
+Chart 位于 `k8s/helm/admin-scaffold`，提供 ConfigMap、Secret、Deployment、Service、HPA、Ingress 与官网服务：
 
 ```bash
 helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
@@ -40,6 +40,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 | --- | --- | --- |
 | `images.*` | `*-latest` | 三个服务镜像 |
 | `replicas.*` | `2` | 副本数 |
+| `images.website` | `website:latest` | 官网镜像 |
 | `config.*` | 本机环境 | DB/Redis/回调/AI 地址 |
 | `secret.*` | 示例值 | 数据库密码、JWT Secret |
 | `ingress.host` | `admin.example.com` | Ingress 域名 |

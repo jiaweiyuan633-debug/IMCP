@@ -3,6 +3,10 @@ package com.example.admin.module.ai;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
+import com.example.admin.common.SseTicketService;
+import com.example.admin.security.SecurityUtils;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiConfigSaveRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
@@ -20,7 +24,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -31,6 +37,22 @@ public class AiController {
 
     private final AiConfigService configService;
     private final AiTaskService taskService;
+    private final AiTaskStreamService taskStreamService;
+    private final SseTicketService sseTicketService;
+
+    @GetMapping("/ticket")
+    public Result<String> sseTicket() {
+        return Result.success(sseTicketService.issue(SecurityUtils.getUserId()));
+    }
+
+    @GetMapping("/tasks/{id}/stream")
+    public SseEmitter taskStream(@PathVariable Long id, @RequestParam String ticket) {
+        Long userId = sseTicketService.consume(ticket);
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        return taskStreamService.stream(id);
+    }
 
     @GetMapping("/config")
     @PreAuthorize("hasAuthority('ai:config:list')")

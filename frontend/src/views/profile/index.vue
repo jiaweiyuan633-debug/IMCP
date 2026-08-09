@@ -30,7 +30,7 @@
             name="newPassword"
             :rules="[
               { required: true, message: t('page.newPasswordRequired') },
-              { min: 6, message: t('page.passwordMin') },
+              { min: 8, message: t('page.passwordMin') },
             ]"
           >
             <a-input-password v-model:value="form.newPassword" />

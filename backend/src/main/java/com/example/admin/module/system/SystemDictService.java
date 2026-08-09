@@ -118,7 +118,7 @@ public class SystemDictService {
         SysDictType exists = typeMapper.selectOne(new LambdaQueryWrapper<SysDictType>()
                 .eq(SysDictType::getDictType, dictType.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
-            throw new BusinessException(1012, "字典类型已存在");
+            throw new BusinessException(ResultCode.DICT_TYPE_EXISTS);
         }
     }
 

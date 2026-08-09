@@ -2,11 +2,13 @@ images:
   backend: admin-backend:latest
   ai: ai-service:latest
   frontend: frontend:latest
+  website: website:latest
 
 replicas:
   backend: 2
   ai: 2
   frontend: 2
+  website: 2
 
 config:
   dbHost: mysql

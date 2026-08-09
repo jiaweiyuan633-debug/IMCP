@@ -12,9 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -28,6 +31,7 @@ public class AlertMonitorService {
     private final SystemNoticeService noticeService;
     private final NoticeSseService noticeSseService;
     private final StringRedisTemplate redisTemplate;
+    private final RestTemplate restTemplate;
 
     @Scheduled(
             initialDelayString = "${app.alert-check-initial-delay-ms:15000}",
@@ -51,7 +55,8 @@ public class AlertMonitorService {
                 continue;
             }
             String redisKey = ALERT_KEY_PREFIX + rule.getId();
-            Boolean first = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(10));
+            int silenceMinutes = rule.getSilenceMinutes() == null ? 10 : Math.max(rule.getSilenceMinutes(), 1);
+            Boolean first = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(silenceMinutes));
             if (!Boolean.TRUE.equals(first)) {
                 continue;
             }
@@ -62,16 +67,35 @@ public class AlertMonitorService {
     }
 
     private void sendNotice(SysAlertRule rule, double value) {
+        String severity = rule.getSeverity() == null ? "WARNING" : rule.getSeverity();
         SysNotice notice = new SysNotice();
-        notice.setNoticeTitle("告警：" + rule.getRuleName());
+        notice.setNoticeTitle("[" + severity + "] " + rule.getRuleName());
         notice.setNoticeType(1);
         notice.setNoticeContent(String.format(
-                "监控指标 %s 当前值 %.2f，已触发阈值 %.2f。",
-                rule.getMetric(), value, rule.getThreshold()));
+                "级别 %s，监控指标 %s 当前值 %.2f，已触发阈值 %.2f。",
+                severity, rule.getMetric(), value, rule.getThreshold()));
         notice.setStatus(1);
         noticeService.create(notice);
         noticeSseService.publishAll(notice);
-        log.warn("Alert triggered: {} current={} threshold={}", rule.getRuleName(), value, rule.getThreshold());
+        sendWebhook(rule, severity, value);
+        log.warn("Alert triggered: {} severity={} current={} threshold={}", rule.getRuleName(), severity, value, rule.getThreshold());
+    }
+
+    private void sendWebhook(SysAlertRule rule, String severity, double value) {
+        if (rule.getWebhookUrl() == null || rule.getWebhookUrl().isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("ruleName", rule.getRuleName());
+            payload.put("metric", rule.getMetric());
+            payload.put("severity", severity);
+            payload.put("currentValue", value);
+            payload.put("threshold", rule.getThreshold());
+            restTemplate.postForEntity(rule.getWebhookUrl(), payload, String.class);
+        } catch (Exception exception) {
+            log.warn("Alert webhook failed for {}", rule.getRuleName(), exception);
+        }
     }
 
     private double readMetric(ServerMonitorVo monitor, String metric) {

@@ -336,6 +336,10 @@ export function getUnreadNoticeCount(): Promise<number> {
   return request.get('/system/notice/unread-count')
 }
 
+export function getNoticeSseTicket(): Promise<string> {
+  return request.get('/system/notice/ticket')
+}
+
 export function markNoticeRead(id: number): Promise<void> {
   return request.put(`/system/notice/read/${id}`)
 }
@@ -384,6 +388,8 @@ export interface WorkflowVo {
   bizType: string
   processDefId?: number
   currentNodeName?: string
+  assigneeUserId?: number
+  assigneeName?: string
   applicantName?: string
   content?: string
   status: string
@@ -409,6 +415,14 @@ export function approveWorkflow(id: number, remark?: string): Promise<void> {
 
 export function rejectWorkflow(id: number, remark?: string): Promise<void> {
   return request.put(`/system/workflow/${id}/reject`, { remark })
+}
+
+export function withdrawWorkflow(id: number, remark?: string): Promise<void> {
+  return request.put(`/system/workflow/${id}/withdraw`, { remark })
+}
+
+export function delegateWorkflow(id: number, delegateUserId: number): Promise<void> {
+  return request.put(`/system/workflow/${id}/delegate`, { delegateUserId })
 }
 
 export interface WorkflowLogVo {

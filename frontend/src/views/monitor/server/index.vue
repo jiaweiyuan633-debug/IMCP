@@ -48,7 +48,7 @@ const diskColumns = [
 const cards = computed(() => {
   const d = data.value
   return [
-    { label: t('page.monitorCpu'), value: d ? `${d.cpuLoad.toFixed(2)}` : '-' },
+    { label: t('page.monitorCpu'), value: d ? `${d.cpuLoad.toFixed(2)}%` : '-' },
     { label: t('page.monitorMemory'), value: d ? `${d.memUsagePercent}%` : '-' },
     { label: t('page.monitorJvm'), value: d ? `${d.jvmUsagePercent}%` : '-' },
     { label: `${t('page.monitorCpu')} Cores`, value: d ? String(d.cpuCores) : '-' },

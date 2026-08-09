@@ -69,7 +69,7 @@ public class SystemConfigService {
         SysConfig exists = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
                 .eq(SysConfig::getConfigKey, configKey.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
-            throw new BusinessException(1013, "参数键名已存在");
+            throw new BusinessException(ResultCode.CONFIG_KEY_EXISTS);
         }
     }
 

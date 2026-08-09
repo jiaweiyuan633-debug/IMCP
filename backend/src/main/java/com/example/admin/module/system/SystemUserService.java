@@ -105,7 +105,7 @@ public class SystemUserService {
         boolean exists = userMapper.exists(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername().trim()));
         if (exists) {
-            throw new BusinessException(1006, "用户名已存在");
+            throw new BusinessException(ResultCode.USERNAME_EXISTS);
         }
         if (!StringUtils.hasText(request.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
@@ -141,7 +141,7 @@ public class SystemUserService {
         SysUser sameName = userMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, request.getUsername().trim()));
         if (sameName != null && !sameName.getId().equals(request.getId())) {
-            throw new BusinessException(1006, "用户名已存在");
+            throw new BusinessException(ResultCode.USERNAME_EXISTS);
         }
         user.setUsername(request.getUsername().trim());
         if (StringUtils.hasText(request.getPassword())) {
@@ -306,7 +306,7 @@ public class SystemUserService {
             boolean exists = userMapper.exists(new LambdaQueryWrapper<SysUser>()
                     .eq(SysUser::getUsername, row.getUsername().trim()));
             if (exists) {
-                throw new BusinessException(1006, "导入失败，用户名已存在：" + row.getUsername());
+                throw new BusinessException(ResultCode.USERNAME_EXISTS.getCode(), "导入失败，用户名已存在：" + row.getUsername());
             }
             SysUser user = new SysUser();
             user.setTenantId(TenantContext.getTenantId());
