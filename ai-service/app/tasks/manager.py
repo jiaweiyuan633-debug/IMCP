@@ -25,7 +25,7 @@ class TaskManager:
         self.redis = redis
         self.settings = settings
 
-    async def create_task(self, request: TaskCreateRequest) -> TaskStatusResponse:
+    async def create_task(self, request: TaskCreateRequest, request_id: str | None = None) -> TaskStatusResponse:
         if request.biz_type not in SERVICE_REGISTRY:
             raise HTTPException(status_code=400, detail=f"unsupported biz_type: {request.biz_type}")
 
@@ -36,6 +36,7 @@ class TaskManager:
             "status": "QUEUED",
             "params": request.params,
             "callback_url": request.callback_url,
+            "request_id": request_id,
             "result": None,
             "error": None,
             "retry_count": 0,
@@ -111,6 +112,8 @@ class TaskManager:
             "retry_count": data.get("retry_count", 0),
         }
         headers = {"X-Ai-Service-Token": self.settings.callback_token}
+        if data.get("request_id"):
+            headers["X-Request-Id"] = data["request_id"]
         try:
             async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
                 response = await client.post(callback_url, json=payload, headers=headers)

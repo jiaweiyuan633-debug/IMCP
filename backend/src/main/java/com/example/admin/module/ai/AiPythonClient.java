@@ -1,6 +1,7 @@
 package com.example.admin.module.ai;
 
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.RequestIdHolder;
 import com.example.admin.module.ai.entity.AiServiceConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
@@ -34,6 +35,9 @@ public class AiPythonClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        if (RequestIdHolder.get() != null) {
+            headers.set("X-Request-Id", RequestIdHolder.get());
+        }
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(
                     config.getBaseUrl() + "/api/v1/tasks",

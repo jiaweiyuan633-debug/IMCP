@@ -55,6 +55,8 @@ public class SecurityConfig {
                                 "/api/auth/login-config",
                                 "/api/ai/callback/**",
                                 "/uploads/**",
+                                "/actuator/health/**",
+                                "/actuator/prometheus",
                                 "/doc.html",
                                 "/webjars/**",
                                 "/v3/api-docs/**",

@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.schemas.task import TaskCreateRequest, TaskStatusResponse
 
@@ -12,7 +14,8 @@ async def ping() -> dict[str, str]:
 
 @router.post("/tasks", status_code=202, response_model=TaskStatusResponse)
 async def create_task(request: Request, payload: TaskCreateRequest) -> TaskStatusResponse:
-    return await request.app.state.task_manager.create_task(payload)
+    request_id = request.headers.get("X-Request-Id")
+    return await request.app.state.task_manager.create_task(payload, request_id)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
@@ -26,3 +29,8 @@ async def get_task(request: Request, task_id: str) -> TaskStatusResponse:
 @router.post("/tasks/{task_id}/retry", response_model=TaskStatusResponse)
 async def retry_task(request: Request, task_id: str) -> TaskStatusResponse:
     return await request.app.state.task_manager.retry(task_id)
+
+
+@router.get("/metrics")
+async def metrics() -> Response:
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
