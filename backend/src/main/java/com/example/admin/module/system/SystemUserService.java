@@ -49,6 +49,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class SystemUserService {
 
+    private static final String DEFAULT_INIT_PASSWORD = "admin123";
+    private static final int ENABLED = 1;
+
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
     private final SysUserRoleMapper userRoleMapper;
@@ -123,7 +126,7 @@ public class SystemUserService {
         user.setNickname(request.getNickname());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
-        user.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        user.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         user.setDeptId(request.getDeptId());
         userMapper.insert(user);
         if (request.getRoleIds() != null) {
@@ -340,7 +343,7 @@ public class SystemUserService {
             user.setNickname(row.getNickname());
             user.setEmail(row.getEmail());
             user.setPhone(row.getPhone());
-            user.setStatus(row.getStatus() == null ? 1 : row.getStatus());
+            user.setStatus(row.getStatus() == null ? ENABLED : row.getStatus());
             userMapper.insert(user);
             count++;
         }
@@ -350,7 +353,7 @@ public class SystemUserService {
     private String defaultPassword() {
         SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
                 .eq(SysConfig::getConfigKey, "sys.user.initPassword"));
-        return config == null ? "admin123" : config.getConfigValue();
+        return config == null ? DEFAULT_INIT_PASSWORD : config.getConfigValue();
     }
 
     private void checkTenantUserLimit() {

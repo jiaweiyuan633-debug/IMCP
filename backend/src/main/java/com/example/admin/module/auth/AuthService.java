@@ -48,6 +48,13 @@ import java.time.Duration;
 public class AuthService {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String CAPTCHA_CONFIG_KEY = "sys.account.captchaEnabled";
+    private static final String LOGIN_RATE_KEY_PREFIX = "login:rate:";
+    private static final String LOGIN_FAIL_KEY_PREFIX = "login:fail:";
+    private static final int RATE_LIMIT_PER_MINUTE = 20;
+    private static final int MAX_LOGIN_FAILURES = 5;
+    private static final long RATE_LIMIT_WINDOW_MINUTES = 1;
+    private static final long FAILURE_LOCK_MINUTES = 10;
 
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
@@ -88,7 +95,7 @@ public class AuthService {
                 && !totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getTotpCode())) {
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
-        redisTemplate.delete("login:fail:" + username);
+        redisTemplate.delete(LOGIN_FAIL_KEY_PREFIX + username);
 
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         List<String> perms = menuMapper.selectPermsByUserId(user.getId());
@@ -120,7 +127,7 @@ public class AuthService {
 
     public LoginConfigVo loginConfig() {
         SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, "sys.account.captchaEnabled"));
+                .eq(SysConfig::getConfigKey, CAPTCHA_CONFIG_KEY));
         return LoginConfigVo.builder()
                 .captchaEnabled(config != null && Boolean.parseBoolean(config.getConfigValue()))
                 .build();
@@ -314,26 +321,26 @@ public class AuthService {
     }
 
     private boolean isRateLimited(String ip) {
-        String key = "login:rate:" + ip;
+        String key = LOGIN_RATE_KEY_PREFIX + ip;
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1) {
-            redisTemplate.expire(key, Duration.ofMinutes(1));
+            redisTemplate.expire(key, Duration.ofMinutes(RATE_LIMIT_WINDOW_MINUTES));
         }
-        return count != null && count > 20;
+        return count != null && count > RATE_LIMIT_PER_MINUTE;
     }
 
     private void checkLoginLockout(String username) {
-        String value = redisTemplate.opsForValue().get("login:fail:" + username);
-        if (value != null && Integer.parseInt(value) >= 5) {
+        String value = redisTemplate.opsForValue().get(LOGIN_FAIL_KEY_PREFIX + username);
+        if (value != null && Integer.parseInt(value) >= MAX_LOGIN_FAILURES) {
             throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
         }
     }
 
     private void recordLoginFailure(String username) {
-        String key = "login:fail:" + username;
+        String key = LOGIN_FAIL_KEY_PREFIX + username;
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1) {
-            redisTemplate.expire(key, Duration.ofMinutes(10));
+            redisTemplate.expire(key, Duration.ofMinutes(FAILURE_LOCK_MINUTES));
         }
     }
 

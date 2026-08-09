@@ -26,6 +26,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProcessDefService {
 
+    private static final int ENABLED = 1;
+    private static final String DEFAULT_NODE_TYPE = "APPROVE";
+    private static final int DEFAULT_TIMEOUT_HOURS = 48;
+
     private final SysProcessDefMapper defMapper;
     private final SysProcessNodeMapper nodeMapper;
     private final SysWorkflowMapper workflowMapper;
@@ -42,7 +46,7 @@ public class ProcessDefService {
 
     public List<SysProcessDef> listOptions() {
         return defMapper.selectList(new LambdaQueryWrapper<SysProcessDef>()
-                .eq(SysProcessDef::getStatus, 1)
+                .eq(SysProcessDef::getStatus, ENABLED)
                 .orderByDesc(SysProcessDef::getId));
     }
 
@@ -59,7 +63,7 @@ public class ProcessDefService {
         def.setDefName(request.getDefName());
         def.setDefKey(request.getDefKey());
         def.setDescription(request.getDescription());
-        def.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        def.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         def.setCreatedBy(tryGetUserId());
         defMapper.insert(def);
         saveNodes(def.getId(), request.getNodes());
@@ -79,7 +83,7 @@ public class ProcessDefService {
         def.setDefName(request.getDefName());
         def.setDefKey(request.getDefKey());
         def.setDescription(request.getDescription());
-        def.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        def.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         def.setUpdatedBy(tryGetUserId());
         defMapper.updateById(def);
         nodeMapper.delete(new LambdaQueryWrapper<SysProcessNode>()
@@ -103,9 +107,11 @@ public class ProcessDefService {
             node.setProcessDefId(defId);
             node.setNodeName(item.getNodeName());
             node.setNodeKey(item.getNodeKey());
-            node.setNodeType(item.getNodeType() == null ? "APPROVE" : item.getNodeType());
+            node.setNodeType(item.getNodeType() == null ? DEFAULT_NODE_TYPE : item.getNodeType());
             node.setConditionExpression(item.getConditionExpression());
-            node.setTimeoutHours(item.getTimeoutHours() == null ? 48 : item.getTimeoutHours());
+            node.setTimeoutHours(item.getTimeoutHours() == null
+                    ? DEFAULT_TIMEOUT_HOURS
+                    : item.getTimeoutHours());
             node.setNodeOrder(item.getNodeOrder() == null ? order : item.getNodeOrder());
             node.setApproverRoleId(item.getApproverRoleId());
             nodeMapper.insert(node);

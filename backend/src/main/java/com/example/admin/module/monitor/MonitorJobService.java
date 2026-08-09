@@ -25,6 +25,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MonitorJobService {
 
+    private static final int ENABLED = 1;
+    private static final int DEFAULT_STATUS = 0;
+    private static final int DEFAULT_CONCURRENT = 1;
+    private static final String DEFAULT_MISFIRE_POLICY = "1";
+
     private final SysJobMapper jobMapper;
     private final SysJobLogMapper jobLogMapper;
     private final SysJobSchedulerService schedulerService;
@@ -44,7 +49,7 @@ public class MonitorJobService {
         SysJob job = toEntity(request);
         job.setCreatedBy(tryGetUserId());
         jobMapper.insert(job);
-        if (job.getStatus() != null && job.getStatus() == 1) {
+        if (job.getStatus() != null && job.getStatus() == ENABLED) {
             schedulerService.scheduleJob(job);
         }
         return job.getId();
@@ -56,7 +61,7 @@ public class MonitorJobService {
         }
         SysJob job = toEntity(request);
         jobMapper.updateById(job);
-        if (job.getStatus() != null && job.getStatus() == 1) {
+        if (job.getStatus() != null && job.getStatus() == ENABLED) {
             schedulerService.scheduleJob(job);
         } else {
             schedulerService.deleteJob(job);
@@ -80,7 +85,7 @@ public class MonitorJobService {
         }
         job.setStatus(status);
         jobMapper.updateById(job);
-        if (status == 1) {
+        if (status == ENABLED) {
             schedulerService.scheduleJob(job);
         } else {
             schedulerService.deleteJob(job);
@@ -111,9 +116,11 @@ public class MonitorJobService {
         job.setJobGroup(request.getJobGroup());
         job.setInvokeTarget(request.getInvokeTarget());
         job.setCronExpression(request.getCronExpression());
-        job.setMisfirePolicy(request.getMisfirePolicy() == null ? "1" : request.getMisfirePolicy());
-        job.setConcurrent(request.getConcurrent() == null ? 1 : request.getConcurrent());
-        job.setStatus(request.getStatus() == null ? 0 : request.getStatus());
+        job.setMisfirePolicy(request.getMisfirePolicy() == null
+                ? DEFAULT_MISFIRE_POLICY
+                : request.getMisfirePolicy());
+        job.setConcurrent(request.getConcurrent() == null ? DEFAULT_CONCURRENT : request.getConcurrent());
+        job.setStatus(request.getStatus() == null ? DEFAULT_STATUS : request.getStatus());
         job.setRemark(request.getRemark());
         return job;
     }

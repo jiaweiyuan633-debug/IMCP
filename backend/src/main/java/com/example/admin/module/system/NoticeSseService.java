@@ -17,6 +17,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class NoticeSseService {
 
+    private static final long NO_TIMEOUT = 0L;
+
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -27,7 +29,7 @@ public class NoticeSseService {
     }
 
     public SseEmitter connect(Long userId) {
-        SseEmitter emitter = new SseEmitter(0L);
+        SseEmitter emitter = new SseEmitter(NO_TIMEOUT);
         emitters.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> remove(userId, emitter));
         emitter.onTimeout(() -> remove(userId, emitter));

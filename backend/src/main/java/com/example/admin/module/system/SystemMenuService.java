@@ -17,13 +17,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemMenuService {
 
+    private static final long ROOT_PARENT_ID = 0L;
+    private static final int DEFAULT_SORT = 0;
+    private static final int VISIBLE = 1;
+    private static final int ENABLED = 1;
+
     private final SysMenuMapper menuMapper;
 
     public List<MenuVo> tree() {
         List<SysMenu> menus = menuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
                 .orderByAsc(SysMenu::getSort)
                 .orderByAsc(SysMenu::getId));
-        return buildTree(menus, 0L);
+        return buildTree(menus, ROOT_PARENT_ID);
     }
 
     public Long create(MenuSaveRequest request) {
@@ -50,16 +55,16 @@ public class SystemMenuService {
     private SysMenu toEntity(MenuSaveRequest request) {
         SysMenu menu = new SysMenu();
         menu.setId(request.getId());
-        menu.setParentId(request.getParentId() == null ? 0L : request.getParentId());
+        menu.setParentId(request.getParentId() == null ? ROOT_PARENT_ID : request.getParentId());
         menu.setName(request.getName());
         menu.setType(request.getType());
         menu.setPath(request.getPath());
         menu.setComponent(request.getComponent());
         menu.setPerm(request.getPerm());
         menu.setIcon(request.getIcon());
-        menu.setSort(request.getSort() == null ? 0 : request.getSort());
-        menu.setVisible(request.getVisible() == null ? 1 : request.getVisible());
-        menu.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        menu.setSort(request.getSort() == null ? DEFAULT_SORT : request.getSort());
+        menu.setVisible(request.getVisible() == null ? VISIBLE : request.getVisible());
+        menu.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         return menu;
     }
 

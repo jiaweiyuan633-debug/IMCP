@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SystemTenantService {
 
+    private static final int DEFAULT_USER_LIMIT = 100;
+    private static final long DEFAULT_STORAGE_LIMIT_MB = 1024L;
+
     private final SysTenantMapper tenantMapper;
     private final SysUserMapper userMapper;
 
@@ -34,8 +37,10 @@ public class SystemTenantService {
     @Transactional
     public Long create(SysTenant tenant) {
         tenant.setId(null);
-        tenant.setUserLimit(tenant.getUserLimit() == null ? 100 : tenant.getUserLimit());
-        tenant.setStorageLimitMb(tenant.getStorageLimitMb() == null ? 1024 : tenant.getStorageLimitMb());
+        tenant.setUserLimit(tenant.getUserLimit() == null ? DEFAULT_USER_LIMIT : tenant.getUserLimit());
+        tenant.setStorageLimitMb(tenant.getStorageLimitMb() == null
+                ? DEFAULT_STORAGE_LIMIT_MB
+                : tenant.getStorageLimitMb());
         tenantMapper.insert(tenant);
         validateAdminUser(tenant.getAdminUserId(), tenant.getId());
         return tenant.getId();

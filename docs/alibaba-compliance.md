@@ -18,7 +18,10 @@
 | 安全规约 | 敏感信息 | TOTP 密钥加密、文件签名访问、日志不输出敏感字段 |
 | MySQL | SQL | 自定义 SQL 已移除 `SELECT *`，改为显式字段 |
 | MySQL | 建表 | V26 为关联表补齐 `created_at/updated_at` |
+| MySQL | 索引 | V27 为登录日志、操作日志、工作流、AI 任务、公告、定时任务补齐高频查询组合索引 |
 | 工程结构 | 分层 | 新增 `ai/manager/AiTaskManager`，Service 不再直接依赖外部客户端 |
+| 编程规约 | 魔法值 | AI、租户、用户、登录限流、定时任务、告警、流程、菜单等业务默认值收敛为常量 |
+| 编程规约 | BigDecimal/日期/并发 | 复查无 `BigDecimal.equals` 等值比较、无 `SimpleDateFormat`/`Executors`/`java.sql.Date` |
 
 ## 残余整改项
 
@@ -29,6 +32,7 @@
 | MySQL | 主键 UNSIGNED | 现有 `id BIGINT` 未改为 `BIGINT UNSIGNED`，需要评估迁移影响 |
 | 工程结构 | Manager 覆盖度 | 目前 AI 已拆 Manager，文件、告警等外部能力仍为 Service 直连 |
 | 异常日志 | 外部 SDK 边界 | `SysFileService` 文件对象删除仍保留单点 `catch (Exception)`，避免 SDK 多异常类耦合 |
+| 编程规约 | 魔法值清理 | 少量低频服务仍有业务默认值硬编码，后续随模块重构继续收敛 |
 
 ## 后续建议
 

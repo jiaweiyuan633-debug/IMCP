@@ -76,9 +76,9 @@ public class MonitorService {
     public DashboardStatsVo stats() {
         long aiTotal = aiTaskMapper.selectCount(null);
         long aiSucceeded = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .eq(AiTask::getStatus, "SUCCEEDED"));
+                .eq(AiTask::getStatus, AiTaskStatus.SUCCEEDED.name()));
         long aiFailed = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
-                .eq(AiTask::getStatus, "FAILED"));
+                .eq(AiTask::getStatus, AiTaskStatus.FAILED.name()));
         long aiRunning = aiTaskMapper.selectCount(new LambdaQueryWrapper<AiTask>()
                 .in(AiTask::getStatus,
                         AiTaskStatus.PENDING.name(),

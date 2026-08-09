@@ -17,13 +17,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemDeptService {
 
+    private static final long ROOT_PARENT_ID = 0L;
+    private static final int DEFAULT_ORDER = 0;
+    private static final int ENABLED = 1;
+
     private final SysDeptMapper deptMapper;
 
     public List<DeptVo> tree() {
         List<SysDept> depts = deptMapper.selectList(new LambdaQueryWrapper<SysDept>()
                 .orderByAsc(SysDept::getOrderNum)
                 .orderByAsc(SysDept::getId));
-        return buildTree(depts, 0L);
+        return buildTree(depts, ROOT_PARENT_ID);
     }
 
     public Long create(DeptSaveRequest request) {
@@ -41,14 +45,14 @@ public class SystemDeptService {
         if (dept == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        dept.setParentId(request.getParentId() == null ? 0L : request.getParentId());
+        dept.setParentId(request.getParentId() == null ? ROOT_PARENT_ID : request.getParentId());
         dept.setAncestors(buildAncestors(dept.getParentId()));
         dept.setDeptName(request.getDeptName());
-        dept.setOrderNum(request.getOrderNum() == null ? 0 : request.getOrderNum());
+        dept.setOrderNum(request.getOrderNum() == null ? DEFAULT_ORDER : request.getOrderNum());
         dept.setLeader(request.getLeader());
         dept.setPhone(request.getPhone());
         dept.setEmail(request.getEmail());
-        dept.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        dept.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         deptMapper.updateById(dept);
     }
 
@@ -64,18 +68,18 @@ public class SystemDeptService {
     private SysDept toEntity(DeptSaveRequest request) {
         SysDept dept = new SysDept();
         dept.setId(request.getId());
-        dept.setParentId(request.getParentId() == null ? 0L : request.getParentId());
+        dept.setParentId(request.getParentId() == null ? ROOT_PARENT_ID : request.getParentId());
         dept.setDeptName(request.getDeptName());
-        dept.setOrderNum(request.getOrderNum() == null ? 0 : request.getOrderNum());
+        dept.setOrderNum(request.getOrderNum() == null ? DEFAULT_ORDER : request.getOrderNum());
         dept.setLeader(request.getLeader());
         dept.setPhone(request.getPhone());
         dept.setEmail(request.getEmail());
-        dept.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        dept.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         return dept;
     }
 
     private String buildAncestors(Long parentId) {
-        if (parentId == null || parentId == 0L) {
+        if (parentId == null || parentId == ROOT_PARENT_ID) {
             return "0";
         }
         SysDept parent = deptMapper.selectById(parentId);

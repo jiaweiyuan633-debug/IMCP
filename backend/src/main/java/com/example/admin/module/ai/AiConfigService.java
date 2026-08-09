@@ -16,6 +16,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AiConfigService {
 
+    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
+    private static final int DEFAULT_DAILY_LIMIT = 1000;
+
     private final AiServiceConfigMapper configMapper;
 
     public List<AiConfigVo> list() {
@@ -36,9 +39,11 @@ public class AiConfigService {
         if (request.getApiKey() != null && !request.getApiKey().isBlank()) {
             config.setApiKey(request.getApiKey());
         }
-        config.setTimeoutSeconds(request.getTimeoutSeconds() == null ? 60 : request.getTimeoutSeconds());
+        config.setTimeoutSeconds(request.getTimeoutSeconds() == null
+                ? DEFAULT_TIMEOUT_SECONDS
+                : request.getTimeoutSeconds());
         config.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
-        config.setDailyLimit(request.getDailyLimit() == null ? 1000 : request.getDailyLimit());
+        config.setDailyLimit(request.getDailyLimit() == null ? DEFAULT_DAILY_LIMIT : request.getDailyLimit());
         configMapper.updateById(config);
     }
 

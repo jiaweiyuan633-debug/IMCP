@@ -27,6 +27,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemRoleService {
 
+    private static final int ENABLED = 1;
+    private static final int DEFAULT_SORT = 0;
+    private static final int DEFAULT_DATA_SCOPE = 1;
+
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysRoleDeptMapper roleDeptMapper;
@@ -47,7 +51,7 @@ public class SystemRoleService {
 
     public List<RoleOptionVo> options() {
         return roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                        .eq(SysRole::getStatus, 1)
+                        .eq(SysRole::getStatus, ENABLED)
                         .orderByAsc(SysRole::getSort))
                 .stream()
                 .map(role -> RoleOptionVo.builder()
@@ -95,7 +99,7 @@ public class SystemRoleService {
         role.setDescription(request.getDescription());
         role.setStatus(request.getStatus());
         role.setDataScope(request.getDataScope());
-        role.setSort(request.getSort() == null ? 0 : request.getSort());
+        role.setSort(request.getSort() == null ? DEFAULT_SORT : request.getSort());
         roleMapper.updateById(role);
         if (request.getMenuIds() != null) {
             assignMenus(role.getId(), request.getMenuIds());
@@ -135,9 +139,9 @@ public class SystemRoleService {
         role.setCode(request.getCode().trim());
         role.setName(request.getName());
         role.setDescription(request.getDescription());
-        role.setStatus(request.getStatus() == null ? 1 : request.getStatus());
-        role.setDataScope(request.getDataScope() == null ? 1 : request.getDataScope());
-        role.setSort(request.getSort() == null ? 0 : request.getSort());
+        role.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
+        role.setDataScope(request.getDataScope() == null ? DEFAULT_DATA_SCOPE : request.getDataScope());
+        role.setSort(request.getSort() == null ? DEFAULT_SORT : request.getSort());
         return role;
     }
 

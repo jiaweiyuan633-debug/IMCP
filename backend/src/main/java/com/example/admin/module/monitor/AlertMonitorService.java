@@ -27,6 +27,11 @@ import java.util.Map;
 public class AlertMonitorService {
 
     private static final String ALERT_KEY_PREFIX = "alert:notify:";
+    private static final String DEFAULT_SEVERITY = "WARNING";
+    private static final int DEFAULT_SILENCE_MINUTES = 10;
+    private static final int MIN_SILENCE_MINUTES = 1;
+    private static final int NOTICE_TYPE = 1;
+    private static final int NOTICE_STATUS = 1;
 
     private final SysAlertRuleMapper ruleMapper;
     private final ServerMonitorService serverMonitorService;
@@ -58,7 +63,9 @@ public class AlertMonitorService {
                     continue;
                 }
                 String redisKey = ALERT_KEY_PREFIX + rule.getId();
-                int silenceMinutes = rule.getSilenceMinutes() == null ? 10 : Math.max(rule.getSilenceMinutes(), 1);
+                int silenceMinutes = rule.getSilenceMinutes() == null
+                        ? DEFAULT_SILENCE_MINUTES
+                        : Math.max(rule.getSilenceMinutes(), MIN_SILENCE_MINUTES);
                 Boolean first = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(silenceMinutes));
                 if (!Boolean.TRUE.equals(first)) {
                     continue;
@@ -73,14 +80,14 @@ public class AlertMonitorService {
     }
 
     private void sendNotice(SysAlertRule rule, double value) {
-        String severity = rule.getSeverity() == null ? "WARNING" : rule.getSeverity();
+        String severity = rule.getSeverity() == null ? DEFAULT_SEVERITY : rule.getSeverity();
         SysNotice notice = new SysNotice();
         notice.setNoticeTitle("[" + severity + "] " + rule.getRuleName());
-        notice.setNoticeType(1);
+        notice.setNoticeType(NOTICE_TYPE);
         notice.setNoticeContent(String.format(
                 "级别 %s，监控指标 %s 当前值 %.2f，已触发阈值 %.2f。",
                 severity, rule.getMetric(), value, rule.getThreshold()));
-        notice.setStatus(1);
+        notice.setStatus(NOTICE_STATUS);
         noticeService.create(notice);
         noticeSseService.publishAll(notice);
         sendWebhook(rule, severity, value);

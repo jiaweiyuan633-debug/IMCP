@@ -48,6 +48,10 @@ import java.util.Set;
 public class AiTaskService {
 
     private static final DateTimeFormatter TASK_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+    private static final String TASK_NO_PREFIX = "AI";
+    private static final int TASK_NO_RANDOM_DIGITS = 4;
+    private static final int DEFAULT_MAX_RETRY = 3;
+    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
     private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
             AiTaskStatus.SUCCEEDED,
             AiTaskStatus.FAILED,
@@ -86,7 +90,8 @@ public class AiTaskService {
             }
         }
 
-        String taskNo = "AI" + LocalDateTime.now().format(TASK_NO_FORMATTER) + RandomUtil.randomNumbers(4);
+        String taskNo = TASK_NO_PREFIX + LocalDateTime.now().format(TASK_NO_FORMATTER)
+                + RandomUtil.randomNumbers(TASK_NO_RANDOM_DIGITS);
         AiTask task = new AiTask();
         task.setTenantId(TenantContext.getTenantId());
         task.setTaskNo(taskNo);
@@ -96,8 +101,10 @@ public class AiTaskService {
         task.setStatus(AiTaskStatus.PENDING.name());
         task.setParamsJson(toJson(request.getParams()));
         task.setRetryCount(0);
-        task.setMaxRetry(3);
-        task.setTimeoutSeconds(config.getTimeoutSeconds() == null ? 60 : config.getTimeoutSeconds());
+        task.setMaxRetry(DEFAULT_MAX_RETRY);
+        task.setTimeoutSeconds(config.getTimeoutSeconds() == null
+                ? DEFAULT_TIMEOUT_SECONDS
+                : config.getTimeoutSeconds());
         task.setCallbackUrl(callbackBaseUrl + "/api/ai/callback/task");
         task.setCreatedBy(tryGetUserId());
         taskMapper.insert(task);

@@ -29,6 +29,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemDictService {
 
+    private static final int ENABLED = 1;
+    private static final int DEFAULT_SORT = 0;
+    private static final int NOT_DEFAULT = 0;
+
     private final SysDictTypeMapper typeMapper;
     private final SysDictDataMapper dataMapper;
 
@@ -87,7 +91,7 @@ public class SystemDictService {
     public List<DictDataVo> dataByType(String dictType) {
         return dataMapper.selectList(new LambdaQueryWrapper<SysDictData>()
                         .eq(SysDictData::getDictType, dictType)
-                        .eq(SysDictData::getStatus, 1)
+                        .eq(SysDictData::getStatus, ENABLED)
                         .orderByAsc(SysDictData::getDictSort))
                 .stream()
                 .map(this::toDataVo)
@@ -127,7 +131,7 @@ public class SystemDictService {
         type.setId(request.getId());
         type.setDictName(request.getDictName());
         type.setDictType(request.getDictType().trim());
-        type.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        type.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         type.setRemark(request.getRemark());
         return type;
     }
@@ -138,10 +142,10 @@ public class SystemDictService {
         data.setDictType(request.getDictType());
         data.setDictLabel(request.getDictLabel());
         data.setDictValue(request.getDictValue());
-        data.setDictSort(request.getDictSort() == null ? 0 : request.getDictSort());
+        data.setDictSort(request.getDictSort() == null ? DEFAULT_SORT : request.getDictSort());
         data.setListClass(request.getListClass());
-        data.setIsDefault(request.getIsDefault() == null ? 0 : request.getIsDefault());
-        data.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        data.setIsDefault(request.getIsDefault() == null ? NOT_DEFAULT : request.getIsDefault());
+        data.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         data.setRemark(request.getRemark());
         return data;
     }

@@ -23,6 +23,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemConfigService {
 
+    private static final int SYSTEM_CONFIG_TYPE = 1;
+
     private final SysConfigMapper configMapper;
 
     public PageResult<ConfigVo> page(ConfigQuery query) {
@@ -79,7 +81,7 @@ public class SystemConfigService {
         config.setConfigName(request.getConfigName());
         config.setConfigKey(request.getConfigKey().trim());
         config.setConfigValue(request.getConfigValue());
-        config.setConfigType(request.getConfigType() == null ? 1 : request.getConfigType());
+        config.setConfigType(request.getConfigType() == null ? SYSTEM_CONFIG_TYPE : request.getConfigType());
         config.setRemark(request.getRemark());
         return config;
     }

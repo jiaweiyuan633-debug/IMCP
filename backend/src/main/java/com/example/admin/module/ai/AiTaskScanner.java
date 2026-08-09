@@ -17,11 +17,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AiTaskScanner {
 
+    private static final int TIMEOUT_TOLERANCE_MINUTES = 1;
+    private static final String TIMEOUT_ERROR_MESSAGE = "任务执行超时";
+
     private final AiTaskMapper taskMapper;
 
     @Scheduled(fixedDelayString = "${app.ai.scan-interval-ms:30000}")
     public void scanTimeoutTasks() {
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(1);
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(TIMEOUT_TOLERANCE_MINUTES);
         List<Long> tenantIds = taskMapper.selectTenantIds();
         for (Long tenantId : tenantIds) {
             TenantContext.setTenantId(tenantId);
@@ -29,7 +32,7 @@ public class AiTaskScanner {
                 List<AiTask> tasks = taskMapper.selectTimeoutTasks(tenantId, threshold);
                 for (AiTask task : tasks) {
                     task.setStatus(AiTaskStatus.FAILED.name());
-                    task.setErrorMsg("任务执行超时");
+                    task.setErrorMsg(TIMEOUT_ERROR_MESSAGE);
                     task.setUpdatedAt(LocalDateTime.now());
                     taskMapper.updateById(task);
                     log.warn("AI task {} timed out", task.getTaskNo());

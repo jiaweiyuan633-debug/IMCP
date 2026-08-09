@@ -17,6 +17,8 @@ import java.util.concurrent.ScheduledFuture;
 @RequiredArgsConstructor
 public class AiTaskStreamService {
 
+    private static final long SSE_TIMEOUT_MILLIS = 180_000L;
+    private static final long POLL_INTERVAL_SECONDS = 2;
     private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
             AiTaskStatus.SUCCEEDED,
             AiTaskStatus.FAILED,
@@ -26,9 +28,9 @@ public class AiTaskStreamService {
     private final ThreadPoolTaskScheduler scheduler;
 
     public SseEmitter stream(Long taskId) {
-        SseEmitter emitter = new SseEmitter(180_000L);
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
         ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(
-                () -> emit(emitter, taskId), java.time.Duration.ofSeconds(2));
+                () -> emit(emitter, taskId), java.time.Duration.ofSeconds(POLL_INTERVAL_SECONDS));
         emitter.onCompletion(() -> future.cancel(false));
         emitter.onTimeout(() -> future.cancel(false));
         emitter.onError(error -> future.cancel(false));

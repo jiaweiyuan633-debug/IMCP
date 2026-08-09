@@ -22,6 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemPostService {
 
+    private static final int ENABLED = 1;
+    private static final int DEFAULT_SORT = 0;
+
     private final SysPostMapper postMapper;
 
     public PageResult<PostVo> page(PostQuery query) {
@@ -39,7 +42,7 @@ public class SystemPostService {
 
     public List<PostOptionVo> options() {
         return postMapper.selectList(new LambdaQueryWrapper<SysPost>()
-                        .eq(SysPost::getStatus, 1)
+                        .eq(SysPost::getStatus, ENABLED)
                         .orderByAsc(SysPost::getSort))
                 .stream()
                 .map(post -> PostOptionVo.builder()
@@ -82,8 +85,8 @@ public class SystemPostService {
         post.setId(request.getId());
         post.setPostCode(request.getPostCode().trim());
         post.setPostName(request.getPostName());
-        post.setSort(request.getSort() == null ? 0 : request.getSort());
-        post.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        post.setSort(request.getSort() == null ? DEFAULT_SORT : request.getSort());
+        post.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         post.setDescription(request.getDescription());
         return post;
     }

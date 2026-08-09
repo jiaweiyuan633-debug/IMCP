@@ -20,6 +20,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AlertRuleService {
 
+    private static final int ENABLED = 1;
+    private static final String DEFAULT_SEVERITY = "WARNING";
+    private static final int DEFAULT_SILENCE_MINUTES = 10;
+
     private final SysAlertRuleMapper ruleMapper;
 
     public List<SysAlertRule> listAll() {
@@ -64,9 +68,11 @@ public class AlertRuleService {
         rule.setMetric(request.getMetric());
         rule.setOperator(request.getOperator());
         rule.setThreshold(request.getThreshold());
-        rule.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
-        rule.setSeverity(request.getSeverity() == null ? "WARNING" : request.getSeverity());
-        rule.setSilenceMinutes(request.getSilenceMinutes() == null ? 10 : request.getSilenceMinutes());
+        rule.setEnabled(request.getEnabled() == null ? ENABLED : request.getEnabled());
+        rule.setSeverity(request.getSeverity() == null ? DEFAULT_SEVERITY : request.getSeverity());
+        rule.setSilenceMinutes(request.getSilenceMinutes() == null
+                ? DEFAULT_SILENCE_MINUTES
+                : request.getSilenceMinutes());
         rule.setWebhookUrl(request.getWebhookUrl());
         rule.setRemark(request.getRemark());
         return rule;

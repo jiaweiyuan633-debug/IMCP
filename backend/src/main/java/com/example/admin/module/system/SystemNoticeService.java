@@ -22,6 +22,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemNoticeService {
 
+    private static final int PUBLISHED = 1;
+    private static final int MIN_LATEST_LIMIT = 1;
+    private static final int MAX_LATEST_LIMIT = 20;
+
     private final SysNoticeMapper noticeMapper;
     private final SysNoticeReadMapper noticeReadMapper;
     private final NoticeSseService noticeSseService;
@@ -38,9 +42,9 @@ public class SystemNoticeService {
 
     public List<SysNotice> latest(int limit) {
         return noticeMapper.selectList(new LambdaQueryWrapper<SysNotice>()
-                .eq(SysNotice::getStatus, 1)
+                .eq(SysNotice::getStatus, PUBLISHED)
                 .orderByDesc(SysNotice::getId)
-                .last("LIMIT " + Math.min(Math.max(limit, 1), 20)));
+                .last("LIMIT " + Math.min(Math.max(limit, MIN_LATEST_LIMIT), MAX_LATEST_LIMIT)));
     }
 
     public Long create(SysNotice notice) {
@@ -65,7 +69,7 @@ public class SystemNoticeService {
 
     public long unreadCount(Long userId) {
         long total = noticeMapper.selectCount(new LambdaQueryWrapper<SysNotice>()
-                .eq(SysNotice::getStatus, 1));
+                .eq(SysNotice::getStatus, PUBLISHED));
         long read = noticeReadMapper.selectCount(new LambdaQueryWrapper<SysNoticeRead>()
                 .eq(SysNoticeRead::getUserId, userId));
         return Math.max(total - read, 0);

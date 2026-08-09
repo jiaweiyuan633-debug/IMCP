@@ -48,6 +48,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SystemWorkflowService {
 
+    private static final int DEFAULT_TIMEOUT_HOURS = 48;
+    private static final int TIMEOUT_NOTIFIED = 1;
+    private static final int TIMEOUT_NOT_NOTIFIED = 0;
+    private static final int NOTICE_TYPE = 1;
+    private static final int NOTICE_STATUS = 1;
+
     private final SysWorkflowMapper workflowMapper;
     private final SysWorkflowLogMapper workflowLogMapper;
     private final SysProcessDefMapper processDefMapper;
@@ -96,7 +102,7 @@ public class SystemWorkflowService {
         workflow.setStatus(WorkflowStatus.PENDING.name());
         workflow.setTenantId(TenantContext.getTenantId());
         workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
-        workflow.setTimeoutNotified(0);
+        workflow.setTimeoutNotified(TIMEOUT_NOT_NOTIFIED);
         workflowMapper.insert(workflow);
         saveLog(workflow.getId(), "STARTED", "发起流程：" + def.getDefName());
         return workflow.getId();
@@ -184,7 +190,7 @@ public class SystemWorkflowService {
         }
         applyCurrentNodes(workflow, next);
         workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
-        workflow.setTimeoutNotified(0);
+        workflow.setTimeoutNotified(TIMEOUT_NOT_NOTIFIED);
         workflowMapper.updateById(workflow);
         saveLog(id, "ADVANCED", "进入下一审批环节");
     }
@@ -252,7 +258,8 @@ public class SystemWorkflowService {
             for (SysWorkflow workflow : pending) {
                 try {
                     if (workflow.getCurrentNodeAssignedAt() == null
-                            || workflow.getTimeoutNotified() != null && workflow.getTimeoutNotified() == 1) {
+                            || workflow.getTimeoutNotified() != null
+                            && workflow.getTimeoutNotified() == TIMEOUT_NOTIFIED) {
                         continue;
                     }
                     List<SysProcessNode> nodes = currentNodes(workflow.getId());
@@ -260,18 +267,18 @@ public class SystemWorkflowService {
                             .map(SysProcessNode::getTimeoutHours)
                             .filter(hours -> hours != null)
                             .min(Integer::compareTo)
-                            .orElse(48);
+                            .orElse(DEFAULT_TIMEOUT_HOURS);
                     if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(LocalDateTime.now())) {
                         continue;
                     }
                     TenantContext.setTenantId(workflow.getTenantId());
                     SysNotice notice = new SysNotice();
                     notice.setNoticeTitle("流程超时提醒");
-                    notice.setNoticeType(1);
+                    notice.setNoticeType(NOTICE_TYPE);
                     notice.setNoticeContent("流程「" + workflow.getProcessName() + "」在节点等待超过 " + timeoutHours + " 小时。");
-                    notice.setStatus(1);
+                    notice.setStatus(NOTICE_STATUS);
                     noticeService.create(notice);
-                    workflow.setTimeoutNotified(1);
+                    workflow.setTimeoutNotified(TIMEOUT_NOTIFIED);
                     workflowMapper.updateById(workflow);
                 } catch (RuntimeException exception) {
                     log.warn("Workflow timeout reminder failed for id={}", workflow.getId(), exception);
