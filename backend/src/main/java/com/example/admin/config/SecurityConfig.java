@@ -65,6 +65,8 @@ public class SecurityConfig {
                                 "/api/auth/oauth/bind",
                                 "/api/oauth/token",
                                 "/api/ai/callback/**",
+                                "/mcp",
+                                "/mcp/message",
                                 "/uploads/**",
                                 "/files/**",
                                 "/ws/**",
