@@ -1,0 +1,37 @@
+# Prometheus 采集配置（P1-10 可观测性）
+#
+# 供平台/运维团队直接挂载到 Prometheus 容器，或并入现有 Prometheus 联邦采集。
+# 服务名与 k8s/manifests.yaml 一致；启动命令示例：
+#   prometheus --config.file=prometheus.yml --web.enable-lifecycle
+# 采集后端 /actuator/prometheus（Spring Boot Actuator + Micrometer）与 ai-service /metrics（prometheus_client）。
+global:
+  scrape_interval: 15s      # 采集周期：指标粒度与存储成本平衡点
+  evaluation_interval: 15s  # 告警规则评估周期
+  external_labels:
+    cluster: admin-scaffold
+
+rule_files:
+  - prometheus-rules.yml
+
+scrape_configs:
+  # 后端 Java 服务：Micrometer → Prometheus registry，经 actuator 暴露
+  - job_name: admin-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["admin-backend:8080"]
+
+  # AI 服务：FastAPI + prometheus_client
+  - job_name: ai-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ai-service:8000"]
+
+  # ---- 基础设施导出器（按需启用，须先部署对应 exporter 与 Service）----
+  # Redis 指标：需部署 redis-exporter 监听 9121 端口
+  # - job_name: redis-exporter
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  # MySQL 指标：需部署 mysqld-exporter 监听 9104 端口
+  # - job_name: mysqld-exporter
+  #   static_configs:
+  #     - targets: ["mysqld-exporter:9104"]

@@ -1,0 +1,23 @@
+# AlertManager 配置（P1-10 可观测性）
+#
+# 与 prometheus.yml / prometheus-rules.yml 同目录挂载。
+# 路由策略与接收人仅为脚手架基线，对接真实通知渠道（钉钉/企微/邮件/PagerDuty 等）
+# 请在 receivers 中按需配置，并调整 route 收敛参数。
+route:
+  # 相同告警名 + 作业归组，避免刷屏
+  group_by: ['alertname', 'job']
+  group_wait: 30s        # 同组首条告警等待窗口，聚合突发告警
+  group_interval: 5m     # 同组新告警发送间隔
+  repeat_interval: 4h    # 未恢复告警的重复提醒间隔
+  receiver: default
+
+receivers:
+  - name: default
+    # 对接企业通知渠道：在此填写 webhook / 邮箱等接收方。
+    # 示例（钉钉 webhook）：
+    # webhook_configs:
+    #   - url: https://oapi.dingtalk.com/robot/send?access_token=<token>
+    #     send_resolved: true
+    email_configs:
+      - to: ops@example.com
+        send_resolved: true

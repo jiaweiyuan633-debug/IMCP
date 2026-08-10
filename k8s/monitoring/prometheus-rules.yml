@@ -1,0 +1,99 @@
+# Prometheus 告警规则（P1-10 可观测性）
+#
+# 与 prometheus.yml 同目录挂载；触发后由 AlertManager 收敛并路由（见 alertmanager.yml）。
+# 阈值为脚手架基线，对接真实业务后应按 SLO 与容量规划调整。
+groups:
+  - name: admin-scaffold-availability
+    rules:
+      - alert: AdminBackendDown
+        expr: up{job="admin-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "后端服务不可用"
+          description: "admin-backend 已连续 2 分钟无法抓取，Pod 可能宕机或不可达。"
+
+      - alert: AIServiceDown
+        expr: up{job="ai-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI 服务不可用"
+          description: "ai-service 已连续 2 分钟无法抓取，AI 任务将失败或阻塞。"
+
+  - name: admin-scaffold-backend
+    rules:
+      - alert: BackendHighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (service)
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])) by (service), 1) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "后端 5xx 错误率过高"
+          description: "5 分钟内 5xx 占比超过 5%，检查接口异常或下游依赖。"
+
+      - alert: BackendHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (service, le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "后端 P95 延迟超过 1s"
+          description: "近 5 分钟 P95 响应延迟超过 1 秒，关注慢 SQL 或外部调用。"
+
+      - alert: BackendJvmHeapHighUsage
+        expr: |
+          sum by (service, instance) (
+            jvm_memory_used_bytes{area="heap"})
+            / sum by (service, instance) (
+              jvm_memory_max_bytes{area="heap"}) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "后端 JVM 堆内存使用率超过 90%"
+          description: "堆内存持续高位，可能存在内存泄漏或容量不足，建议 dump 分析。"
+
+      - alert: BackendThreadsBusy
+        expr: tomcat_threads_busy / tomcat_threads_max > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "后端 Tomcat 线程池接近饱和"
+          description: "忙碌线程占比超过 90%，请求可能排队等待，检查线程泄漏或慢请求。"
+
+  - name: admin-scaffold-infrastructure
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 不可用"
+          description: "redis-exporter 无法抓取，Redis 依赖的认证/锁/缓存功能将受影响。"
+
+      - alert: MySqlDown
+        expr: up{job="mysqld-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL 不可用"
+          description: "mysqld-exporter 无法抓取，数据库不可用将导致全站故障。"
+
+      - alert: RedisMemoryHighUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 内存使用率超过 85%"
+          description: "Redis 接近 maxmemory，触发淘汰策略可能影响缓存命中与会话。"

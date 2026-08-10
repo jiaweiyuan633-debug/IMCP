@@ -56,6 +56,11 @@ management:
   zipkin:
     tracing:
       endpoint: ${ZIPKIN_ENDPOINT:}
+  metrics:
+    # 多服务共用 Prometheus 时按应用名区分指标（prometheus 抓取目标 job 亦可区分）；
+    # micrometer-registry-prometheus 在 classpath 时默认启用 prometheus 导出
+    tags:
+      application: ${spring.application.name}
   endpoints:
     web:
       exposure:

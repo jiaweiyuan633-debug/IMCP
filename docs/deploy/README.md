@@ -82,13 +82,31 @@ Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%�
 
 ## 3. 可观测性
 
+### 指标采集（Prometheus）
+
 - 后端健康检查：`/actuator/health`（Kubernetes 探针细分使用 `/actuator/health/readiness` 与 `/actuator/health/liveness`）
-- Prometheus 指标：`/actuator/prometheus`
+- 后端指标：`/actuator/prometheus`（Micrometer，指标带 `application=admin-backend` 标签）
 - AI 指标：`/api/v1/metrics`
-- 结构化日志包含 `requestId/traceId`
+- 采集配置与告警规则位于 [k8s/monitoring/](../../k8s/monitoring/)：
+  - `prometheus.yml` —— 抓取 admin-backend / ai-service，Redis/MySQL exporter 按需启用
+  - `prometheus-rules.yml` —— 服务宕机、5xx 错误率、P95 延迟、JVM 堆、Tomcat 线程、Redis 内存等告警
+  - `alertmanager.yml` —— 告警收敛路由与接收人占位（钉钉/企微/邮件等按需填写）
+
+### 日志（Loki / ELK）
+
+- 结构化日志包含 `requestId/traceId/spanId`
+- **prod profile 下控制台输出 JSON 单行日志**（LogstashEncoder），由容器运行时 + promtail/filebeat/fluent-bit 直接采集，无需挂载日志卷；同时保留滚动 JSON 文件（`logs/admin-json.log`）供历史归档
+- dev profile 控制台保持人类可读
+
+### 监控业务面
+
 - 监控页面：服务器监控、SQL 监控、登录/操作日志、定时任务日志
 - 告警规则：CPU/内存/JVM/磁盘阈值触发后写入通知公告，并通过 SSE 实时推送
 - 审计日志：操作参数与结果自动落库，可在后台审计日志页查询
+
+### 链路追踪
+
+- Micrometer Tracing（Brave），采样率：dev 默认 1.0，prod 默认 0.1（`TRACING_SAMPLING_PROBABILITY` 可覆盖）；配置 `ZIPKIN_ENDPOINT` 后可上报 Zipkin
 
 ## 4. 运维脚本
 
