@@ -2,6 +2,7 @@ package com.example.admin.module.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
@@ -68,6 +69,7 @@ public class AuthService {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final TotpService totpService;
+    private final BusinessMetrics businessMetrics;
 
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String ip = httpRequest.getRemoteAddr();
@@ -322,6 +324,11 @@ public class AuthService {
         loginLog.setMessage(message);
         loginLog.setLoginTime(LocalDateTime.now());
         loginLogMapper.insert(loginLog);
+        if (success) {
+            businessMetrics.loginSuccess();
+        } else {
+            businessMetrics.loginFailure();
+        }
     }
 
     private boolean isRateLimited(String ip) {

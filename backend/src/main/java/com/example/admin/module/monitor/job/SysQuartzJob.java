@@ -4,6 +4,7 @@ import com.example.admin.module.monitor.entity.SysJobLogDO;
 import com.example.admin.module.monitor.entity.SysJobDO;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
+import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
@@ -28,6 +29,9 @@ public class SysQuartzJob implements Job {
 
     @Autowired
     private SysJobMapper jobMapper;
+
+    @Autowired
+    private BusinessMetrics businessMetrics;
 
     @Override
     public void execute(JobExecutionContext context) {
@@ -68,6 +72,7 @@ public class SysQuartzJob implements Job {
             jobLog.setStartTime(start);
             jobLog.setEndTime(LocalDateTime.now());
             jobLogMapper.insert(jobLog);
+            businessMetrics.jobExecution(success);
             TenantContext.clear();
         }
     }

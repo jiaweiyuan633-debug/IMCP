@@ -3,6 +3,7 @@ package com.example.admin.common.aspect;
 import com.baomidou.mybatisplus.core.metadata.TableFieldInfo;
 import com.baomidou.mybatisplus.core.metadata.TableInfo;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.FieldDiffUtils;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.FieldAudit;
@@ -46,6 +47,7 @@ public class FieldAuditAspect {
     private final SysFieldAuditLogMapper fieldAuditLogMapper;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final BusinessMetrics businessMetrics;
 
     @Around("@annotation(fieldAudit)")
     public Object around(ProceedingJoinPoint joinPoint, FieldAudit fieldAudit) throws Throwable {
@@ -95,6 +97,7 @@ public class FieldAuditAspect {
             record.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
             record.setCreatedAt(LocalDateTime.now());
             fieldAuditLogMapper.insert(record);
+            businessMetrics.fieldAuditWritten();
         } catch (RuntimeException exception) {
             log.warn("Failed to write field audit log", exception);
         }

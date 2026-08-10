@@ -1,5 +1,6 @@
 package com.example.admin.common.aspect;
 
+import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.system.entity.SysOperLogDO;
 import com.example.admin.module.system.mapper.SysOperLogMapper;
@@ -40,6 +41,7 @@ public class OperLogAspect {
     private final SysOperLogMapper operLogMapper;
     private final SysAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
+    private final BusinessMetrics businessMetrics;
 
     @Around("@annotation(operLog)")
     public Object around(ProceedingJoinPoint joinPoint, OperLog operLog) throws Throwable {
@@ -84,6 +86,7 @@ public class OperLogAspect {
             operLogEntity.setResult(toJson(result));
             operLogMapper.insert(operLogEntity);
             saveAuditLog(operLogEntity);
+            businessMetrics.operLogWritten();
         } catch (RuntimeException exception) {
             log.warn("Failed to write oper log", exception);
         }
