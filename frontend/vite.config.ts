@@ -16,8 +16,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: '后台管理系统',
-        short_name: '后台管理系统',
+        name: '智能管理平台',
+        short_name: '智能管理平台',
         start_url: '/',
         display: 'standalone',
         theme_color: '#2563eb',

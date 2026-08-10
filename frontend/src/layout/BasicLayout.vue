@@ -5,7 +5,7 @@
     <a-layout-sider class="desktop-sider" v-model:collapsed="appStore.collapsed" :width="220" theme="dark" collapsible :trigger="null">
       <div class="app-logo">
         <ApiOutlined v-if="appStore.collapsed" />
-        <template v-else>{{ t('app.title') }}</template>
+        <template v-else>{{ systemTitle }}</template>
       </div>
       <a-menu :selected-keys="[route.path]" theme="dark" mode="inline">
         <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
@@ -37,7 +37,7 @@
       :closable="false"
       :styles="{ body: { padding: 0, background: '#001529' } }"
     >
-      <div class="app-logo">{{ t('app.title') }}</div>
+      <div class="app-logo">{{ systemTitle }}</div>
       <a-menu :selected-keys="[route.path]" theme="dark" mode="inline" @click="onMenuNavigate">
         <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
           <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
@@ -212,6 +212,7 @@ import type { MessageVo, NotificationFeedItem, NoticeVo } from '@/api/system'
 import { API_BASE_URL } from '@/utils/env'
 import dayjs from 'dayjs'
 import GlobalSearch from '@/components/GlobalSearch.vue'
+import { useSystemTitle } from '@/composables/useSystemTitle'
 
 const route = useRoute()
 const router = useRouter()
@@ -219,6 +220,7 @@ const appStore = useAppStore()
 const permissionStore = usePermissionStore()
 const userStore = useUserStore()
 const { t, te, locale } = useI18n()
+const systemTitle = useSystemTitle()
 const latestMessages = ref<MessageVo[]>([])
 const latestNotices = ref<NoticeVo[]>([])
 const unreadCount = ref(0)
@@ -316,7 +318,7 @@ watch(
   () => route.path,
   () => {
     const title = route.meta.title as string | undefined
-    document.title = title ? `${menuTitle(title)} - ${t('app.title')}` : t('app.title')
+    document.title = title ? `${menuTitle(title)} - ${systemTitle.value}` : systemTitle.value
     if (title) {
       appStore.addTab({ path: route.path, title })
     }

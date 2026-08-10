@@ -2,12 +2,12 @@
 
 ## 总体结构
 
-Y15 双端管理平台由四个运行时组成：
+智能管理平台由四个运行时组成：
 
 - `backend`：Spring Boot 3.3，承载认证、系统管理、监控、AI 编排、工作流、租户与文件能力
 - `ai-service`：FastAPI 异步任务服务，负责算法执行与回调
 - `frontend`：后台管理系统，Vue3 + Ant Design Vue
-- `website`：Y15智能管理平台官网，Vue3
+- `website`：智能管理平台官网，Vue3
 
 ## 数据流
 

@@ -1,6 +1,8 @@
 export default {
   app: {
     title: '后台管理系统',
+    userTitle: '用户个人管理系统',
+    platform: '智能管理平台',
   },
   common: {
     search: '查询',

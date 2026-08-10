@@ -18,7 +18,7 @@
 - 多租户：租户配额、租户管理员、角色/部门/字典/参数/业务表 `tenant_id` 隔离、数据权限联动
 - 可观测性：服务器监控、SQL 监控、操作日志、审计日志、Prometheus、`requestId/traceId`
 - 前端体验：全量中英文国际化、暗黑模式、移动端响应式、PWA 离线缓存
-- 官网转化：Y15智能管理平台提供产品展示、解决方案、定价与预约演示
+- 官网转化：智能管理平台提供产品展示、解决方案、定价与预约演示
 - 交付质量：GitHub Actions 覆盖后端/前端/AI/官网构建测试、前端 ESLint、后端 JaCoCo 覆盖率门槛、CodeQL，冒烟与压测脚本
 
 ## 扩展进度
@@ -62,7 +62,7 @@
 
 ```text
 frontend/    后台管理系统（Vue3 管理端）
-website/     Y15智能管理平台官网
+website/     智能管理平台官网
 backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V41）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料

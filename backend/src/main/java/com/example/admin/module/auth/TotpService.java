@@ -46,7 +46,7 @@ public class TotpService {
 
     public String buildOtpauthUrl(String secret, String username) {
         String encoded = URLEncoder.encode(username, StandardCharsets.UTF_8);
-        return "otpauth://totp/Y15:" + encoded + "?secret=" + secret + "&issuer=Y15";
+        return "otpauth://totp/智能管理平台:" + encoded + "?secret=" + secret + "&issuer=智能管理平台";
     }
 
     public boolean verify(String secret, String code) {

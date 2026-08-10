@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <a-card class="login-card">
-      <div class="login-title">{{ t('app.title') }}</div>
+      <div class="login-title">{{ t('app.platform') }}</div>
       <a-form layout="vertical" :model="form" @finish="onSubmit">
         <a-form-item
           :label="t('login.username')"
@@ -105,6 +105,7 @@ async function onOauth(entry: OauthProviderVo) {
 }
 
 onMounted(async () => {
+  document.title = t('app.platform')
   const config = await getLoginConfig()
   captchaEnabled.value = config.captchaEnabled
   if (config.captchaEnabled) {

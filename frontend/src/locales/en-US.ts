@@ -1,6 +1,8 @@
 export default {
   app: {
     title: 'Admin Console',
+    userTitle: 'User Portal',
+    platform: 'Smart Management Platform',
   },
   common: {
     search: 'Search',

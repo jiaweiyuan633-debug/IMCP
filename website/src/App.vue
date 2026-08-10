@@ -3,8 +3,8 @@
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="#top">
-          <span class="brand-mark">Y15</span>
-          <span class="brand-name">Y15智能管理平台</span>
+          <span class="brand-mark">智</span>
+          <span class="brand-name">智能管理平台</span>
         </a>
         <button class="nav-toggle" aria-label="菜单" @click="navOpen = !navOpen">
           <Menu v-if="!navOpen" :size="22" />
@@ -22,11 +22,11 @@
 
     <main id="top">
       <section class="hero">
-        <img class="hero-visual" src="/src/assets/dashboard-preview.svg" alt="Y15智能管理平台管理后台预览" />
+        <img class="hero-visual" src="/src/assets/dashboard-preview.svg" alt="智能管理平台管理后台预览" />
         <div class="hero-overlay" />
         <div class="container hero-content">
           <p class="eyebrow">企业生产管理 · 双端智能平台</p>
-          <h1>Y15智能管理平台</h1>
+          <h1>智能管理平台</h1>
           <p class="hero-lead">
             一个平台覆盖组织权限、流程审批、AI 任务、实时监控与多租户管理，让企业管理从经验驱动升级为数据驱动。
           </p>
@@ -78,7 +78,7 @@
             <p>信息密度、操作效率与安全边界并重，适合高频重复的日常工作。</p>
           </div>
           <div class="product-showcase">
-            <img src="/src/assets/dashboard-preview.svg" alt="Y15后台管理系统界面" />
+            <img src="/src/assets/dashboard-preview.svg" alt="后台管理系统界面" />
             <div class="product-points">
               <div v-for="point in productPoints" :key="point.title" class="point">
                 <CheckCircle2 :size="22" />
@@ -135,7 +135,7 @@
         <div class="container contact-grid">
           <div class="contact-copy">
             <p class="eyebrow">预约演示</p>
-            <h2>30 分钟了解 Y15 是否适合你</h2>
+            <h2>30 分钟了解智能管理平台是否适合你</h2>
             <p>提交需求后，顾问会结合你的组织规模和业务流程，给出部署建议与演示方案。</p>
             <div class="contact-info">
               <Phone :size="20" />
@@ -177,7 +177,7 @@
     <footer class="site-footer">
       <div class="container footer-inner">
         <div>
-          <span class="brand-mark">Y15</span>
+          <span class="brand-mark">智</span>
           <p>企业智能管理平台，后台管理系统 + 前台官网一体化交付。</p>
         </div>
         <div class="footer-links">
@@ -186,7 +186,7 @@
           <a href="#pricing">定价</a>
           <a href="#contact">联系我们</a>
         </div>
-        <p class="copyright">© 2026 Y15智能管理平台</p>
+        <p class="copyright">© 2026 智能管理平台</p>
       </div>
     </footer>
   </div>
