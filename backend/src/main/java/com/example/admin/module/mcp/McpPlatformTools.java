@@ -16,14 +16,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
 /**
- * 平台 MCP Server 工具集：对外暴露只读查询工具（用户 / 设备 / 平台统计），
+ * 平台 MCP Server 工具集：聚合内置平台工具与外部 {@link PlatformToolProvider} 扩展工具，
  * 供 Claude Desktop 等外部 MCP 客户端安全调用。
+ *
+ * <p>内置工具为只读查询（用户 / 设备 / 平台统计）；新增工具请实现
+ * {@link PlatformToolProvider} 并注册为 Spring Bean，将自动聚合到本集合。
  */
 @Component
 @RequiredArgsConstructor
@@ -32,8 +36,16 @@ public class McpPlatformTools {
     private final SysUserMapper userMapper;
     private final DeviceMapper deviceMapper;
     private final ObjectMapper objectMapper;
+    private final List<PlatformToolProvider> externalToolProviders;
 
     public List<SyncToolSpecification> toolSpecifications() {
+        List<SyncToolSpecification> specs = new ArrayList<>(platformTools());
+        externalToolProviders.forEach(provider -> specs.addAll(provider.toolSpecifications()));
+        return specs;
+    }
+
+    /** 内置平台只读工具（本类自持，避免工具逻辑散落）。 */
+    private List<SyncToolSpecification> platformTools() {
         return List.of(
                 tool("list_users", "查询用户列表", "分页查询平台用户，可带用户名/昵称关键词过滤",
                         List.of(

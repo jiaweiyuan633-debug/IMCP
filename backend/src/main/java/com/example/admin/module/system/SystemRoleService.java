@@ -13,6 +13,7 @@ import com.example.admin.module.system.entity.SysRoleDO;
 import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysRoleMenuMapper;
 import com.example.admin.module.system.mapper.SysRoleDeptMapper;
+import com.example.admin.module.system.mapper.SysUserRoleMapper;
 import com.example.admin.security.TokenService;
 import com.example.admin.module.system.vo.RoleOptionVo;
 import com.example.admin.module.system.vo.RoleVo;
@@ -35,6 +36,7 @@ public class SystemRoleService {
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysRoleDeptMapper roleDeptMapper;
+    private final SysUserRoleMapper userRoleMapper;
     private final TokenService tokenService;
 
     public PageResult<RoleVo> page(RoleQuery query) {
@@ -120,12 +122,13 @@ public class SystemRoleService {
 
     @Transactional
     public void assignMenus(Long roleId, List<Long> menuIds) {
+        List<Long> userIds = userRoleMapper.selectUserIdsByRoleIds(List.of(roleId));
         roleMenuMapper.deleteByRoleId(roleId);
-        if (menuIds == null || menuIds.isEmpty()) {
-            return;
+        if (menuIds != null && !menuIds.isEmpty()) {
+            roleMenuMapper.insertBatch(roleId, menuIds);
         }
-        roleMenuMapper.insertBatch(roleId, menuIds);
-        tokenService.evictAllPermissions();
+        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效绑定该角色的用户，避免 KEYS 全扫与缓存雪崩
+        tokenService.evictPermissionsByUserIds(userIds);
     }
 
     public void assignDepts(Long roleId, List<Long> deptIds) {

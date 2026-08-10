@@ -13,7 +13,8 @@ public class AiConfigVo {
     private String name;
     private String model;
     private String baseUrl;
-    private String apiKey;
+    /** 是否已配置 API Key（Key 本身不回显，仅标记存在性） */
+    private boolean hasApiKey;
     private Integer timeoutSeconds;
     private Integer enabled;
     private Integer dailyLimit;

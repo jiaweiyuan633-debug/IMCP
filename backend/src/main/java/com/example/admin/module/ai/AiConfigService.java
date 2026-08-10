@@ -9,6 +9,7 @@ import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.vo.AiConfigVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -58,7 +59,7 @@ public class AiConfigService {
                 .name(config.getName())
                 .model(config.getModel())
                 .baseUrl(config.getBaseUrl())
-                .apiKey(config.getApiKey())
+                .hasApiKey(StringUtils.hasText(config.getApiKey()))
                 .timeoutSeconds(config.getTimeoutSeconds())
                 .enabled(config.getEnabled())
                 .dailyLimit(config.getDailyLimit())

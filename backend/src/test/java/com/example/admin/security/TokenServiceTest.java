@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,5 +49,29 @@ class TokenServiceTest {
         when(redisTemplate.keys("auth:perms:*")).thenReturn(Set.of("auth:perms:1", "auth:perms:2"));
         tokenService.deleteCacheKey("auth:perms:*");
         verify(redisTemplate).delete(anyCollection());
+    }
+
+    @Test
+    void evictUserPermissionsDeletesSingleKey() {
+        tokenService.evictUserPermissions(7L);
+        verify(redisTemplate).delete("auth:perms:7");
+    }
+
+    @Test
+    void evictUserPermissionsIgnoresNull() {
+        tokenService.evictUserPermissions(null);
+        verify(redisTemplate, never()).delete(any(String.class));
+    }
+
+    @Test
+    void evictPermissionsByUserIdsDeletesEachKey() {
+        tokenService.evictPermissionsByUserIds(List.of(1L, 2L));
+        verify(redisTemplate).delete(List.of("auth:perms:1", "auth:perms:2"));
+    }
+
+    @Test
+    void evictPermissionsByUserIdsSkipsEmpty() {
+        tokenService.evictPermissionsByUserIds(List.of());
+        verify(redisTemplate, never()).delete(anyCollection());
     }
 }

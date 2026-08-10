@@ -191,13 +191,14 @@ public class SystemUserService {
     @Transactional
     public void assignRoles(Long userId, List<Long> roleIds) {
         userRoleMapper.deleteByUserId(userId);
+        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效该用户，避免全局 KEYS 全扫与缓存雪崩
+        tokenService.evictUserPermissions(userId);
         if (roleIds == null || roleIds.isEmpty()) {
             return;
         }
         for (Long roleId : roleIds) {
             userRoleMapper.insert(userId, roleId);
         }
-        tokenService.evictAllPermissions();
     }
 
     public void assignPosts(Long userId, List<Long> postIds) {

@@ -8,7 +8,7 @@ export interface AiConfigVo {
   name: string
   model?: string
   baseUrl: string
-  apiKey?: string
+  hasApiKey?: boolean
   timeoutSeconds: number
   enabled: number
   dailyLimit?: number

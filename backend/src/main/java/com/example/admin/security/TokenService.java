@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -164,6 +165,23 @@ public class TokenService {
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
+    }
+
+    /** 精准失效单个用户的权限缓存（避免角色变更时 KEYS 全扫与全局缓存雪崩）。 */
+    public void evictUserPermissions(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        redisTemplate.delete(PERMS_KEY + userId);
+    }
+
+    /** 批量失效指定用户的权限缓存。 */
+    public void evictPermissionsByUserIds(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        List<String> keys = userIds.stream().map(id -> PERMS_KEY + id).toList();
+        redisTemplate.delete(keys);
     }
 }
 

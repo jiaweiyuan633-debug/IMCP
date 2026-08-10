@@ -100,4 +100,23 @@ class SystemUserServiceTest {
         verify(userRoleMapper).insert(eq(10L), eq(2L));
         verify(userPostMapper).insert(eq(10L), eq(3L));
     }
+
+    @Test
+    void assignRolesEvictsUserPermissions() {
+        userService.assignRoles(7L, List.of(2L, 3L));
+
+        verify(userRoleMapper).deleteByUserId(7L);
+        verify(userRoleMapper).insert(eq(7L), eq(2L));
+        verify(userRoleMapper).insert(eq(7L), eq(3L));
+        verify(tokenService).evictUserPermissions(7L);
+    }
+
+    @Test
+    void assignRolesClearAlsoEvicts() {
+        // 清空角色必须失效权限缓存，否则用户仍持旧权限直到 TTL
+        userService.assignRoles(7L, List.of());
+
+        verify(userRoleMapper).deleteByUserId(7L);
+        verify(tokenService).evictUserPermissions(7L);
+    }
 }

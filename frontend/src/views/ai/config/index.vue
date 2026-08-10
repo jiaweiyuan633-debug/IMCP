@@ -31,7 +31,11 @@
           <a-input v-model:value="form.baseUrl" placeholder="http://localhost:8000" />
         </a-form-item>
         <a-form-item :label="t('page.aiApiKey')">
-          <a-input-password v-model:value="form.apiKey" />
+          <a-input-password
+            v-model:value="form.apiKey"
+            :placeholder="editingId ? t('page.aiApiKeyEditPlaceholder') : t('page.aiApiKeyPlaceholder')"
+          />
+          <div v-if="editingId && hasApiKey" class="api-key-hint">{{ t('page.aiApiKeyHint') }}</div>
         </a-form-item>
         <a-form-item :label="t('page.aiTimeout')">
           <a-input-number v-model:value="form.timeoutSeconds" :min="5" :max="300" style="width: 100%" />
@@ -76,6 +80,7 @@ const modalOpen = ref(false)
 const configs = ref<AiConfigVo[]>([])
 const editingId = ref<number | undefined>()
 const enabled = ref(true)
+const hasApiKey = ref(false)
 const form = reactive({
   name: '',
   provider: 'openai',
@@ -102,12 +107,13 @@ async function loadData() {
 
 function openEdit(record: AiConfigVo) {
   editingId.value = record.id
+  hasApiKey.value = !!record.hasApiKey
   Object.assign(form, {
     name: record.name,
     provider: record.provider || 'openai',
     model: record.model || '',
     baseUrl: record.baseUrl,
-    apiKey: record.apiKey || '',
+    apiKey: '',
     timeoutSeconds: record.timeoutSeconds,
     dailyLimit: record.dailyLimit || 1000,
   })
@@ -142,3 +148,11 @@ async function onSubmit() {
 
 onMounted(loadData)
 </script>
+
+<style scoped>
+.api-key-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #52c41a;
+}
+</style>

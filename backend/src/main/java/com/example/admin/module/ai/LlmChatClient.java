@@ -18,20 +18,31 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * OpenAI 兼容大模型直连客户端：POST {baseUrl}/v1/chat/completions。
+ * OpenAI 兼容大模型直连实现（{@link LlmProvider} SPI 默认实现）：
+ * POST {baseUrl}/v1/chat/completions。
  * 独立 RestTemplate（120s 读超时），不占用共享 5s 超时的任务派发实例。
+ *
+ * <p>支持 provider 标识：openai（OpenAI 官方）与 local（Ollama / vLLM / LM Studio 等
+ * 本地 OpenAI 兼容服务），二者协议一致，共用同一实现。
  */
 @Component
 @RequiredArgsConstructor
-public class LlmChatClient {
+public class LlmChatClient implements LlmProvider {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 120_000;
 
     private final RestTemplate chatRestTemplate = buildRestTemplate();
 
+    @Override
+    public Set<String> providerNames() {
+        return Set.of("openai", "local");
+    }
+
+    @Override
     public String chat(AiServiceConfigDO config, String model, List<Map<String, String>> messages, Double temperature) {
         String resolvedModel = StringUtils.hasText(model) ? model : config.getModel();
         if (!StringUtils.hasText(resolvedModel)) {

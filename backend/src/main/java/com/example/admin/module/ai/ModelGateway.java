@@ -28,7 +28,7 @@ import java.util.Map;
 public class ModelGateway {
 
     private final AiServiceConfigMapper configMapper;
-    private final LlmChatClient llmChatClient;
+    private final List<LlmProvider> llmProviders;
     private final PromptTemplateService promptTemplateService;
     private final KnowledgeService knowledgeService;
     private final StringRedisTemplate redisTemplate;
@@ -64,7 +64,8 @@ public class ModelGateway {
         }
 
         long start = System.currentTimeMillis();
-        String content = llmChatClient.chat(config, request.getModel(), messages, request.getTemperature());
+        String content = resolveProvider(config.getProvider())
+                .chat(config, request.getModel(), messages, request.getTemperature());
         long durationMs = System.currentTimeMillis() - start;
 
         return AiChatVo.builder()
@@ -103,5 +104,18 @@ public class ModelGateway {
             }
         }
         return null;
+    }
+
+    /** 按 provider 路由到对应 {@link LlmProvider} 实现；未命中或为空时回退到默认实现（OpenAI 兼容）。 */
+    private LlmProvider resolveProvider(String provider) {
+        if (StringUtils.hasText(provider)) {
+            for (LlmProvider candidate : llmProviders) {
+                if (candidate.providerNames().contains(provider)) {
+                    return candidate;
+                }
+            }
+        }
+        return llmProviders.stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("未注册任何 LlmProvider 实现"));
     }
 }
