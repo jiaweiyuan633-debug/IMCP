@@ -19,6 +19,14 @@ data:
   # 生产配置层必需项：缺失会导致后端启动失败（fail-fast）
   FRONTEND_URL: {{ .Values.config.frontendUrl }}
   CORS_ALLOWED_ORIGIN_PATTERNS: {{ .Values.config.corsAllowedOriginPatterns }}
+  # 上传持久化挂载点：本地存储 root + /uploads 静态资源根（P2-15 高可用）
+  UPLOAD_PATH: {{ .Values.storage.uploadPath }}
+{{- if .Values.config.redisSentinelMaster }}
+  # Redis 主从哨兵（可选）：仅当 master 非空时注入，避免空值误激活后端哨兵段（application-prod.yml on-property）
+  REDIS_SENTINEL_MASTER: {{ .Values.config.redisSentinelMaster }}
+  REDIS_SENTINEL_NODES: {{ .Values.config.redisSentinelNodes }}
+  REDIS_SENTINEL_PASSWORD: {{ .Values.config.redisSentinelPassword }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Secret
@@ -31,6 +39,22 @@ stringData:
   TOTP_ENCRYPTION_KEY: {{ .Values.secret.totpEncryptionKey }}
   AUTH_TOKEN: {{ .Values.secret.aiAuthToken }}
   MCP_AUTH_TOKEN: {{ .Values.secret.mcpAuthToken }}
+{{- if .Values.storage.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-upload
+spec:
+  accessModes:
+    - {{ .Values.storage.accessMode }}
+  {{- with .Values.storage.className }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -47,6 +71,22 @@ spec:
         app: {{ .Release.Name }}-backend
     spec:
       automountServiceAccountToken: false
+      # 优雅停机宽限期 > 后端 prod 关闭超时（30s），排空在途请求再销毁
+      terminationGracePeriodSeconds: {{ .Values.storage.terminationGracePeriodSeconds }}
+      # 多副本打散到不同节点，避免单节点故障拖垮全部实例（P2-15 高可用）
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-backend
+      {{- if .Values.storage.enabled }}
+      volumes:
+        - name: upload
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-upload
+      {{- end }}
       containers:
         - name: backend
           image: {{ .Values.images.backend }}
@@ -56,6 +96,11 @@ spec:
             {{- toYaml .Values.securityContext.backend | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.backend | nindent 12 }}
+          {{- if .Values.storage.enabled }}
+          volumeMounts:
+            - name: upload
+              mountPath: {{ .Values.storage.uploadPath }}
+          {{- end }}
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -94,6 +139,15 @@ spec:
         app: {{ .Release.Name }}-ai
     spec:
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.storage.terminationGracePeriodSeconds }}
+      # 多副本打散到不同节点（P2-15 高可用）
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-ai
       containers:
         - name: ai
           image: {{ .Values.images.ai }}

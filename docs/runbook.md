@@ -51,10 +51,18 @@ scripts/load-test-multi.ps1
 
 文件访问需要短期签名 Token，重新上传或通过文件管理页获取 Token。
 
+## 高可用（P2-15）
+
+- **上传持久化**：Helm 默认创建上传 PVC（`storage.enabled=true`）挂到后端 `/data/uploads`，`UPLOAD_PATH` 指向挂载点。多副本必须使用 ReadWriteMany（RWX）存储类，否则 Pod 间文件不可见、Pod 重建即丢。
+- **Redis 主从哨兵**：设置 `config.redisSentinelMaster` + `config.redisSentinelNodes` 后后端自动切换哨兵拓扑（`application-prod.yml` `on-property: REDIS_SENTINEL_MASTER` 条件激活）；留空则单实例。切换时**必须成对设置 master 与 nodes**，只设其一会因 placeholder 缺失而启动失败。主节点故障时哨兵自动提升从节点，应用无需重启。
+- **多副本打散**：backend/ai 带 `topologySpreadConstraints`（软约束），故障节点只损失单副本。
+- **优雅停机**：prod 关闭超时 30s，滚动更新时 readiness 先转 Down 再关闭，避免在途请求中断。若探针窗口不足，检查 `storage.terminationGracePeriodSeconds`（默认 60s）是否大于关闭超时。
+
 ## 生产发布检查项
 
 - 部署只走 Helm Chart（`k8s/helm/admin-scaffold`）或 ArgoCD，禁止直接 `kubectl apply` 零散资源，避免清单漂移
 - 配置 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、数据库密码、AI 回调 Token
+- 确认上传卷存储类为 RWX（`--set storage.className=...`），Redis 单点则按需启用哨兵
 - 开启 HTTPS 与 WAF
 - 配置 Prometheus + Grafana 告警
 - 执行备份演练

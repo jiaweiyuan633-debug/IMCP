@@ -56,7 +56,8 @@ spec:
     - Ingress
   ingress:
     - ports:
-        - port: 80
+        # 与 nginx 实际监听端口一致（frontend/nginx.conf listen 8080）；default-deny 下端口不符会阻断前端
+        - port: 8080
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -70,4 +71,5 @@ spec:
     - Ingress
   ingress:
     - ports:
-        - port: 80
+        # 与 nginx 实际监听端口一致（website/nginx.conf listen 8080）
+        - port: 8080

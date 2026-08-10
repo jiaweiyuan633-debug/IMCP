@@ -87,7 +87,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --set ingress.host=admin.example.com
 ```
 
-密钥必须通过 `--set secret.*` 显式注入（values 默认留空，未注入时模板顶部 `fail` 校验直接终止渲染，杜绝明文默认密钥上生产）。Chart 默认部署 backend/ai/frontend/website 各 2 副本，backend/ai 带 HPA、PDB 与 NetworkPolicy。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过外部 Secret（Vault / External Secrets / Sealed Secrets）注入密钥。
+密钥必须通过 `--set secret.*` 显式注入（values 默认留空，未注入时模板顶部 `fail` 校验直接终止渲染，杜绝明文默认密钥上生产）。Chart 默认部署 backend/ai/frontend/website 各 2 副本，backend/ai 带 HPA、PDB 与 NetworkPolicy。高可用项（P2-15）：上传卷默认挂 PVC（`storage.enabled=true`，多副本需 ReadWriteMany 存储类）、可选用 Redis 主从哨兵（`--set config.redisSentinelMaster=... --set config.redisSentinelNodes=...`，成对注入）、backend/ai 多副本打散、prod 优雅停机（30s 关闭超时）。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过外部 Secret（Vault / External Secrets / Sealed Secrets）注入密钥。
 
 ## 3. 可观测性
 

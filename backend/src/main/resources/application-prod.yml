@@ -5,7 +5,14 @@
 #    绝不允许静默回落 dev 明文兜底（JwtProperties / TotpService 会在非 dev 下拒绝开发默认密钥）。
 # 2. 关闭接口文档与信息泄露面：springdoc / knife4j / health 详情。
 # 3. 采样率降为 0.1（P1-10 可观测性），默认值即可，环境变量可覆盖。
+# 4. 优雅停机（P2-15 高可用）：滚动更新/缩容时 readiness 先转 Down 摘流量再关闭，
+#    不中断在途请求；需配合 Deployment terminationGracePeriodSeconds（宽限期 > 关闭超时）。
+server:
+  shutdown: graceful
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME}
@@ -59,3 +66,23 @@ app:
 jwt:
   # 生产不设默认：缺失、等于 dev/占位密钥或长度不足时 JwtProperties 校验将抛异常
   secret: ${JWT_SECRET}
+---
+# Redis 主从哨兵（可选，P2-15 高可用）：仅当注入 REDIS_SENTINEL_MASTER 时激活本段，
+# 切换为主从哨兵拓扑（Spring 检测到 sentinel 配置即优先于上方 host/port 单实例）；
+# 未注入时沿用单实例 standalone 配置（默认）。哨兵连接为惰性，节点故障自动切换主从。
+# 注意：Helm 图表对空值不注入 REDIS_SENTINEL_MASTER（避免空字符串误激活本段）。
+spring:
+  config:
+    activate:
+      on-property: REDIS_SENTINEL_MASTER
+  data:
+    redis:
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      sentinel:
+        # 哨兵监控的主节点名；与 nodes 必须成对注入，否则 placeholder 解析失败启动即报错
+        master: ${REDIS_SENTINEL_MASTER}
+        # 逗号分隔的哨兵节点列表，如 host1:26379,host2:26379
+        nodes: ${REDIS_SENTINEL_NODES}
+        # 哨兵节点自身的认证口令（可选）
+        password: ${REDIS_SENTINEL_PASSWORD:}

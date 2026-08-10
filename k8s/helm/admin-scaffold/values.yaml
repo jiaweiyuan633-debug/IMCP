@@ -83,6 +83,26 @@ config:
   # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）
   frontendUrl: http://admin-frontend:8080
   corsAllowedOriginPatterns: https://admin.example.com
+  # 可选：Redis 主从哨兵高可用。不设（留空）则后端走 redisHost/redisPort 单实例；
+  # 设置 master 时后端自动切换为哨兵拓扑（application-prod.yml on-property 激活）。
+  # 空值时模板不注入 REDIS_SENTINEL_MASTER，避免空字符串误激活哨兵段。
+  redisSentinelMaster: ""
+  # 逗号分隔哨兵节点：host1:26379,host2:26379，与 master 成对设置
+  redisSentinelNodes: ""
+  # 哨兵节点自身认证口令（可选）
+  redisSentinelPassword: ""
+
+# 上传文件持久化：本地存储（app.storage.type=local，默认）多副本必须共享同一存储卷，
+# 否则文件散落在各 Pod 本地盘且 Pod 重建即丢。多副本需 ReadWriteMany（RWX）存储类。
+storage:
+  enabled: true
+  className: ""
+  accessMode: ReadWriteMany
+  size: 10Gi
+  # 后端上传目录（挂载点），同时作为 /uploads 静态资源根目录
+  uploadPath: /data/uploads
+  # 优雅停机宽限期（秒）：> 后端关闭超时（prod 配置 30s），留出在途请求排空时间
+  terminationGracePeriodSeconds: 60
 
 # 密钥一律不留默认值：部署时必须通过 --set secret.*=... 显式注入，
 # 留空或未注入时 all.yaml 顶部 fail 校验将终止渲染，杜绝明文默认密钥上生产。
