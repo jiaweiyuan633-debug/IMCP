@@ -37,12 +37,16 @@ public class NoticeSseService {
         return emitter;
     }
 
+    /**
+     * 仅通过 Redis 频道广播，由各实例（含本实例）的 {@link NoticeSseRedisListener} 在本地投递，
+     * 避免本实例「本地推送 + Redis 回环推送」造成重复投递。Redis 不可用时降级为本实例本地推送。
+     */
     public void publishAll(Object payload) {
-        publishLocal(payload);
         try {
             redisTemplate.convertAndSend("notice:sse", objectMapper.writeValueAsString(payload));
         } catch (JsonProcessingException | DataAccessException exception) {
-            log.warn("Failed to broadcast notice to redis", exception);
+            log.warn("公告广播到 Redis 失败，降级本地推送", exception);
+            publishLocal(payload);
         }
     }
 

@@ -1,6 +1,6 @@
 package com.example.admin.module.ai;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.example.admin.common.MessageBizType;
 import com.example.admin.common.ScheduledTaskLock;
 import com.example.admin.module.ai.entity.AiTaskDO;
@@ -42,10 +42,17 @@ public class AiTaskScanner {
                 try {
                     List<AiTaskDO> tasks = taskMapper.selectTimeoutTasks(tenantId, threshold);
                     for (AiTaskDO task : tasks) {
-                        task.setStatus(AiTaskStatus.FAILED.name());
-                        task.setErrorMsg(TIMEOUT_ERROR_MESSAGE);
-                        task.setUpdatedAt(LocalDateTime.now());
-                        taskMapper.updateById(task);
+                        // 条件更新：仅当任务仍处于非终态时才置为超时失败，避免覆盖并发回调已写入的终态，
+                        // 并据此跳过重复通知（updated == 0 说明已被回调抢占处理）
+                        int updated = taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                                .eq(AiTaskDO::getId, task.getId())
+                                .in(AiTaskDO::getStatus, AiTaskStatus.PENDING.name(), AiTaskStatus.QUEUED.name(), AiTaskStatus.RUNNING.name())
+                                .set(AiTaskDO::getStatus, AiTaskStatus.FAILED.name())
+                                .set(AiTaskDO::getErrorMsg, TIMEOUT_ERROR_MESSAGE)
+                                .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
+                        if (updated == 0) {
+                            continue;
+                        }
                         notifyTimeout(task);
                         log.warn("AI task {} timed out", task.getTaskNo());
                     }

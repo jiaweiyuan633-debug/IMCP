@@ -38,7 +38,10 @@ public class SystemConfigService {
         return PageResult.of(result, records);
     }
 
-    @Cacheable(value = "configs", key = "#configKey")
+    /**
+     * 缓存键含租户维度：sys_config 受租户拦截器过滤，键只取 configKey 会造成跨租户配置串扰。
+     */
+    @Cacheable(value = "configs", key = "T(com.example.admin.common.TenantContext).getTenantId() + ':' + #configKey")
     public String getByKey(String configKey) {
         SysConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<SysConfigDO>()
                 .eq(SysConfigDO::getConfigKey, configKey));

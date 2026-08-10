@@ -11,6 +11,7 @@ import com.example.admin.module.system.entity.SysMessageDO;
 import com.example.admin.module.system.mapper.SysMessageMapper;
 import com.example.admin.module.system.mapper.SysMessageReadMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,7 +29,7 @@ public class SystemMessageService {
 
     private final SysMessageMapper messageMapper;
     private final SysMessageReadMapper messageReadMapper;
-    private final MessageRealtimeService messageRealtimeService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PageResult<SysMessageDO> page(long pageNum, long pageSize, String messageType, Integer readStatus) {
         Long userId = com.example.admin.security.SecurityUtils.getUserId();
@@ -105,7 +106,8 @@ public class SystemMessageService {
     public Long sendBroadcast(Long senderId, String messageType, String title, String content,
                               String bizType, Long bizId) {
         Long id = insert(senderId, null, messageType, title, content, bizType, bizId);
-        messageRealtimeService.broadcast(pushPayload(id, messageType, title, bizType, bizId));
+        // 事务提交后推送，事务回滚则消息与推送一并撤销
+        eventPublisher.publishEvent(new MessagePushEvent(null, pushPayload(id, messageType, title, bizType, bizId)));
         return id;
     }
 
@@ -152,7 +154,7 @@ public class SystemMessageService {
 
     private void push(Long userId, Long id, String messageType, String title,
                       String bizType, Long bizId) {
-        messageRealtimeService.pushToUser(userId, pushPayload(id, messageType, title, bizType, bizId));
+        eventPublisher.publishEvent(new MessagePushEvent(userId, pushPayload(id, messageType, title, bizType, bizId)));
     }
 
     private Map<String, Object> pushPayload(Long id, String messageType, String title,

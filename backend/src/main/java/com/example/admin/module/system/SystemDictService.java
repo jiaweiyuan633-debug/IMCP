@@ -87,7 +87,11 @@ public class SystemDictService {
         return PageResult.of(result, records);
     }
 
-    @Cacheable(value = "dictData", key = "#dictType")
+    /**
+     * 缓存键含租户维度：sys_dict_data 受租户拦截器过滤（同一 dictType 不同租户数据不同），
+     * 若键只取 dictType 会造成跨租户数据串扰。
+     */
+    @Cacheable(value = "dictData", key = "T(com.example.admin.common.TenantContext).getTenantId() + ':' + #dictType")
     public List<DictDataVo> dataByType(String dictType) {
         return dataMapper.selectList(new LambdaQueryWrapper<SysDictDataDO>()
                         .eq(SysDictDataDO::getDictType, dictType)
