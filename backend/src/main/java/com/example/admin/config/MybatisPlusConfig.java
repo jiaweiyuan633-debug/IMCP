@@ -52,7 +52,9 @@ public class MybatisPlusConfig {
             "ai_service_config",
             "ai_task",
             "ai_task_result",
-            "sys_device");
+            "sys_device",
+            "sys_channel_config",
+            "sys_channel_log");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
