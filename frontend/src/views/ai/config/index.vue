@@ -21,6 +21,12 @@
         <a-form-item :label="t('page.aiConfigName')" required>
           <a-input v-model:value="form.name" />
         </a-form-item>
+        <a-form-item :label="t('page.aiProvider')">
+          <a-select v-model:value="form.provider" :options="providerOptions" />
+        </a-form-item>
+        <a-form-item :label="t('page.aiModel')">
+          <a-input v-model:value="form.model" placeholder="gpt-4o-mini" />
+        </a-form-item>
         <a-form-item :label="t('page.aiBaseUrl')" required>
           <a-input v-model:value="form.baseUrl" placeholder="http://localhost:8000" />
         </a-form-item>
@@ -55,7 +61,9 @@ const { t } = useI18n()
 const columns = [
   { title: t('page.aiConfigCode'), dataIndex: 'code', key: 'code' },
   { title: t('page.aiConfigName'), dataIndex: 'name', key: 'name' },
-  { title: t('page.aiBaseUrl'), dataIndex: 'baseUrl', key: 'baseUrl' },
+  { title: t('page.aiProvider'), dataIndex: 'provider', key: 'provider', width: 90 },
+  { title: t('page.aiModel'), dataIndex: 'model', key: 'model', ellipsis: true },
+  { title: t('page.aiBaseUrl'), dataIndex: 'baseUrl', key: 'baseUrl', ellipsis: true },
   { title: t('page.aiTimeout'), dataIndex: 'timeoutSeconds', key: 'timeoutSeconds', width: 100 },
   { title: t('page.aiDailyLimit'), dataIndex: 'dailyLimit', key: 'dailyLimit', width: 110 },
   { title: t('page.aiEnabled'), key: 'enabled', width: 90 },
@@ -70,11 +78,18 @@ const editingId = ref<number | undefined>()
 const enabled = ref(true)
 const form = reactive({
   name: '',
+  provider: 'openai',
+  model: '',
   baseUrl: '',
   apiKey: '',
   timeoutSeconds: 60,
   dailyLimit: 1000,
 })
+
+const providerOptions = [
+  { label: 'OpenAI', value: 'openai' },
+  { label: 'Local', value: 'local' },
+]
 
 async function loadData() {
   loading.value = true
@@ -89,6 +104,8 @@ function openEdit(record: AiConfigVo) {
   editingId.value = record.id
   Object.assign(form, {
     name: record.name,
+    provider: record.provider || 'openai',
+    model: record.model || '',
     baseUrl: record.baseUrl,
     apiKey: record.apiKey || '',
     timeoutSeconds: record.timeoutSeconds,
@@ -107,6 +124,8 @@ async function onSubmit() {
   try {
     await updateAiConfig(editingId.value, {
       name: form.name,
+      provider: form.provider,
+      model: form.model || undefined,
       baseUrl: form.baseUrl,
       apiKey: form.apiKey || undefined,
       timeoutSeconds: form.timeoutSeconds,

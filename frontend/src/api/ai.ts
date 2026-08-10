@@ -4,7 +4,9 @@ import type { PageResult } from '@/types'
 export interface AiConfigVo {
   id: number
   code: string
+  provider?: string
   name: string
+  model?: string
   baseUrl: string
   apiKey?: string
   timeoutSeconds: number
@@ -49,6 +51,8 @@ export function updateAiConfig(
   id: number,
   data: {
     name: string
+    provider?: string
+    model?: string
     baseUrl: string
     apiKey?: string
     timeoutSeconds: number

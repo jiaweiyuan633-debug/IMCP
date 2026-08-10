@@ -16,6 +16,8 @@ public class AiConfigSaveRequest {
     @NotBlank(message = "服务地址不能为空")
     private String baseUrl;
 
+    private String provider;
+    private String model;
     private String apiKey;
     private Integer timeoutSeconds;
     private Integer enabled;

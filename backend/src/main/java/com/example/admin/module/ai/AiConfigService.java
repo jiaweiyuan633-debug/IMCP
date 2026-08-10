@@ -36,6 +36,8 @@ public class AiConfigService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         config.setName(request.getName());
+        config.setProvider(request.getProvider());
+        config.setModel(request.getModel());
         config.setBaseUrl(request.getBaseUrl());
         if (request.getApiKey() != null && !request.getApiKey().isBlank()) {
             config.setApiKey(request.getApiKey());
@@ -52,7 +54,9 @@ public class AiConfigService {
         return AiConfigVo.builder()
                 .id(config.getId())
                 .code(config.getCode())
+                .provider(config.getProvider())
                 .name(config.getName())
+                .model(config.getModel())
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
                 .timeoutSeconds(config.getTimeoutSeconds())

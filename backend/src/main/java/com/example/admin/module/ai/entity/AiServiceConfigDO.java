@@ -13,7 +13,9 @@ public class AiServiceConfigDO {
     private Long id;
     private Long tenantId;
     private String code;
+    private String provider;
     private String name;
+    private String model;
     private String baseUrl;
     private String apiKey;
     private Integer timeoutSeconds;
