@@ -5,7 +5,7 @@ export interface McpServerVo {
   id: number
   name: string
   url: string
-  authToken?: string
+  hasAuthToken?: boolean
   enabled: number
   sort: number
   remark?: string

@@ -55,20 +55,15 @@ PWA 离线缓存：
 
 ## 2. Kubernetes
 
-### 原生清单
-
-```bash
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/manifests.yaml
-```
-
-### Helm Chart
-
-密钥必须通过 `--set secret.*` 显式注入（values 默认留空，未注入时模板渲染直接失败，杜绝明文默认密钥上生产）：
+> **Helm Chart（`k8s/helm/admin-scaffold`）是 K8s 部署的唯一来源**。原生清单（`k8s/manifests.yaml` / `k8s/configmap.yaml`）已移除，避免与 Chart 漂移。生产环境经 ArgoCD（`gitops/argocd/application.yaml`）声明式同步，或直接执行：
 
 ```bash
 helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --namespace admin-scaffold --create-namespace \
+  --set images.backend=registry.example.com/admin-backend:1.0.0 \
+  --set images.ai=registry.example.com/ai-service:1.0.0 \
+  --set images.frontend=registry.example.com/admin-frontend:1.0.0 \
+  --set images.website=registry.example.com/website:1.0.0 \
   --set config.dbHost=mysql \
   --set secret.dbPassword='<强口令>' \
   --set secret.jwtSecret='<≥32 位随机串>' \
@@ -78,7 +73,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --set ingress.host=admin.example.com
 ```
 
-Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%，2-6 副本）和 Ingress。官网如需独立 K8s 服务，也可按相同模板扩展。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过外部 Secret（Vault / External Secrets / Sealed Secrets）注入密钥。
+密钥必须通过 `--set secret.*` 显式注入（values 默认留空，未注入时模板顶部 `fail` 校验直接终止渲染，杜绝明文默认密钥上生产）。Chart 默认部署 backend/ai/frontend/website 各 2 副本，backend/ai 带 HPA、PDB 与 NetworkPolicy。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过外部 Secret（Vault / External Secrets / Sealed Secrets）注入密钥。
 
 ## 3. 可观测性
 
@@ -131,6 +126,6 @@ scripts/fetch-openapi.ps1
 - 配置 Prometheus + Grafana 告警
 - 定期备份并演练恢复
 - 所有数据库变更通过 Flyway 执行
-- 当前数据库版本 V1-V33，升级时避免直接修改已执行迁移脚本
+- 当前数据库版本 V1-V41，升级时避免直接修改已执行迁移脚本
 - 多租户生产环境前确认租户标识传递、数据权限与备份粒度策略
 - 官网域名与后台域名分离，启用 HTTPS 后配置 CDN 与转化埋点

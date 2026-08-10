@@ -1,12 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: y15-admin-scaffold
+  name: admin-scaffold
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://github.com/jiaweiyuan633-debug/Y15-framework.git
+    # TODO: 替换为实际私有 Git 仓库地址（Helm Chart 唯一来源，勿与原生清单混用）
+    repoURL: https://github.com/your-org/admin-scaffold.git
     targetRevision: main
     path: k8s/helm/admin-scaffold
     helm:

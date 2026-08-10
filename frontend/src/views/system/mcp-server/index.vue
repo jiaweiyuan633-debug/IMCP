@@ -51,7 +51,12 @@
           <a-input v-model:value="form.url" :placeholder="t('page.mcpUrlPlaceholder')" :maxlength="255" />
         </a-form-item>
         <a-form-item :label="t('page.mcpAuthToken')">
-          <a-input-password v-model:value="form.authToken" :placeholder="t('page.mcpTokenPlaceholder')" :maxlength="255" />
+          <a-input-password
+            v-model:value="form.authToken"
+            :placeholder="editingId ? t('page.mcpTokenEditPlaceholder') : t('page.mcpTokenPlaceholder')"
+            :maxlength="255"
+          />
+          <div v-if="editingId && hasToken" class="token-hint">{{ t('page.mcpTokenHint') }}</div>
         </a-form-item>
         <a-form-item :label="t('page.mcpStatus')">
           <a-select v-model:value="form.enabled" :options="statusOptions" />
@@ -176,6 +181,7 @@ const columns = [
 const saving = ref(false)
 const modalOpen = ref(false)
 const editingId = ref<number | undefined>()
+const hasToken = ref(false)
 const form = reactive<McpServerSaveRequest>({
   name: '',
   url: '',
@@ -195,16 +201,18 @@ const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, o
 
 function openCreate() {
   editingId.value = undefined
+  hasToken.value = false
   Object.assign(form, { name: '', url: '', authToken: '', enabled: 1, sort: 0, remark: '' })
   modalOpen.value = true
 }
 
 function openEdit(record: McpServerVo) {
   editingId.value = record.id
+  hasToken.value = !!record.hasAuthToken
   Object.assign(form, {
     name: record.name,
     url: record.url,
-    authToken: record.authToken || '',
+    authToken: '',
     enabled: record.enabled,
     sort: record.sort,
     remark: record.remark || '',
@@ -336,6 +344,11 @@ async function onCall() {
 }
 .danger {
   color: #ff4d4f;
+}
+.token-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #52c41a;
 }
 .call-result {
   max-height: 320px;

@@ -99,19 +99,14 @@ MySQL/Redis 启动后，后端通过 Flyway 自动完成建表与基础数据初
 
 ## Kubernetes 与 Helm
 
-使用原生清单：
-
-```bash
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/manifests.yaml
-```
-
-使用 Helm Chart（推荐，包含 HPA 与 Ingress）：
+使用 Helm Chart（K8s 部署的唯一来源，含 HPA、PDB 与 Ingress；原生清单已移除避免漂移）：
 
 ```bash
 helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --namespace admin-scaffold --create-namespace
 ```
+
+生产环境请通过 `--set secret.*` 显式注入密钥（留空时模板 fail-fast），详见 [k8s/README.md](k8s/README.md)。
 
 详见 [k8s/README.md](k8s/README.md)。
 

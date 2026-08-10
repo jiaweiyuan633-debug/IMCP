@@ -15,6 +15,8 @@ kubectl apply -f gitops/argocd/application.yaml
 
 ArgoCD 会监听 `main` 分支，自动同步 `k8s/helm/admin-scaffold`，并开启 `prune/selfHeal`。
 
+> **Helm Chart 是 K8s 部署的唯一来源**（原生清单已移除），ArgoCD 仅消费该 Chart；`values-prod.yaml` 中的 `secret.*` 由部署时注入（见下）。
+
 当前工程已完成 Playwright E2E、覆盖率门槛、PWA 离线缓存、API 版本化与 GitOps 交付。
 
 ## 生产要求

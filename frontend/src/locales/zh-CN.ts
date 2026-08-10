@@ -813,6 +813,8 @@ export default {
     mcpCallError: '调用失败',
     mcpUrlPlaceholder: 'https://example.com/mcp',
     mcpTokenPlaceholder: '留空则匿名访问',
+    mcpTokenEditPlaceholder: '留空表示不修改',
+    mcpTokenHint: '已配置认证令牌',
   },
 }
 

@@ -813,6 +813,8 @@ export default {
     mcpCallError: 'Call failed',
     mcpUrlPlaceholder: 'https://example.com/mcp',
     mcpTokenPlaceholder: 'Leave empty for anonymous access',
+    mcpTokenEditPlaceholder: 'Leave empty to keep current token',
+    mcpTokenHint: 'Auth token configured',
   },
 }
 

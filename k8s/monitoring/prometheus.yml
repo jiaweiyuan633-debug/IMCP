@@ -1,7 +1,7 @@
 # Prometheus 采集配置（P1-10 可观测性）
 #
 # 供平台/运维团队直接挂载到 Prometheus 容器，或并入现有 Prometheus 联邦采集。
-# 服务名与 k8s/manifests.yaml 一致；启动命令示例：
+# 服务名与 k8s/helm/admin-scaffold 模板保持一致；启动命令示例：
 #   prometheus --config.file=prometheus.yml --web.enable-lifecycle
 # 采集后端 /actuator/prometheus（Spring Boot Actuator + Micrometer）与 ai-service /metrics（prometheus_client）。
 global:

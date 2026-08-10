@@ -50,7 +50,15 @@ public class McpConfigService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "服务 ID 不能为空");
         }
-        mcpServerMapper.updateById(toEntity(request));
+        SysMcpServerDO server = toEntity(request);
+        // 令牌不回显给前端，编辑留空表示不修改：从库中保留原令牌，避免空串覆盖
+        if (!StringUtils.hasText(request.getAuthToken())) {
+            SysMcpServerDO existing = mcpServerMapper.selectById(request.getId());
+            if (existing != null) {
+                server.setAuthToken(existing.getAuthToken());
+            }
+        }
+        mcpServerMapper.updateById(server);
     }
 
     public void updateStatus(Long id, Integer enabled) {
@@ -90,7 +98,7 @@ public class McpConfigService {
                 .id(server.getId())
                 .name(server.getName())
                 .url(server.getUrl())
-                .authToken(server.getAuthToken())
+                .hasAuthToken(StringUtils.hasText(server.getAuthToken()))
                 .enabled(server.getEnabled())
                 .sort(server.getSort())
                 .remark(server.getRemark())

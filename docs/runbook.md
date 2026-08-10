@@ -15,7 +15,7 @@ scripts/load-test-multi.ps1
 
 ## 数据库
 
-- Flyway 自动迁移，当前版本 V1-V29。
+- Flyway 自动迁移，当前版本 V1-V41。
 - 禁止直接修改已执行的迁移脚本；变更必须新增 V 系列脚本。
 - 定期执行 `scripts/backup-drill.ps1` 验证备份可恢复。
 
@@ -53,6 +53,7 @@ scripts/load-test-multi.ps1
 
 ## 生产发布检查项
 
+- 部署只走 Helm Chart（`k8s/helm/admin-scaffold`）或 ArgoCD，禁止直接 `kubectl apply` 零散资源，避免清单漂移
 - 配置 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、数据库密码、AI 回调 Token
 - 开启 HTTPS 与 WAF
 - 配置 Prometheus + Grafana 告警

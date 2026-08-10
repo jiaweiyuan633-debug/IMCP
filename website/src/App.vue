@@ -143,7 +143,7 @@
             </div>
             <div class="contact-info">
               <Mail :size="20" />
-              <span>hello@y15-platform.com</span>
+              <span>hello@example.com</span>
             </div>
           </div>
           <form class="contact-form" @submit.prevent="submit">
