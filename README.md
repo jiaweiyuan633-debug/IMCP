@@ -136,7 +136,6 @@ GitOps 交付见 [gitops/README.md](gitops/README.md)。
 - 接口文档：`docs/api/`
 - 数据库设计：`docs/database/`
 - 部署教程：`docs/deploy/`
-- 演示与答辩材料：`docs/demo-outline.md`
 - 架构说明：`docs/architecture.md`
 - 架构设计规约：`docs/architecture-conventions.md`
 - 运维手册：`docs/runbook.md`
