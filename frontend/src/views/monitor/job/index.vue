@@ -1,5 +1,52 @@
 <template>
   <a-card :title="t('page.monitorJobTitle')">
+    <div v-if="scheduler" class="scheduler-panel">
+      <a-row :gutter="[16, 16]">
+        <a-col :xs="12" :sm="8" :lg="6">
+          <a-card class="metric-card">
+            <div class="metric-value">
+              <a-tag :color="scheduler.clustered ? 'success' : 'default'">
+                {{ scheduler.clustered ? t('page.monitorSchedulerEnabled') : t('page.monitorSchedulerDisabled') }}
+              </a-tag>
+            </div>
+            <div class="metric-label">{{ t('page.monitorSchedulerStatus') }}</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :sm="8" :lg="6">
+          <a-card class="metric-card">
+            <div class="metric-value">{{ scheduler.nodeCount }}</div>
+            <div class="metric-label">{{ t('page.monitorSchedulerNodeCount') }}</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :sm="8" :lg="6">
+          <a-card class="metric-card">
+            <div class="metric-value">{{ scheduler.jobCount }}</div>
+            <div class="metric-label">{{ t('page.monitorSchedulerJobCount') }}</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :sm="8" :lg="6">
+          <a-card class="metric-card">
+            <div class="metric-value">{{ scheduler.triggerCount }}</div>
+            <div class="metric-label">{{ t('page.monitorSchedulerTriggerCount') }}</div>
+          </a-card>
+        </a-col>
+      </a-row>
+      <a-descriptions :column="3" bordered size="small" class="scheduler-descriptions">
+        <a-descriptions-item :label="t('page.monitorSchedulerInstanceId')">{{ scheduler.instanceId }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerInstanceName')">{{ scheduler.instanceName }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerThreadPool')">{{ scheduler.threadPoolSize }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerFiredCount')">
+          <a-tag :color="scheduler.firedTriggerCount > 0 ? 'processing' : 'default'">{{ scheduler.firedTriggerCount }}</a-tag>
+        </a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerPaused')">{{ scheduler.pausedTriggerCount }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerOverdue')">
+          <a-tag :color="scheduler.overdueTriggerCount > 0 ? 'warning' : 'default'">{{ scheduler.overdueTriggerCount }}</a-tag>
+        </a-descriptions-item>
+        <a-descriptions-item :label="t('page.monitorSchedulerError')">
+          <a-tag :color="scheduler.errorTriggerCount > 0 ? 'error' : 'default'">{{ scheduler.errorTriggerCount }}</a-tag>
+        </a-descriptions-item>
+      </a-descriptions>
+    </div>
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
       <a-button v-permission="'monitor:job:add'" type="primary" @click="openCreate">{{ t('page.monitorAddJob') }}</a-button>
@@ -81,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
@@ -92,10 +139,11 @@ import {
   deleteJob,
   getJobLogPage,
   getJobPage,
+  getSchedulerStatus,
   runJob,
   updateJob,
 } from '@/api/monitor'
-import type { JobLogVo, JobVo } from '@/api/monitor'
+import type { JobLogVo, JobVo, SchedulerStatusVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { useTableQuery } from '@/composables/useTableQuery'
@@ -142,6 +190,19 @@ const yesNoOptions = [
   { label: t('common.enabled'), value: 1 },
   { label: t('common.disabled'), value: 0 },
 ]
+
+const scheduler = ref<SchedulerStatusVo | null>(null)
+
+async function loadSchedulerStatus() {
+  try {
+    scheduler.value = await getSchedulerStatus()
+  } catch {
+    // 集群状态查询失败时保留旧值，不影响任务列表主体功能
+    scheduler.value = null
+  }
+}
+
+onMounted(loadSchedulerStatus)
 
 const saving = ref(false)
 const modalOpen = ref(false)
@@ -231,6 +292,7 @@ async function onSubmit() {
     message.success(t('page.monitorJobSaved'))
     modalOpen.value = false
     loadData()
+    loadSchedulerStatus()
   } finally {
     saving.value = false
   }
@@ -240,6 +302,7 @@ async function toggleStatus(record: JobVo, checked: boolean) {
   await changeJobStatus(record.id, checked ? 1 : 0)
   message.success(t('page.monitorJobStatusUpdated'))
   loadData()
+  loadSchedulerStatus()
 }
 
 function onRun(record: JobVo) {
@@ -261,6 +324,7 @@ function onDelete(record: JobVo) {
       await deleteJob(record.id)
       message.success(t('page.monitorJobDeleted'))
       loadData()
+      loadSchedulerStatus()
     },
   })
 }
@@ -276,5 +340,27 @@ function openLogs(record: JobVo) {
 <style scoped>
 .toolbar {
   margin-bottom: 16px;
+}
+
+.scheduler-panel {
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.metric-label {
+  color: #888;
+  margin-top: 4px;
+}
+
+.scheduler-descriptions {
+  margin-top: 16px;
 }
 </style>

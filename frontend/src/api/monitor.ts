@@ -127,6 +127,24 @@ export function getJobLogPage(params: Record<string, unknown>): Promise<PageResu
   return request.get('/monitor/job/log', { params })
 }
 
+export interface SchedulerStatusVo {
+  clustered: boolean
+  instanceId: string
+  instanceName: string
+  threadPoolSize: number
+  nodeCount: number
+  jobCount: number
+  triggerCount: number
+  pausedTriggerCount: number
+  errorTriggerCount: number
+  firedTriggerCount: number
+  overdueTriggerCount: number
+}
+
+export function getSchedulerStatus(): Promise<SchedulerStatusVo> {
+  return request.get('/monitor/job/scheduler/status')
+}
+
 export interface ServerMonitorVo {
   osName: string
   osArch: string

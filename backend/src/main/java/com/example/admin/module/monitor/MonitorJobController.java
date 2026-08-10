@@ -7,6 +7,7 @@ import com.example.admin.module.monitor.dto.JobQuery;
 import com.example.admin.module.monitor.dto.JobSaveRequest;
 import com.example.admin.module.monitor.entity.SysJobDO;
 import com.example.admin.module.monitor.vo.JobLogVo;
+import com.example.admin.module.monitor.vo.SchedulerStatusVo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -70,6 +71,12 @@ public class MonitorJobController {
     public Result<Void> runOnce(@PathVariable Long id) {
         jobService.runOnce(id);
         return Result.success();
+    }
+
+    @GetMapping("/scheduler/status")
+    @PreAuthorize("hasAuthority('monitor:job:list')")
+    public Result<SchedulerStatusVo> schedulerStatus() {
+        return Result.success(jobService.schedulerStatus());
     }
 
     @GetMapping("/log")

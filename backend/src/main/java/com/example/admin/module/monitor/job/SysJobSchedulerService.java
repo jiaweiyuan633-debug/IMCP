@@ -15,6 +15,7 @@ import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.TriggerBuilder;
+import org.quartz.TriggerKey;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -39,10 +40,8 @@ public class SysJobSchedulerService {
 
     public void scheduleJob(SysJobDO job) {
         JobKey jobKey = jobKey(job);
+        TriggerKey triggerKey = triggerKey(job);
         try {
-            if (scheduler.checkExists(jobKey)) {
-                scheduler.deleteJob(jobKey);
-            }
             JobDataMap dataMap = new JobDataMap();
             dataMap.put("jobId", job.getId());
             dataMap.put("jobName", job.getJobName());
@@ -53,22 +52,35 @@ public class SysJobSchedulerService {
                     .withIdentity(jobKey)
                     .usingJobData(dataMap)
                     .build();
-            CronScheduleBuilder cronSchedule = CronScheduleBuilder.cronSchedule(job.getCronExpression());
-            if ("2".equals(job.getMisfirePolicy())) {
-                cronSchedule.withMisfireHandlingInstructionFireAndProceed();
-            } else if ("3".equals(job.getMisfirePolicy())) {
-                cronSchedule.withMisfireHandlingInstructionIgnoreMisfires();
-            } else {
-                cronSchedule.withMisfireHandlingInstructionDoNothing();
-            }
+            // replace=true 的原子 upsert：多副本同时启动/编辑时不会抛 AlreadyExistsException，
+            // 由 Quartz JDBC 存储保证最终一致，避免启动竞态
+            scheduler.addJob(jobDetail, true);
+
             CronTrigger trigger = TriggerBuilder.newTrigger()
-                    .withIdentity(jobKey.getName() + "-trigger", job.getJobGroup())
-                    .withSchedule(cronSchedule)
+                    .withIdentity(triggerKey)
+                    .withSchedule(cronSchedule(job))
                     .build();
-            scheduler.scheduleJob(jobDetail, trigger);
+            if (scheduler.checkExists(triggerKey)) {
+                // 触发器已存在则原子替换（更新 cron / misfire 策略）
+                scheduler.rescheduleJob(triggerKey, trigger);
+            } else {
+                scheduler.scheduleJob(trigger);
+            }
         } catch (SchedulerException | RuntimeException exception) {
             log.error("Failed to schedule job {}", job.getId(), exception);
         }
+    }
+
+    private CronScheduleBuilder cronSchedule(SysJobDO job) {
+        CronScheduleBuilder cronSchedule = CronScheduleBuilder.cronSchedule(job.getCronExpression());
+        if ("2".equals(job.getMisfirePolicy())) {
+            cronSchedule.withMisfireHandlingInstructionFireAndProceed();
+        } else if ("3".equals(job.getMisfirePolicy())) {
+            cronSchedule.withMisfireHandlingInstructionIgnoreMisfires();
+        } else {
+            cronSchedule.withMisfireHandlingInstructionDoNothing();
+        }
+        return cronSchedule;
     }
 
     public void deleteJob(SysJobDO job) {
@@ -93,6 +105,10 @@ public class SysJobSchedulerService {
 
     private JobKey jobKey(SysJobDO job) {
         return JobKey.jobKey("job-" + job.getId(), job.getJobGroup());
+    }
+
+    private TriggerKey triggerKey(SysJobDO job) {
+        return TriggerKey.triggerKey(jobKey(job).getName() + "-trigger", job.getJobGroup());
     }
 }
 

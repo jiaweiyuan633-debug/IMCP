@@ -14,8 +14,13 @@ import com.example.admin.module.monitor.job.SysJobSchedulerService;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
 import com.example.admin.module.monitor.vo.JobLogVo;
+import com.example.admin.module.monitor.vo.SchedulerStatusVo;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.SchedulerMetaData;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,6 +39,8 @@ public class MonitorJobService {
     private final SysJobMapper jobMapper;
     private final SysJobLogMapper jobLogMapper;
     private final SysJobSchedulerService schedulerService;
+    private final Scheduler scheduler;
+    private final JdbcTemplate jdbcTemplate;
 
     public PageResult<SysJobDO> page(JobQuery query) {
         Page<SysJobDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -99,6 +106,36 @@ public class MonitorJobService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         schedulerService.runOnce(job);
+    }
+
+    /**
+     * 调度集群状态：Quartz 元数据 + QRTZ 调度表实时统计。
+     * 多副本部署时 nodeCount > 1 表示各实例共享同一 QRTZ 存储，触发器由集群互斥消费。
+     */
+    public SchedulerStatusVo schedulerStatus() {
+        try {
+            SchedulerMetaData meta = scheduler.getMetaData();
+            return SchedulerStatusVo.builder()
+                    .clustered(meta.isJobStoreClustered())
+                    .instanceId(scheduler.getSchedulerInstanceId())
+                    .instanceName(scheduler.getSchedulerName())
+                    .threadPoolSize(meta.getThreadPoolSize())
+                    .nodeCount(countRows("SELECT COUNT(*) FROM QRTZ_SCHEDULER_STATE"))
+                    .jobCount(countRows("SELECT COUNT(*) FROM QRTZ_JOB_DETAILS"))
+                    .triggerCount(countRows("SELECT COUNT(*) FROM QRTZ_TRIGGERS"))
+                    .pausedTriggerCount(countRows("SELECT COUNT(*) FROM QRTZ_TRIGGERS WHERE TRIGGER_STATE = 'PAUSED'"))
+                    .errorTriggerCount(countRows("SELECT COUNT(*) FROM QRTZ_TRIGGERS WHERE TRIGGER_STATE = 'ERROR'"))
+                    .firedTriggerCount(countRows("SELECT COUNT(*) FROM QRTZ_FIRED_TRIGGERS"))
+                    .overdueTriggerCount(countRows("SELECT COUNT(*) FROM QRTZ_TRIGGERS WHERE TRIGGER_STATE IN ('WAITING','ACQUIRED') AND NEXT_FIRE_TIME IS NOT NULL AND NEXT_FIRE_TIME < " + System.currentTimeMillis()))
+                    .build();
+        } catch (SchedulerException exception) {
+            throw new BusinessException(ResultCode.INTERNAL_ERROR.getCode(), "查询调度器状态失败");
+        }
+    }
+
+    private int countRows(String sql) {
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
+        return count == null ? 0 : count;
     }
 
     public PageResult<JobLogVo> logPage(long pageNum, long pageSize, String jobName) {
