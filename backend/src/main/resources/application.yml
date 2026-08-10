@@ -86,6 +86,7 @@ jwt:
 
 app:
   callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
   ai-base-url: ${AI_BASE_URL:}
   upload-path: ${UPLOAD_PATH:uploads}
   storage:

@@ -102,7 +102,15 @@ public class AuthService {
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
         redisTemplate.delete(LOGIN_FAIL_KEY_PREFIX + username);
+        return completeLogin(user, httpRequest);
+    }
 
+    /**
+     * 签发令牌并记录登录态：供密码登录与第三方 OAuth 登录复用。
+     * 调用方需保证 user 已通过鉴权校验（密码/TOTP/第三方绑定）且启用。
+     */
+    public LoginResponse completeLogin(SysUserDO user, HttpServletRequest httpRequest) {
+        TenantContext.setTenantId(user.getTenantId());
         List<String> roles = roleMapper.selectRoleCodesByUserId(user.getId());
         List<String> perms = menuMapper.selectPermsByUserId(user.getId());
         List<MenuVo> menus = buildMenuTree(menuMapper.selectMenusByUserId(user.getId()));
@@ -122,7 +130,7 @@ public class AuthService {
 
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
-        saveLoginLog(httpRequest, username, true, "登录成功");
+        saveLoginLog(httpRequest, user.getUsername(), true, "登录成功");
 
         return LoginResponse.builder()
                 .accessToken(accessToken)

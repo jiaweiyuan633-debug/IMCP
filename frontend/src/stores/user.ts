@@ -16,11 +16,15 @@ export const useUserStore = defineStore('user', {
   actions: {
     async login(form: LoginForm): Promise<LoginResponse> {
       const data = await loginApi(form)
+      this.applyLogin(data)
+      return data
+    },
+    /** 应用一次完整登录结果（密码登录 / 第三方登录 / 绑定后登录共用）。 */
+    applyLogin(data: LoginResponse) {
       setTokens(data.accessToken, data.refreshToken)
       this.accessToken = data.accessToken
       this.refreshToken = data.refreshToken
       this.userInfo = data.user
-      return data
     },
     async fetchMe(): Promise<UserInfo> {
       const data = await getMe()

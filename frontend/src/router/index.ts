@@ -16,6 +16,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/oauth/callback',
+      name: 'OauthCallback',
+      component: () => import('@/views/oauth/callback.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/',
       name: 'Root',
       component: BasicLayout,
@@ -92,6 +98,10 @@ router.beforeEach(async (to) => {
       useAppStore().resetTabs()
     }
     return userStore.isLoggedIn ? { path: firstMenuPath(permissionStore.menus) } : true
+  }
+  // 第三方登录回跳页：未登录也可访问
+  if (to.meta.public) {
+    return true
   }
   if (!userStore.isLoggedIn) {
     removeDynamicRoutes()

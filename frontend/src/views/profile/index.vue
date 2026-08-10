@@ -48,6 +48,25 @@
           <a-button v-else danger @click="openDisableTotp">{{ t('page.totpDisable') }}</a-button>
         </a-space>
       </a-card>
+      <a-card :title="t('page.oauthBindingsTitle')" style="margin-top: 16px">
+        <a-spin :spinning="loadingBindings">
+          <a-empty v-if="!providers.length" :description="t('page.oauthNoProvider')" />
+          <a-list v-else size="small" :data-source="providers">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-list-item-meta>
+                  <template #title>{{ item.label }}</template>
+                  <template #description>{{ bindingOf(item.provider)?.nickname || t('page.oauthNotBound') }}</template>
+                </a-list-item-meta>
+                <a-button v-if="bindingOf(item.provider)" size="small" danger @click="onUnbind(item.provider)">
+                  {{ t('page.oauthUnbind') }}
+                </a-button>
+                <a-button v-else size="small" type="primary" @click="onBind(item)">{{ t('page.oauthBind') }}</a-button>
+              </a-list-item>
+            </template>
+          </a-list>
+        </a-spin>
+      </a-card>
     </a-col>
   </a-row>
 
@@ -70,10 +89,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import FileUpload from '@/components/FileUpload.vue'
 import { disableTotp, enableTotp, getTotpStatus, setupTotp, updateProfile } from '@/api/auth'
+import { getOauthAuthorizeUrl, getOauthBindings, getOauthProviders, unbindOauth } from '@/api/oauth'
+import type { OauthBindingVo, OauthProviderVo } from '@/api/oauth'
 import { useI18n } from 'vue-i18n'
 import { PASSWORD_PATTERN } from '@/utils/validation'
 
@@ -104,6 +125,46 @@ if (userStore.userInfo) {
 }
 
 const rolesText = computed(() => (userStore.userInfo?.roles || []).join(', ') || '-')
+
+const providers = ref<OauthProviderVo[]>([])
+const bindings = ref<OauthBindingVo[]>([])
+const loadingBindings = ref(false)
+
+function bindingOf(provider: string): OauthBindingVo | undefined {
+  return bindings.value.find((b) => b.provider === provider)
+}
+
+async function loadOauth() {
+  loadingBindings.value = true
+  try {
+    const [p, b] = await Promise.all([getOauthProviders(), getOauthBindings()])
+    providers.value = p
+    bindings.value = b
+  } finally {
+    loadingBindings.value = false
+  }
+}
+
+async function onBind(entry: OauthProviderVo) {
+  try {
+    const { url } = await getOauthAuthorizeUrl({ provider: entry.provider, bindMode: true })
+    window.location.href = url
+  } catch (error) {
+    message.error((error as Error).message)
+  }
+}
+
+function onUnbind(provider: string) {
+  Modal.confirm({
+    title: t('page.oauthUnbindTitle'),
+    content: t('page.oauthUnbindConfirm'),
+    onOk: async () => {
+      await unbindOauth(provider)
+      message.success(t('page.oauthUnbound'))
+      loadOauth()
+    },
+  })
+}
 
 async function onSubmit() {
   loading.value = true
@@ -168,6 +229,7 @@ async function onTotpSubmit() {
 onMounted(async () => {
   const status = await getTotpStatus()
   totpStatus.enabled = status.enabled
+  loadOauth()
 })
 </script>
 
