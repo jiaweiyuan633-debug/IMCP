@@ -93,11 +93,11 @@ public class ReportService {
 
     private List<NameValueVo> dailyTrend(String table, String timeColumn, Long tenantId) {
         List<NameValueVo> rows = jdbcTemplate.query(
-                "SELECT DATE_FORMAT(" + timeColumn + ", '%Y-%m-%d') AS day, COUNT(*) AS cnt "
+                "SELECT DATE_FORMAT(" + timeColumn + ", '%Y-%m-%d') AS name, COUNT(*) AS value "
                         + "FROM " + table
                         + " WHERE tenant_id = ? AND " + timeColumn + " >= ?"
                         + " GROUP BY DATE_FORMAT(" + timeColumn + ", '%Y-%m-%d')"
-                        + " ORDER BY day",
+                        + " ORDER BY name",
                 this::mapNameValue, tenantId, LocalDate.now().minusDays(TREND_DAYS - 1L));
         Map<String, Long> byDay = new LinkedHashMap<>();
         for (NameValueVo row : rows) {
