@@ -1,11 +1,14 @@
 package com.example.admin.security;
 
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
 import com.example.admin.module.monitor.vo.OnlineUserVo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,11 @@ public class TokenService {
     private static final String BLACKLIST_KEY = "login:blacklist:";
     private static final String ONLINE_KEY = "login:online:";
     private static final String PERMS_KEY = "auth:perms:";
+
+    // 缓存管理页允许清理的前缀白名单：仅限可自愈的业务缓存；
+    // 认证令牌/授权码/限流计数/分布式锁等关键 key 禁止通过缓存页删除，避免造成会话失效或 DoS
+    private static final Set<String> CACHE_DELETE_ALLOWED_PREFIXES = Set.of(
+            "captcha:", "auth:perms:", "login:online:");
 
     private final StringRedisTemplate redisTemplate;
     private final JwtProperties properties;
@@ -117,8 +125,23 @@ public class TokenService {
         return onlineUsers;
     }
 
+    /**
+     * 清理缓存 key（支持尾部通配符 *）：仅允许白名单内的可自愈缓存前缀。
+     */
     public void deleteCacheKey(String key) {
-        redisTemplate.delete(key);
+        if (!StringUtils.hasText(key)
+                || CACHE_DELETE_ALLOWED_PREFIXES.stream().noneMatch(key::startsWith)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "仅允许清理白名单缓存前缀：" + String.join(", ", CACHE_DELETE_ALLOWED_PREFIXES));
+        }
+        if (key.endsWith("*")) {
+            Set<String> keys = redisTemplate.keys(key);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } else {
+            redisTemplate.delete(key);
+        }
     }
 
     public List<String> getCachedPermissions(Long userId) {

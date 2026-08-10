@@ -92,6 +92,8 @@ secret:
   totpEncryptionKey: ""
   # AI 服务鉴权密钥：与后端 AiServiceConfig.apiKey 保持一致（入站任务鉴权 + 回调 HMAC 签名）
   aiAuthToken: ""
+  # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端连接 /mcp 时以 Authorization: Bearer 携带
+  mcpAuthToken: ""
 
 ingress:
   host: admin.example.com

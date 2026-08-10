@@ -85,7 +85,7 @@ public class FileStorageManager {
                 .sha256(sha256)
                 .scanStatus(entity.getScanStatus())
                 .contentUrl(contentUrl)
-                .accessToken(fileAccessService.issue(contentUrl))
+                .accessToken(fileAccessService.issue(contentUrl, SecurityUtils.tryGetUserId()))
                 .build();
     }
 

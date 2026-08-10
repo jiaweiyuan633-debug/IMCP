@@ -20,6 +20,8 @@ secret:
   dbPassword: ""
   jwtSecret: ""
   totpEncryptionKey: ""
+  aiAuthToken: ""
+  mcpAuthToken: ""
 
 ingress:
   host: admin.example.com

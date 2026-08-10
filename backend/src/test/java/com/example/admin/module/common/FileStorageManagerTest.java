@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -95,7 +96,7 @@ class FileStorageManagerTest {
         when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
         when(storage.store(any(), any(), any(), any(), any()))
                 .thenReturn(new StoredObject("2026/08/09/a.png", "local", "/uploads/2026/08/09/a.png"));
-        when(accessService.issue("/files/1")).thenReturn("token");
+        when(accessService.issue(eq("/files/1"), any())).thenReturn("token");
         when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
             SysFileDO entity = invocation.getArgument(0);
             entity.setId(1L);

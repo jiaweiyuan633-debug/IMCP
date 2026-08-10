@@ -2,7 +2,7 @@
   <a-card :title="t('page.monitorCacheTitle')">
     <a-form layout="inline">
       <a-form-item :label="t('page.monitorCacheKey')">
-        <a-input v-model:value="key" placeholder="login:token:*" style="width: 320px" />
+        <a-input v-model:value="key" placeholder="auth:perms:*" style="width: 320px" />
       </a-form-item>
       <a-form-item>
         <a-button v-permission="'monitor:cache:delete'" type="primary" :loading="deleting" @click="onDelete">
@@ -25,7 +25,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
-const commonKeys = ['login:token:', 'login:online:', 'auth:perms:', 'ai:task:']
+const commonKeys = ['auth:perms:', 'login:online:', 'captcha:']
 const key = ref('')
 const deleting = ref(false)
 

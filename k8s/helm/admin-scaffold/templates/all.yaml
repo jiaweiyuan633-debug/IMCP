@@ -1,6 +1,6 @@
 {{- /* 密钥治理：缺省/空值即终止渲染（fail-fast），杜绝明文默认密钥上生产 */ -}}
-{{- if or (not .Values.secret.dbPassword) (not .Values.secret.jwtSecret) (not .Values.secret.totpEncryptionKey) (not .Values.secret.aiAuthToken) }}
-{{ fail "secret.dbPassword / secret.jwtSecret / secret.totpEncryptionKey / secret.aiAuthToken 必须通过 --set 显式注入（例如 --set secret.dbPassword=xxx --set secret.jwtSecret=xxx --set secret.totpEncryptionKey=xxx --set secret.aiAuthToken=xxx）" }}
+{{- if or (not .Values.secret.dbPassword) (not .Values.secret.jwtSecret) (not .Values.secret.totpEncryptionKey) (not .Values.secret.aiAuthToken) (not .Values.secret.mcpAuthToken) }}
+{{ fail "secret.dbPassword / secret.jwtSecret / secret.totpEncryptionKey / secret.aiAuthToken / secret.mcpAuthToken 必须通过 --set 显式注入（例如 --set secret.dbPassword=xxx --set secret.jwtSecret=xxx --set secret.totpEncryptionKey=xxx --set secret.aiAuthToken=xxx --set secret.mcpAuthToken=xxx）" }}
 {{- end }}
 apiVersion: v1
 kind: ConfigMap
@@ -30,6 +30,7 @@ stringData:
   JWT_SECRET: {{ .Values.secret.jwtSecret }}
   TOTP_ENCRYPTION_KEY: {{ .Values.secret.totpEncryptionKey }}
   AUTH_TOKEN: {{ .Values.secret.aiAuthToken }}
+  MCP_AUTH_TOKEN: {{ .Values.secret.mcpAuthToken }}
 ---
 apiVersion: apps/v1
 kind: Deployment

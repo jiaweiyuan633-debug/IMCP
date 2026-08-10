@@ -47,19 +47,17 @@ public class SsoAuthService {
     /** 当前登录用户授权某第三方应用，签发一次性授权码。 */
     public SsoAuthorizeVo authorize(String clientId, String redirectUri) {
         SysOauthClientDO client = requireEnabledClient(clientId);
-        if (StringUtils.hasText(client.getRedirectUri())
-                && StringUtils.hasText(redirectUri)
-                && !redirectUri.startsWith(client.getRedirectUri())) {
+        // redirect_uri 必须与注册白名单精确一致：前缀匹配存在开放重定向绕过（如 app.com/callback.evil.com）
+        if (!StringUtils.hasText(client.getRedirectUri()) || !client.getRedirectUri().equals(redirectUri)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "redirect_uri 不在应用白名单内");
         }
         String code = jwtUtil.generateJti();
-        String target = StringUtils.hasText(redirectUri) ? redirectUri : client.getRedirectUri();
         // 授权码绑定用户与客户端，一次性消费
         redisTemplate.opsForValue().set(
                 SSO_CODE_PREFIX + code, SecurityUtils.getUserId() + ":" + clientId, CODE_TTL);
         return SsoAuthorizeVo.builder()
                 .code(code)
-                .redirectUri(target)
+                .redirectUri(client.getRedirectUri())
                 .build();
     }
 

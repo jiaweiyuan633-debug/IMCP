@@ -41,7 +41,7 @@ public class CommonController {
         if (fileId != null) {
             fileStorageManager.getOwnedOrThrow(fileId);
         }
-        return Result.success(fileAccessService.issue(url));
+        return Result.success(fileAccessService.issue(url, SecurityUtils.getUserId()));
     }
 
     private Long parseFileId(String url) {

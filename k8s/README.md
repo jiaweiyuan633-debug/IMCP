@@ -21,7 +21,8 @@ kubectl create secret generic admin-secret \
   --from-literal=DB_PASSWORD='<强口令>' \
   --from-literal=JWT_SECRET='<≥32 位随机串>' \
   --from-literal=TOTP_ENCRYPTION_KEY='<随机串>' \
-  --from-literal=AUTH_TOKEN='<随机串，与后端 AiServiceConfig.apiKey 保持一致>'
+  --from-literal=AUTH_TOKEN='<随机串，与后端 AiServiceConfig.apiKey 保持一致>' \
+  --from-literal=MCP_AUTH_TOKEN='<随机串，MCP Server 端点鉴权令牌>'
 ```
 
 - 执行：
@@ -48,6 +49,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --set secret.jwtSecret='<≥32 位随机串>' \
   --set secret.totpEncryptionKey='<随机串>' \
   --set secret.aiAuthToken='<随机串，与后端 AiServiceConfig.apiKey 保持一致>' \
+  --set secret.mcpAuthToken='<随机串，MCP Server 端点鉴权令牌>' \
   --set ingress.host=admin.example.com
 ```
 
@@ -63,6 +65,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 | `secret.jwtSecret` | 空（必填） | JWT 密钥（≥32 位） |
 | `secret.totpEncryptionKey` | 空（必填） | TOTP 加密密钥 |
 | `secret.aiAuthToken` | 空（必填） | AI 服务鉴权密钥（= 后端 AiServiceConfig.apiKey） |
+| `secret.mcpAuthToken` | 空（必填） | MCP Server 端点鉴权令牌 |
 | `ingress.host` | `admin.example.com` | Ingress 域名 |
 
 生产建议：

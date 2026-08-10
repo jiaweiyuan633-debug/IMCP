@@ -43,6 +43,9 @@ management:
 app:
   callback-base-url: ${CALLBACK_BASE_URL}
   frontend-url: ${FRONTEND_URL}
+  mcp:
+    # 生产不设默认：缺失时 placeholder 解析失败启动即失败；非 dev 下等于 dev 默认值时 MCP 拒绝连接
+    auth-token: ${MCP_AUTH_TOKEN}
   upload-path: ${UPLOAD_PATH:uploads}
   storage:
     type: ${STORAGE_TYPE:local}

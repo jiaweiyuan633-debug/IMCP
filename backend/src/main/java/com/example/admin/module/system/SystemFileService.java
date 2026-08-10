@@ -7,6 +7,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.common.FileStorageManager;
 import com.example.admin.module.system.entity.SysFileDO;
+import com.example.admin.security.SecurityUtils;
 import com.example.admin.module.system.mapper.SysFileMapper;
 import com.example.admin.common.FileAccessService;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,7 @@ public class SystemFileService {
         result.getRecords().forEach(file -> {
             String contentUrl = "/files/" + file.getId();
             file.setContentUrl(contentUrl);
-            file.setAccessToken(fileAccessService.issue(contentUrl));
+            file.setAccessToken(fileAccessService.issue(contentUrl, SecurityUtils.tryGetUserId()));
         });
         return PageResult.of(result, result.getRecords());
     }

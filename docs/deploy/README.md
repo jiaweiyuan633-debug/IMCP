@@ -74,6 +74,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --set secret.jwtSecret='<≥32 位随机串>' \
   --set secret.totpEncryptionKey='<随机串>' \
   --set secret.aiAuthToken='<随机串，与后端 AiServiceConfig.apiKey 保持一致>' \
+  --set secret.mcpAuthToken='<随机串，MCP Server 端点鉴权令牌>' \
   --set ingress.host=admin.example.com
 ```
 
@@ -105,7 +106,7 @@ scripts/fetch-openapi.ps1
 
 ## 5. 生产检查项
 
-- 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 服务鉴权 Token（`AUTH_TOKEN`，须与后端 `AiServiceConfig.apiKey` 保持一致）
+- 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 服务鉴权 Token（`AUTH_TOKEN`，须与后端 `AiServiceConfig.apiKey` 保持一致）、MCP Server 鉴权令牌（`MCP_AUTH_TOKEN`）
 - `CALLBACK_BASE_URL` 配置为 AI 服务可访问的地址（默认 `127.0.0.1` 仅限本地联调），否则 AI 回调无法到达后端
 - 按需启用 MinIO 对象存储并配置生命周期策略
 - 开启 HTTPS 和 WAF

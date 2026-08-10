@@ -116,6 +116,10 @@ app:
     allowed-extensions: ${UPLOAD_ALLOWED_EXTENSIONS:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
+  mcp:
+    # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端以 Authorization: Bearer 携带；
+    # 非 dev 环境未注入或等于开发默认值时 McpAuthFilter fail-closed 拒绝一切连接
+    auth-token: ${MCP_AUTH_TOKEN:dev-mcp-token}
 
 knife4j:
   enable: true
