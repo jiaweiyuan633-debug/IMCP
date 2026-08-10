@@ -210,23 +210,23 @@
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
-                                        <!-- 脚手架基线门槛：当前实测 LINE≈11.2%/BRANCH≈8.8%/METHOD≈10.2%。
+                                        <!-- 脚手架基线门槛：P1-9 补安全核心测试后实测 LINE≈14.7%/BRANCH≈13.6%/METHOD≈13.7%。
                                              门槛略低于实测以留抖动余量、保证门禁真实生效（新增未测试代码即拦截）。
-                                             补安全核心测试（P1-9）后应随覆盖提升而上调。 -->
+                                             后续批次补测试后应随覆盖提升继续上调。 -->
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.10</minimum>
+                                            <minimum>0.13</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.08</minimum>
+                                            <minimum>0.12</minimum>
                                         </limit>
                                         <limit>
                                             <counter>METHOD</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.07</minimum>
+                                            <minimum>0.12</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
