@@ -1,5 +1,6 @@
 package com.example.admin.module.ai;
 
+import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -36,6 +37,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.Duration;
@@ -44,6 +48,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 @Slf4j
 @Service
@@ -55,6 +61,8 @@ public class AiTaskService {
     private static final int TASK_NO_RANDOM_DIGITS = 4;
     private static final int DEFAULT_MAX_RETRY = 3;
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
+    // 回调时钟偏移容忍：与 ai-service app/core/config.py callback_clock_skew_seconds=300 保持一致
+    private static final int CALLBACK_MAX_SKEW_SECONDS = 300;
     private static final Set<AiTaskStatus> TERMINAL_STATUS = EnumSet.of(
             AiTaskStatus.SUCCEEDED,
             AiTaskStatus.FAILED,
@@ -181,7 +189,7 @@ public class AiTaskService {
     }
 
     @Transactional
-    public void handleCallback(AiCallbackRequest request, String token) {
+    public void handleCallback(AiCallbackRequest request, byte[] rawBody, String timestamp, String signature) {
         AiTaskDO task = taskMapper.selectByTaskNoIgnoreTenant(request.getTaskNo());
         if (task == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "AI 任务不存在");
@@ -189,8 +197,7 @@ public class AiTaskService {
         TenantContext.setTenantId(task.getTenantId());
         AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
                 .eq(AiServiceConfigDO::getCode, task.getServiceCode()));
-        if (config == null || !StringUtils.hasText(config.getApiKey())
-                || !config.getApiKey().equals(token)) {
+        if (config == null || !validCallbackHmac(config.getApiKey(), rawBody, timestamp, signature)) {
             throw new BusinessException(ResultCode.AI_CALLBACK_INVALID);
         }
         if (isTerminal(task.getStatus())) {
@@ -305,6 +312,40 @@ public class AiTaskService {
         }
         if (task.getCreatedBy() == null || !allowedUserIds.contains(task.getCreatedBy())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+    }
+
+    /**
+     * 回调 HMAC-SHA256 校验，与 ai-service tasks/manager.py _callback 保持字节级一致：
+     * message = timestamp + "\n" + rawBody，key = 服务配置 apiKey（= AI 侧 AUTH_TOKEN）。
+     * 时间戳在 ±CALLBACK_MAX_SKEW_SECONDS 内有效；签名比较用常量时间避免时序侧信道。
+     */
+    private boolean validCallbackHmac(String apiKey, byte[] body, String timestamp, String signature) {
+        if (!StringUtils.hasText(apiKey) || !StringUtils.hasText(timestamp) || !StringUtils.hasText(signature)) {
+            return false;
+        }
+        long ts;
+        try {
+            ts = Long.parseLong(timestamp);
+        } catch (NumberFormatException exception) {
+            return false;
+        }
+        if (Math.abs(System.currentTimeMillis() / 1000 - ts) > CALLBACK_MAX_SKEW_SECONDS) {
+            return false;
+        }
+        byte[] head = (timestamp + "\n").getBytes(StandardCharsets.UTF_8);
+        byte[] message = new byte[head.length + body.length];
+        System.arraycopy(head, 0, message, 0, head.length);
+        System.arraycopy(body, 0, message, head.length, body.length);
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(apiKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] expected = HexUtil.encodeHexStr(mac.doFinal(message))
+                    .getBytes(StandardCharsets.US_ASCII);
+            return MessageDigest.isEqual(expected, signature.getBytes(StandardCharsets.US_ASCII));
+        } catch (GeneralSecurityException exception) {
+            log.warn("AI 回调 HMAC 计算失败", exception);
+            return false;
         }
     }
 

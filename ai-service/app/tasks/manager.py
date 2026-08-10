@@ -1,6 +1,9 @@
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -117,7 +120,19 @@ class TaskManager:
             "error": data.get("error"),
             "retry_count": data.get("retry_count", 0),
         }
-        headers = {"X-Ai-Service-Token": self.settings.callback_token}
+        # HMAC-SHA256(timestamp + "\n" + body)，密钥与后端 AiServiceConfig.apiKey 一致；
+        # 后端校验时间戳窗口（防重放）与签名（防伪造/篡改），不再透传明文 token
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        timestamp = str(int(time.time()))
+        signature = hmac.new(
+            self.settings.auth_token.encode("utf-8"),
+            timestamp.encode("utf-8") + b"\n" + body,
+            hashlib.sha256,
+        ).hexdigest()
+        headers = {
+            "X-Ai-Timestamp": timestamp,
+            "X-Ai-Signature": signature,
+        }
         if data.get("request_id"):
             headers["X-Request-Id"] = data["request_id"]
         last_error: Exception | None = None

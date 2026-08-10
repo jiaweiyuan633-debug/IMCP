@@ -3,6 +3,7 @@ import axios from 'axios'
 import type { MenuNode, PageResult, RoleOptionVo, RoleVo, UserVo } from '@/types'
 import { getAccessToken } from '@/utils/auth'
 import { API_BASE_URL } from '@/utils/env'
+import { parseContentDispositionFilename, triggerBlobDownload } from '@/utils/download'
 import i18n from '@/locales'
 
 export interface UserQuery {
@@ -299,12 +300,10 @@ export async function exportUsers(): Promise<void> {
     headers: { Authorization: `Bearer ${getAccessToken()}` },
     responseType: 'blob',
   })
-  const url = URL.createObjectURL(response.data)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = i18n.global.t('common.userDataExport')
-  link.click()
-  URL.revokeObjectURL(url)
+  // 优先使用后端 Content-Disposition 文件名（含扩展名），缺失时回退翻译文案 + .xlsx
+  const filename = parseContentDispositionFilename(response.headers['content-disposition'])
+    || `${i18n.global.t('common.userDataExport')}.xlsx`
+  triggerBlobDownload(response.data as Blob, filename)
 }
 
 export function importUsers(file: File): Promise<number> {

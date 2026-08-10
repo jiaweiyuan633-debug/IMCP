@@ -60,6 +60,11 @@ async function doRefresh(refreshToken: string): Promise<boolean> {
 
 service.interceptors.response.use(
   async (response) => {
+    // Blob（文件下载）响应不经过 Result 包装解析，直接返回完整 response
+    // （否则 response.data 是 Blob，result.code === 0 恒为 false，下载会被误判为业务错误）
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     const result = response.data as Result<unknown>
     if (result.code === 0) {
       return result.data as never

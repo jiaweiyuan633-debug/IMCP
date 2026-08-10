@@ -39,17 +39,9 @@ export default defineConfig({
     port: 5173,
   },
   build: {
-    chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          antd: ['ant-design-vue', '@ant-design/icons-vue'],
-          // echarts 已按需引入（echarts/core + charts/components/renderers），
-          // 手动分块只聚合实际使用的子入口，避免把全量 echarts 打进包
-          echarts: ['echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers'],
-          vendor: ['vue', 'vue-router', 'pinia', 'axios', 'vue-i18n'],
-        },
-      },
-    },
+    // 移除 manualChunks 手动分块：脚手架依赖 Vite 默认 chunk 策略
+    // （按动态 import 拆分 + 共享依赖自动提取），避免大块 vendor 缓存粒度差与过度拆分
+    // echarts canvas 渲染器已按需动态拆分为独立 chunk；阈值按 antd-vue 按需后静态基线调高
+    chunkSizeWarningLimit: 1100,
   },
 })

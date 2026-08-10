@@ -2,6 +2,8 @@ package com.example.admin.module.auth;
 
 import cn.hutool.core.codec.Base32;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
@@ -23,12 +25,19 @@ public class TotpService {
     private static final int CODE_DIGITS = 6;
     private static final int WINDOW = 1;
 
+    /** 与 application-dev.yml 一致的开发兜底密钥，仅允许在 dev profile 下使用 */
+    private static final String DEV_FALLBACK_KEY = "dev-only-totp-encryption-key-please-override";
+
     private final SecureRandom secureRandom = new SecureRandom();
     private final byte[] encryptionKey;
 
-    public TotpService(@Value("${app.totp.encryption-key:}") String key) {
+    public TotpService(@Value("${app.totp.encryption-key:}") String key, Environment environment) {
         if (key == null || key.isBlank()) {
             throw new IllegalStateException("TOTP 加密密钥未配置，请通过环境变量 TOTP_ENCRYPTION_KEY 注入（不得复用 JWT_SECRET）");
+        }
+        boolean isDev = environment != null && environment.acceptsProfiles(Profiles.of("dev"));
+        if (!isDev && DEV_FALLBACK_KEY.equals(key)) {
+            throw new IllegalStateException("生产环境禁止使用开发默认 TOTP 密钥，请通过环境变量 TOTP_ENCRYPTION_KEY 注入独立密钥");
         }
         try {
             this.encryptionKey = MessageDigest.getInstance("SHA-256")

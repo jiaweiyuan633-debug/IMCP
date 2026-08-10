@@ -13,6 +13,8 @@ import com.example.admin.module.ai.dto.AiTaskCreateRequest;
 import com.example.admin.module.ai.dto.AiTaskQuery;
 import com.example.admin.module.ai.vo.AiConfigVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -39,6 +42,7 @@ public class AiController {
     private final AiTaskService taskService;
     private final AiTaskStreamService taskStreamService;
     private final SseTicketService sseTicketService;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/ticket")
     public Result<String> sseTicket() {
@@ -98,9 +102,13 @@ public class AiController {
 
     @PostMapping("/callback/task")
     public Result<Void> callback(
-            @RequestBody AiCallbackRequest request,
-            @RequestHeader(value = "X-Ai-Service-Token", required = false) String token) {
-        taskService.handleCallback(request, token);
+            HttpServletRequest servletRequest,
+            @RequestHeader("X-Ai-Timestamp") String timestamp,
+            @RequestHeader("X-Ai-Signature") String signature) throws IOException {
+        // 读取原始请求体用于 HMAC 校验（校验内容与 AI 侧签名字节必须一致），再反序列化业务 DTO
+        byte[] body = servletRequest.getInputStream().readAllBytes();
+        AiCallbackRequest request = objectMapper.readValue(body, AiCallbackRequest.class);
+        taskService.handleCallback(request, body, timestamp, signature);
         return Result.success();
     }
 }

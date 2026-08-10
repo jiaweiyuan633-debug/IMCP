@@ -50,7 +50,9 @@ async function resolveUrl(url: string): Promise<string> {
   } catch {
     // keep original url if token endpoint unavailable
   }
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  // 未注入时默认同源 /api（contentUrl 为 /files/xxx，经 Ingress /files 反代到后端）；
+  // 注入绝对地址时取 origin 拼接（独立部署直连后端）
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
   if (base.startsWith('http')) {
     return `${new URL(base).origin}${url}`
   }

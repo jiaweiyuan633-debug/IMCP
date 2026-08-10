@@ -77,12 +77,21 @@ config:
   dbUser: root
   redisHost: redis
   redisPort: "6379"
+  redisUrl: redis://redis:6379/0
   callbackBaseUrl: http://admin-backend:8080
   aiBaseUrl: http://ai-service:8000
+  # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）
+  frontendUrl: http://admin-frontend:8080
+  corsAllowedOriginPatterns: https://admin.example.com
 
+# 密钥一律不留默认值：部署时必须通过 --set secret.*=... 显式注入，
+# 留空或未注入时 all.yaml 顶部 fail 校验将终止渲染，杜绝明文默认密钥上生产。
 secret:
-  dbPassword: root123456
-  jwtSecret: change-me
+  dbPassword: ""
+  jwtSecret: ""
+  totpEncryptionKey: ""
+  # AI 服务鉴权密钥：与后端 AiServiceConfig.apiKey 保持一致（入站任务鉴权 + 回调 HMAC 签名）
+  aiAuthToken: ""
 
 ingress:
   host: admin.example.com

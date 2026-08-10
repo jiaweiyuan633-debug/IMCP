@@ -19,10 +19,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
+# AI 服务为集群内部服务，无浏览器消费者：默认不开放跨域。
+# 如需浏览器直连，通过 CORS_ORIGINS 显式配置允许来源（且不携带凭证）。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.cors_origins,
+    allow_credentials=bool(settings.cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

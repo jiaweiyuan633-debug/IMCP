@@ -17,7 +17,7 @@ cd website && pnpm install && pnpm dev --port 5174
 scripts/start-dev.ps1
 ```
 
-后端通过环境变量连接基础设施：
+后端通过环境变量连接基础设施（本地开发默认加载 `dev` profile，密钥缺省时使用开发兜底；**生产必须注入 `SPRING_PROFILES_ACTIVE=prod`，缺省/默认密钥会导致启动失败**）：
 
 ```text
 DB_HOST=localhost
@@ -29,7 +29,10 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 CALLBACK_BASE_URL=http://127.0.0.1:8080
 AI_BASE_URL=http://127.0.0.1:8000
-JWT_SECRET=change-me
+# 必填：≥32 位随机串；生产缺失或等于开发默认密钥时启动失败
+JWT_SECRET=
+# 必填：TOTP 加密密钥，禁止复用 JWT_SECRET
+TOTP_ENCRYPTION_KEY=
 SQL_LOG_THRESHOLD_MS=50
 AI_SCAN_INTERVAL_MS=30000
 ```
@@ -61,16 +64,20 @@ kubectl apply -f k8s/manifests.yaml
 
 ### Helm Chart
 
+密钥必须通过 `--set secret.*` 显式注入（values 默认留空，未注入时模板渲染直接失败，杜绝明文默认密钥上生产）：
+
 ```bash
 helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
   --namespace admin-scaffold --create-namespace \
   --set config.dbHost=mysql \
-  --set secret.dbPassword=root123456 \
-  --set secret.jwtSecret=change-me \
+  --set secret.dbPassword='<强口令>' \
+  --set secret.jwtSecret='<≥32 位随机串>' \
+  --set secret.totpEncryptionKey='<随机串>' \
+  --set secret.aiAuthToken='<随机串，与后端 AiServiceConfig.apiKey 保持一致>' \
   --set ingress.host=admin.example.com
 ```
 
-Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%，2-6 副本）和 Ingress。官网如需独立 K8s 服务，也可按相同模板扩展。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过 Secret 保存密码。
+Chart 默认部署 backend/ai/frontend 各 2 副本，backend 带 HPA（CPU 70%，2-6 副本）和 Ingress。官网如需独立 K8s 服务，也可按相同模板扩展。生产环境建议替换镜像地址、使用云数据库或托管 Redis，并通过外部 Secret（Vault / External Secrets / Sealed Secrets）注入密钥。
 
 ## 3. 可观测性
 
@@ -98,7 +105,7 @@ scripts/fetch-openapi.ps1
 
 ## 5. 生产检查项
 
-- 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 回调 Token
+- 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 服务鉴权 Token（`AUTH_TOKEN`，须与后端 `AiServiceConfig.apiKey` 保持一致）
 - `CALLBACK_BASE_URL` 配置为 AI 服务可访问的地址（默认 `127.0.0.1` 仅限本地联调），否则 AI 回调无法到达后端
 - 按需启用 MinIO 对象存储并配置生命周期策略
 - 开启 HTTPS 和 WAF

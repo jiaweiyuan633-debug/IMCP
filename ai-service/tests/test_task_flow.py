@@ -1,4 +1,7 @@
 import asyncio
+import hashlib
+import hmac
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -57,9 +60,9 @@ async def test_unknown_biz_type_rejected() -> None:
 
 
 @pytest.mark.asyncio
-async def test_callback_sends_service_token() -> None:
+async def test_callback_signs_with_hmac() -> None:
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-    manager = TaskManager(redis, Settings(callback_token="secret-token"))
+    manager = TaskManager(redis, Settings(auth_token="secret-token"))
     captured = {}
 
     class FakeAsyncClient:
@@ -89,8 +92,18 @@ async def test_callback_sends_service_token() -> None:
             "error": None,
         })
 
-    assert captured["headers"]["X-Ai-Service-Token"] == "secret-token"
     assert captured["url"] == "http://localhost:8080/api/ai/callback/task"
+    # 不再透发明文 token，改为 HMAC 签名 + 时间戳（防伪造/重放）
+    assert "X-Ai-Service-Token" not in captured["headers"]
+    timestamp = captured["headers"]["X-Ai-Timestamp"]
+    signature = captured["headers"]["X-Ai-Signature"]
+    body = json.dumps(captured["json"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    expected = hmac.new(
+        b"secret-token",
+        timestamp.encode("utf-8") + b"\n" + body,
+        hashlib.sha256,
+    ).hexdigest()
+    assert hmac.compare_digest(signature, expected)
 
 
 async def _wait_for_terminal(manager: TaskManager, task_no: str, attempts: int = 20):

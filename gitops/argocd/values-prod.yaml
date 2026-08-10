@@ -14,9 +14,12 @@ config:
   callbackBaseUrl: http://admin-backend:8080
   aiBaseUrl: http://ai-service:8000
 
+# 生产密钥禁止明文入仓：必须由部署时注入（ArgoCD helm.parameters / External Secrets Operator / Vault / Sealed Secrets）。
+# 留空（或未注入）时 Helm 模板将 fail-fast，ArgoCD 同步会失败，直至密钥注入完成。
 secret:
-  dbPassword: change-me
-  jwtSecret: change-me
+  dbPassword: ""
+  jwtSecret: ""
+  totpEncryptionKey: ""
 
 ingress:
   host: admin.example.com

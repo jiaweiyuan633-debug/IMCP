@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { parseContentDispositionFilename, triggerBlobDownload } from '@/utils/download'
 import type { PageResult } from '@/types'
 
 export interface LoginLogVo {
@@ -230,13 +231,10 @@ export function getAuditLogPage(params: Record<string, unknown>): Promise<PageRe
 }
 
 export async function exportAuditLogs(): Promise<void> {
-  const data = (await request.get('/monitor/audit-log/export', { responseType: 'blob' })) as unknown as Blob
-  const url = URL.createObjectURL(data as Blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'audit-log.csv'
-  link.click()
-  URL.revokeObjectURL(url)
+  const response = await request.get('/monitor/audit-log/export', { responseType: 'blob' })
+  // 优先使用后端 Content-Disposition 文件名（含导出时间戳），缺失时回退默认名
+  const filename = parseContentDispositionFilename(response.headers['content-disposition']) || 'audit-log.csv'
+  triggerBlobDownload(response.data as Blob, filename)
 }
 
 export interface FieldAuditLogVo {

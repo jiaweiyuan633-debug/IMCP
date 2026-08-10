@@ -70,6 +70,7 @@ import { message, Modal } from 'ant-design-vue'
 import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import { deleteFile, downloadFile, getFilePage } from '@/api/system'
+import { triggerBlobDownload } from '@/utils/download'
 import { getFileAccessToken, getStorageQuota, type StorageQuota } from '@/api/common'
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
@@ -205,12 +206,7 @@ async function freshUrl(record: FileVo): Promise<string> {
 async function onDownload(record: FileVo) {
   try {
     const blob = await downloadFile(record.id)
-    const objectUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = objectUrl
-    link.download = record.originalName || record.fileName
-    link.click()
-    URL.revokeObjectURL(objectUrl)
+    triggerBlobDownload(blob, record.originalName || record.fileName)
   } catch {
     message.error(t('page.fileDownloadFailed'))
   }

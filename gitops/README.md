@@ -19,6 +19,6 @@ ArgoCD 会监听 `main` 分支，自动同步 `k8s/helm/admin-scaffold`，并开
 
 ## 生产要求
 
-- Secret 中的值只用于占位，生产应使用外部 Secret 或 Sealed Secrets。
+- `values-prod.yaml` 中 `secret.*` 必须保持为空，密钥由部署时注入（ArgoCD `helm.parameters`、External Secrets Operator、Vault、Sealed Secrets 等）。留空时 Helm 模板将 fail-fast，ArgoCD 同步失败直至密钥注入完成，杜绝明文密钥上生产。
 - 建议将 `values-prod.yaml` 放入独立私有仓库。
 - 每次发布通过 Git 提交触发，禁止手工 `kubectl apply` 修改生产。

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +37,10 @@ public class AiPythonClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // 任务接口鉴权：AI 服务校验 Authorization: Bearer（与回调 HMAC 共用 ApiServiceConfig.apiKey）
+        if (StringUtils.hasText(config.getApiKey())) {
+            headers.setBearerAuth(config.getApiKey());
+        }
         if (RequestIdHolder.get() != null) {
             headers.set("X-Request-Id", RequestIdHolder.get());
         }
