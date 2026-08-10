@@ -51,7 +51,8 @@ public class MybatisPlusConfig {
             "sys_alert_rule",
             "ai_service_config",
             "ai_task",
-            "ai_task_result");
+            "ai_task_result",
+            "sys_device");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
