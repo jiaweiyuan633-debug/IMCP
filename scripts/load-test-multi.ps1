@@ -20,7 +20,7 @@ for ($i = 0; $i -lt $Concurrency; $i++) {
                 Invoke-RestMethod -Uri "$Url/api/monitor/server" -Headers $headers -TimeoutSec 30 | Out-Null
                 Invoke-RestMethod -Uri "$Url/api/system/file?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
                 Invoke-RestMethod -Uri "$Url/api/monitor/alert-rule?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
-                Invoke-RestMethod -Uri "$Url/api/system/workflow/def?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
+                Invoke-RestMethod -Uri "$Url/api/system/workflow-engine/def?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
                 Invoke-RestMethod -Uri "$Url/api/monitor/audit-log?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
                 Invoke-RestMethod -Uri "$Url/api/ai/tasks?pageSize=5" -Headers $headers -TimeoutSec 30 | Out-Null
                 $ok++

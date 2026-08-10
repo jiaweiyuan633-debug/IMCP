@@ -19,6 +19,13 @@ scripts/load-test-multi.ps1
 - 禁止直接修改已执行的迁移脚本；变更必须新增 V 系列脚本。
 - 定期执行 `scripts/backup-drill.ps1` 验证备份可恢复。
 
+## 备份与恢复
+
+- `scripts/backup.ps1` 输出到 `backups/<db>_<时间戳>/` 目录：MySQL SQL 全量 + Redis RDB 快照（`redis-cli --rdb`，密码经 `REDISCLI_AUTH` 注入）+ MinIO 桶镜像（`mc mirror`，提供 `-MinioEndpoint/-MinioAccessKey/-MinioSecretKey/-MinioBucket` 后启用）。
+- `scripts/restore.ps1` 恢复 MySQL 后默认执行校验（表数量 + 关键表 `sys_user` 抽查），`-SkipVerify` 可关闭；Redis RDB 恢复需停机替换 dump.rdb（脚本给出手动步骤，不自动执行）；MinIO 恢复通过 `mc mirror` 反向回写。
+- Redis 恢复注意：RDB 恢复会覆盖当前实例全量数据，执行前务必确认目标实例与备份来源一致。
+- 备份文件含业务数据与文件对象，归档与传输需按敏感数据处理。
+
 ## 日志与监控
 
 - 后端指标：`/actuator/prometheus`
