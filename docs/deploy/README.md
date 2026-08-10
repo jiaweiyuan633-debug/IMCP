@@ -1,5 +1,19 @@
 # 部署教程
 
+## 环境分层
+
+后端通过 `SPRING_PROFILES_ACTIVE` 切换环境，配置层位于 `backend/src/main/resources/application-{env}.yml`：
+
+| 环境 | Profile | 定位 | 接口文档 | 密钥策略 | 采样率 |
+| --- | --- | --- | --- | --- | --- |
+| dev | `dev`（默认） | 本地开发 | 开启 | 明文默认密钥（仅限本地） | 1.0 |
+| test | `test` | 联调 / QA / CI 基线 | 开启 | fail-fast，必须注入 | 1.0 |
+| prod | `prod` | 生产 | 关闭 | fail-fast，必须注入 | 0.1 |
+
+- dev：默认激活，无需显式指定；依赖本地 MySQL/Redis，缺省密钥走 dev 明文兜底。
+- test：`SPRING_PROFILES_ACTIVE=test`，数据源默认 `admin_scaffold_test`（与本地开发库隔离）；`JWT_SECRET / TOTP_ENCRYPTION_KEY / MCP_AUTH_TOKEN` 必须注入，缺失即启动失败。
+- prod：`SPRING_PROFILES_ACTIVE=prod`，见第 5 节生产检查项；与 test 的差异是关闭接口文档、健康详情与采样率降至 0.1。
+
 ## 1. 本地开发
 
 环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+、MySQL 8、Redis 7。

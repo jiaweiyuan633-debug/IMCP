@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V33。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V41。
 
 ## 版本记录
 
@@ -39,6 +39,14 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V31 | 消息中心：`sys_message`、`sys_message_read` 与消息待办、铃铛聚合 |
 | V32 | Warm-Flow 工作流引擎表（`flow_definition/flow_node/flow_skip/flow_ins_order/flow_task` 等） |
 | V33 | `sys_user` 用户名唯一键按租户隔离（`uk_sys_user_tenant_username`） |
+| V34 | 字段级审计日志：`sys_field_audit_log` |
+| V35 | 组件演示菜单种子数据 |
+| V36 | 设备模块：`sys_device` |
+| V37 | 报表模块菜单 |
+| V38 | 消息通道：`sys_channel_config`、`sys_channel_log` |
+| V39 | AI 增强：`ai_prompt_template`、`ai_knowledge_base`、`ai_knowledge_doc` |
+| V40 | OAuth/SSO：`sys_oauth_config`、`sys_user_oauth`、`sys_oauth_client` |
+| V41 | MCP Server 配置：`sys_mcp_server` |
 
 ## 表清单
 
@@ -123,4 +131,3 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - 上传文件通过签名 Token 访问，TOTP 密钥加密存储。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
 - 高频查询字段采用组合索引，索引命名统一为 `idx_表名_字段名`。
-
