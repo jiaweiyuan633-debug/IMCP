@@ -239,4 +239,29 @@ export async function exportAuditLogs(): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+export interface FieldAuditLogVo {
+  id: number
+  userId?: number
+  module?: string
+  entityName?: string
+  entityId?: number
+  action?: string
+  changedFields?: string
+  beforeData?: string
+  afterData?: string
+  status: number
+  createdAt?: string
+}
+
+export interface FieldChange {
+  field: string
+  label: string
+  before: string | null
+  after: string | null
+}
+
+export function getFieldAuditPage(params: Record<string, unknown>): Promise<PageResult<FieldAuditLogVo>> {
+  return request.get('/monitor/field-audit', { params })
+}
+
 

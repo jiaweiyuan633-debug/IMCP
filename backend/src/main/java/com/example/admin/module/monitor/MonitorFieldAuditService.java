@@ -1,0 +1,30 @@
+package com.example.admin.module.monitor;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.admin.common.PageResult;
+import com.example.admin.module.system.entity.SysFieldAuditLogDO;
+import com.example.admin.module.system.mapper.SysFieldAuditLogMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+@Service
+@RequiredArgsConstructor
+public class MonitorFieldAuditService {
+
+    private final SysFieldAuditLogMapper fieldAuditLogMapper;
+
+    public PageResult<SysFieldAuditLogDO> page(long pageNum, long pageSize, String module,
+                                               String entityName, String action) {
+        Page<SysFieldAuditLogDO> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysFieldAuditLogDO> wrapper = new LambdaQueryWrapper<SysFieldAuditLogDO>()
+                .like(StringUtils.hasText(module), SysFieldAuditLogDO::getModule, module)
+                .like(StringUtils.hasText(entityName), SysFieldAuditLogDO::getEntityName, entityName)
+                .eq(StringUtils.hasText(action), SysFieldAuditLogDO::getAction, action)
+                .orderByDesc(SysFieldAuditLogDO::getId);
+        IPage<SysFieldAuditLogDO> result = fieldAuditLogMapper.selectPage(page, wrapper);
+        return PageResult.of(result, result.getRecords());
+    }
+}

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.RoleQuery;
 import com.example.admin.module.system.dto.RoleSaveRequest;
 import com.example.admin.module.system.entity.SysRoleDO;
@@ -81,6 +82,7 @@ public class SystemRoleService {
     }
 
     @Transactional
+    @FieldAudit(entity = SysRoleDO.class, action = "UPDATE", module = "角色管理")
     public void update(RoleSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "角色 ID 不能为空");
