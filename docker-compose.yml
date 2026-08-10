@@ -1,0 +1,110 @@
+# 本地全栈容器编排（开发/演示用）：docker compose up -d --build
+#
+# 注意：生产部署以 Helm（k8s/helm/admin-scaffold）为唯一来源，本文件不参与生产。
+# 后端在此走 dev 配置层（默认 profile）：swagger 开、dev 明文密钥兜底、Flyway 自动迁移 V1-V41。
+# 前端容器镜像内的 nginx 不代理 /api（K8s 由 Ingress 直达后端），本地无 Ingress，
+# 故挂载 docker/nginx.conf 覆盖代理配置，把 /api 与 /uploads 反代到 backend 容器。
+name: admin-scaffold
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: admin_scaffold
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      # 主机 6380，避免与本机原生 Redis(6379) 冲突；应用间走容器网络 redis:6379
+      - "${REDIS_PORT:-6380}:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: admin_scaffold
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SERVER_PORT: 8080
+      CALLBACK_BASE_URL: http://backend:8080
+      AI_BASE_URL: http://ai-service:8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # 上传文件持久化（本地存储 root 为容器内 /app/uploads）
+      - uploads-data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      # 与后端 AiServiceConfig.apiKey 保持一致；仅本地开发默认值，生产由 k8s Secret 注入
+      AUTH_TOKEN: ${AI_AUTH_TOKEN:-dev-ai-service-token}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "${AI_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    volumes:
+      # 本地代理：/api 与 /uploads 反代 backend，SSE 关闭缓冲
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8088}:8080"
+
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    ports:
+      - "${WEBSITE_PORT:-8081}:8080"
+
+volumes:
+  mysql-data:
+  redis-data:
+  uploads-data:

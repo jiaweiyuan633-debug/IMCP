@@ -2,6 +2,9 @@
 # 运行用户固定为 10001（与 k8s securityContext.runAsUser 对齐）
 FROM python:3.11-slim AS builder
 WORKDIR /app
+# 国内网络直连 PyPI 超时，改用清华镜像（pip 装 uv + uv 拉依赖均生效）
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 COPY pyproject.toml uv.lock ./
 RUN pip install --no-cache-dir uv && uv sync --no-dev
 

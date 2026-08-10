@@ -1,11 +1,15 @@
-# 多阶段构建：vite 构建 + 非 root nginx 托管（营销官网，静态站）
+# 多阶段构建：pnpm 构建 + 非 root nginx 托管（营销官网，静态站）
+# 项目为 pnpm 工作区（pnpm-lock.yaml + pnpm-workspace.yaml），与 frontend 保持一致。
+# 不能用 npm 安装：vite@^7 与 vite-plugin-pwa@0.21.x 的 peer 声明（仅到 vite6）会被 npm
+# 严格校验拒绝（ERESOLVE）；pnpm 依据锁文件冻结安装可正常解析该树。
 FROM node:22-alpine AS build
 WORKDIR /app
-# 官网依赖极少且无锁文件，使用 npm 安装
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+RUN corepack enable
+# 官网依赖极少，pnpm 冻结锁文件安装
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 FROM nginxinc/nginx-unprivileged:alpine
 COPY --from=build /app/dist /usr/share/nginx/html

@@ -3,7 +3,12 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml ./
+# 国内网络直连 npmjs 慢且易超时，用 .npmrc 切 npmmirror（pnpm 只认 .npmrc / pnpm config，
+# 不认 npm_config_registry 环境变量）
+RUN echo "registry=https://registry.npmmirror.com" > .npmrc
+# pnpm-workspace.yaml 声明 onlyBuiltDependencies（core-js/esbuild/vue-demi 构建脚本），
+# 漏拷会导致 pnpm 11 报 ERR_PNPM_IGNORED_BUILDS 失败
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
 # VITE_API_BASE_URL 由 CI 注入（docker build --build-arg）；默认 /api 走同源反代，
