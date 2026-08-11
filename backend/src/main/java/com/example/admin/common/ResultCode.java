@@ -53,6 +53,8 @@ public enum ResultCode {
     FORM_CODE_EXISTS(1036, "表单编码已存在"),
     FORM_SCHEMA_INVALID(1037, "表单定义无效"),
     FORM_DATA_INVALID(1038, "表单数据校验不通过"),
+    // 批次 C：数据大屏
+    SCREEN_TEMPLATE_CODE_EXISTS(1039, "大屏模板编码已存在"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");
 
     private final int code;

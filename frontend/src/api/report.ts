@@ -51,3 +51,8 @@ export function getReportCenter(): Promise<ReportCenterVo> {
 export function getReportScreen(): Promise<ReportScreenVo> {
   return request.get('/report/screen')
 }
+
+/** 数据大屏 SSE 订阅票据：登录态签发，60s 内有效。 */
+export function getReportScreenTicket(): Promise<string> {
+  return request.get('/report/screen/ticket')
+}

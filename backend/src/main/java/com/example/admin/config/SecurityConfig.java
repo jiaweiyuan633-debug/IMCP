@@ -70,6 +70,11 @@ public class SecurityConfig {
                                 "/api/auth/oauth/bind",
                                 "/api/oauth/token",
                                 "/api/ai/callback/**",
+                                // SSE 流：EventSource 无法携带 Authorization Header，
+                                // 鉴权由一次性票据承担（ticket 登录态签发、60s 有效、单次消费），见 SseTicketService
+                                "/api/system/notice/stream",
+                                "/api/ai/tasks/*/stream",
+                                "/api/report/screen/stream",
                                 "/mcp",
                                 "/mcp/message",
                                 "/uploads/**",
