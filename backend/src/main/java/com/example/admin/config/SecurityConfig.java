@@ -2,6 +2,7 @@ package com.example.admin.config;
 
 import com.example.admin.common.Result;
 import com.example.admin.common.ResultCode;
+import com.example.admin.security.ApiPermAuthorizationFilter;
 import com.example.admin.security.JwtAuthenticationFilter;
 import com.example.admin.security.JwtProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,13 +37,17 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiPermAuthorizationFilter apiPermAuthorizationFilter;
     private final ObjectMapper objectMapper;
 
     @Value("${app.cors.allowed-origin-patterns:*}")
     private String allowedOriginPatterns;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          ApiPermAuthorizationFilter apiPermAuthorizationFilter,
+                          ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiPermAuthorizationFilter = apiPermAuthorizationFilter;
         this.objectMapper = objectMapper;
     }
 
@@ -87,7 +92,8 @@ public class SecurityConfig {
                                 writeError(response, HttpServletResponse.SC_UNAUTHORIZED, ResultCode.UNAUTHORIZED))
                         .accessDeniedHandler((request, response, accessDeniedException) ->
                                 writeError(response, HttpServletResponse.SC_FORBIDDEN, ResultCode.FORBIDDEN)))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(apiPermAuthorizationFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 

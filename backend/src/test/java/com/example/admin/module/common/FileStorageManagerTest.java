@@ -11,6 +11,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -112,5 +115,57 @@ class FileStorageManagerTest {
         assertEquals("SCANNED", response.getScanStatus());
         assertNotNull(response.getSha256());
         verify(fileMapper).updateById(any(SysFileDO.class));
+    }
+
+    @Test
+    void storeBytesReusesPipelineForChunkedMerge() throws Exception {
+        when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
+        when(storage.store(any(), any(), any(), any(), any()))
+                .thenReturn(new StoredObject("2026/08/09/merged.png", "local", null));
+        when(accessService.issue(eq("/files/2"), any())).thenReturn("token");
+        when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
+            SysFileDO entity = invocation.getArgument(0);
+            entity.setId(2L);
+            return 1;
+        });
+
+        UploadResponse response = manager.storeBytes(PNG_CONTENT, "merged.png", "image/png", "image", "png");
+
+        assertEquals("/files/2", response.getUrl());
+        verify(storage).store(eq(PNG_CONTENT), eq("merged.png"), eq("image/png"), eq("png"), eq("image"));
+        verify(fileMapper).updateById(any(SysFileDO.class));
+    }
+
+    @Test
+    void registerObjectReadsBackAndPersistsWithoutReUploading() throws Exception {
+        when(storage.open("1/x.png")).thenReturn(new ByteArrayInputStream(PNG_CONTENT));
+        when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
+        when(accessService.issue(eq("/files/3"), any())).thenReturn("token");
+        when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
+            SysFileDO entity = invocation.getArgument(0);
+            entity.setId(3L);
+            return 1;
+        });
+
+        UploadResponse response = manager.registerObject("1/x.png", "x.png", "image/png", "image");
+
+        assertEquals("/files/3", response.getUrl());
+        // 预签名直传：对象已存在，不得再次存储
+        verify(storage, never()).store(any(), any(), any(), any(), any());
+        verify(fileMapper).updateById(any(SysFileDO.class));
+    }
+
+    @Test
+    void registerObjectDeletesInfectedObject() throws Exception {
+        when(storage.open("1/x.png")).thenReturn(new ByteArrayInputStream(PNG_CONTENT));
+        when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.blocked("Eicar FOUND"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> manager.registerObject("1/x.png", "x.png", "image/png", "image"));
+
+        assertEquals(1026, exception.getCode());
+        // 中毒文件不滞留存储
+        verify(storage).delete("1/x.png");
+        verify(fileMapper, never()).insert(any(SysFileDO.class));
     }
 }

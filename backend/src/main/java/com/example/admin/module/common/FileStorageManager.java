@@ -42,30 +42,52 @@ public class FileStorageManager {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
         }
-        long maxSize = uploadProperties.getMaxSizeMb() * BYTES_PER_MB;
-        if (file.getSize() > maxSize) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
-                    "文件大小不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
-        }
         String originalName = normalizeName(file.getOriginalFilename());
         String extension = extensionOf(originalName);
-        if (!allowedExtensionSet().contains(extension)) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的文件类型");
-        }
         byte[] content = readContent(file);
         String contentType = resolveContentType(file, originalName);
         String resolvedCategory = resolveCategory(category, extension, contentType);
-        if (!FileMagicValidator.isAllowedContent(content, extension)) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容与扩展名不匹配");
-        }
-        String sha256 = DigestUtil.sha256Hex(content);
-        FileVirusScanner.ScanResult scanResult = fileVirusScanner.scan(content, originalName, extension);
-        if (!scanResult.clean()) {
-            throw new BusinessException(ResultCode.FILE_SCAN_BLOCKED.getCode(), scanResult.message());
+        return storeBytes(content, originalName, contentType, resolvedCategory, extension);
+    }
+
+    /**
+     * 完整上传管线（普通上传/分片合并/预签名确认共用）：大小、扩展名、内容魔数校验 -> 病毒扫描 ->
+     * 配额 -> 对象存储（或登记已直传对象）-> 元数据入库。配额检查先于对象存储，避免超额仍占用存储。
+     */
+    public UploadResponse storeBytes(byte[] content, String originalName, String contentType, String category,
+                                     String extension) {
+        Validation validation = validate(content, originalName, extension);
+        if (!validation.scanResult().clean()) {
+            throw new BusinessException(ResultCode.FILE_SCAN_BLOCKED.getCode(), validation.scanResult().message());
         }
         storageQuotaService.check(content.length);
-        StoredObject stored = storeObject(content, originalName, contentType, extension, resolvedCategory);
-        SysFileDO entity = buildEntity(stored, originalName, content, contentType, resolvedCategory, sha256, scanResult);
+        StoredObject stored = storeObject(content, originalName, contentType, extension, category);
+        return persist(content, originalName, contentType, category, extension, stored, validation);
+    }
+
+    /**
+     * 登记预签名直传的对象：对象已由前端直传对象存储，这里读回做校验/扫描后入库，不重复上传。
+     * 扫描不通过时顺带删除违规对象，避免中毒文件滞留存储。
+     */
+    public UploadResponse registerObject(String objectKey, String originalName, String contentType, String category) {
+        byte[] content = readBackQuietly(objectKey);
+        String extension = extensionOf(originalName);
+        String resolvedCategory = resolveCategory(category, extension, contentType);
+        Validation validation = validate(content, originalName, extension);
+        if (!validation.scanResult().clean()) {
+            deleteQuietly(objectKey);
+            throw new BusinessException(ResultCode.FILE_SCAN_BLOCKED.getCode(), validation.scanResult().message());
+        }
+        storageQuotaService.check(content.length);
+        StoredObject stored = new StoredObject(objectKey, fileStorage.type(), null);
+        return persist(content, originalName, contentType, resolvedCategory, extension, stored, validation);
+    }
+
+    /** 入库 + 组装响应；入库失败时回滚已写入的对象，避免孤儿对象残留。 */
+    private UploadResponse persist(byte[] content, String originalName, String contentType, String category,
+                                   String extension, StoredObject stored, Validation validation) {
+        SysFileDO entity = buildEntity(stored, originalName, content, contentType, category,
+                validation.sha256(), validation.scanResult());
         try {
             fileMapper.insert(entity);
         } catch (RuntimeException exception) {
@@ -81,12 +103,32 @@ public class FileStorageManager {
                 .name(originalName)
                 .size((long) content.length)
                 .contentType(contentType)
-                .category(resolvedCategory)
-                .sha256(sha256)
+                .category(category)
+                .sha256(validation.sha256())
                 .scanStatus(entity.getScanStatus())
                 .contentUrl(contentUrl)
                 .accessToken(fileAccessService.issue(contentUrl, SecurityUtils.tryGetUserId()))
                 .build();
+    }
+
+    /** 大小/扩展名/内容魔数/病毒校验，通过后返回摘要与扫描结果。 */
+    private Validation validate(byte[] content, String originalName, String extension) {
+        long maxSize = uploadProperties.getMaxSizeMb() * BYTES_PER_MB;
+        if (content.length > maxSize) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "文件大小不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
+        }
+        if (!allowedExtensionSet().contains(extension)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的文件类型");
+        }
+        if (!FileMagicValidator.isAllowedContent(content, extension)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容与扩展名不匹配");
+        }
+        return new Validation(DigestUtil.sha256Hex(content),
+                fileVirusScanner.scan(content, originalName, extension));
+    }
+
+    private record Validation(String sha256, FileVirusScanner.ScanResult scanResult) {
     }
 
     public SysFileDO getOwnedOrThrow(Long id) {
@@ -160,6 +202,16 @@ public class FileStorageManager {
         } catch (Exception exception) {
             log.error("文件对象存储失败", exception);
             throw new BusinessException(ResultCode.INTERNAL_ERROR.getCode(), "文件存储失败");
+        }
+    }
+
+    /** 读回对象内容；读失败按业务异常抛出。 */
+    private byte[] readBackQuietly(String objectKey) {
+        try (InputStream inputStream = fileStorage.open(objectKey)) {
+            return inputStream.readAllBytes();
+        } catch (Exception exception) {
+            log.error("读取预签名直传对象失败, objectKey={}", objectKey, exception);
+            throw new BusinessException(ResultCode.INTERNAL_ERROR.getCode(), "直传对象读取失败");
         }
     }
 

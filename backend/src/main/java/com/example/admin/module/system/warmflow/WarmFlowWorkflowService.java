@@ -324,6 +324,10 @@ public class WarmFlowWorkflowService {
             notifyUser(workflow.getApplicantId(), workflow.getTenantId(), "流程审批拒绝",
                     "流程「" + workflow.getProcessName() + "」已被拒绝。", workflow.getId());
         } else {
+            // 流转到下一审批节点：重置超时计时与提醒标记，使 WorkflowTimeoutScanner 按新节点重新计时
+            workflow.setCurrentNodeAssignedAt(LocalDateTime.now());
+            workflow.setTimeoutNotified(0);
+            workflowMapper.updateById(workflow);
             notifyTaskUsers(instance.getId(), workflow.getTenantId(), "流程待办",
                     "您有一条流程待办：「" + workflow.getProcessName() + "」等待审批。", workflow.getId());
         }

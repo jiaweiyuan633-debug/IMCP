@@ -18,6 +18,8 @@ import com.example.admin.module.notice.mapper.SysChannelLogMapper;
 import com.example.admin.module.notice.vo.ChannelConfigVo;
 import com.example.admin.module.notice.vo.ChannelLogVo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -104,6 +106,23 @@ public class ChannelConfigService {
         log.setCreatedAt(LocalDateTime.now());
         channelLogMapper.insert(log);
         return log.getId();
+    }
+
+    /**
+     * 带重试的渠道发送：{@code sender.send} 以返回非 null 字符串表示失败（不抛异常），
+     * 本方法将失败包装为 {@link ChannelSendException} 触发 spring-retry 重试（1s 退避，最多 3 次）。
+     * 业务参数错误（渠道不存在/停用）抛 {@link BusinessException}，不匹配 retryFor，不重试。
+     * 每次尝试写一条发送日志，重试失败的最终错误由最后一次日志承载。
+     */
+    @Retryable(retryFor = ChannelSendException.class, maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2))
+    public Long sendWithRetry(ChannelSendRequest request) {
+        Long logId = send(request);
+        SysChannelLogDO log = channelLogMapper.selectById(logId);
+        if (log == null || log.getStatus() == null || log.getStatus() != STATUS_SUCCESS) {
+            throw new ChannelSendException(log == null ? "发送日志不存在" : log.getErrorMsg());
+        }
+        return logId;
     }
 
     public PageResult<ChannelLogVo> logPage(ChannelConfigQuery query) {

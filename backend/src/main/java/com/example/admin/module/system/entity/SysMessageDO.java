@@ -20,6 +20,8 @@ public class SysMessageDO {
     private String messageType;
     private String title;
     private String content;
+    /** 内容类型 TEXT 纯文本 / HTML 富文本，前端按类型渲染（HTML 不转义）。 */
+    private String contentType;
     private String bizType;
     private Long bizId;
     private String priority;

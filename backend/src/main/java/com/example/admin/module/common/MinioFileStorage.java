@@ -4,10 +4,12 @@ import cn.hutool.core.util.IdUtil;
 import com.example.admin.common.TenantContext;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
+import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.http.Method;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -79,6 +81,26 @@ public class MinioFileStorage implements FileStorage {
         client().removeObject(RemoveObjectArgs.builder()
                 .bucket(bucket)
                 .object(objectKey)
+                .build());
+    }
+
+    @Override
+    public String presignedUpload(String objectKey, String contentType, long size) throws Exception {
+        return client().getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                .method(Method.PUT)
+                .bucket(bucket)
+                .object(objectKey)
+                .expiry(15 * 60)
+                .build());
+    }
+
+    @Override
+    public String presignedDownload(String objectKey) throws Exception {
+        return client().getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                .method(Method.GET)
+                .bucket(bucket)
+                .object(objectKey)
+                .expiry(60 * 60)
                 .build());
     }
 

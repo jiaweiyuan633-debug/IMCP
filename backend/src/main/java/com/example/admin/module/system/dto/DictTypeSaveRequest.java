@@ -18,6 +18,8 @@ public class DictTypeSaveRequest {
     private String dictType;
 
     private Integer status;
+    /** 是否共享字典：1=tenant_id=0 全局一份（需 system:dict:shared:* 权限），0=租户私有。 */
+    private Integer isShared;
     private String remark;
 }
 

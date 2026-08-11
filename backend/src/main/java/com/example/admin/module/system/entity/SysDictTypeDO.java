@@ -18,6 +18,8 @@ public class SysDictTypeDO {
     private String dictName;
     private String dictType;
     private Integer status;
+    /** 是否共享字典：1=tenant_id=0 全局一份，所有租户可读且可覆盖；0=租户私有。 */
+    private Integer isShared;
     private String remark;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

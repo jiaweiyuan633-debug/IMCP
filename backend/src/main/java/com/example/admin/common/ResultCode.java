@@ -40,6 +40,19 @@ public enum ResultCode {
     PROMPT_CODE_EXISTS(1029, "Prompt 模板编码已存在"),
     UNAUTHORIZED(401, "未登录或登录已过期"),
     FORBIDDEN(403, "无权限访问"),
+    REPEAT_SUBMIT(1030, "请勿重复提交"),
+    ACQUIRE_LOCK_TIMEOUT(1031, "系统繁忙，请稍后重试"),
+    // 批次4：报表定义化
+    REPORT_CODE_EXISTS(1032, "报表编码已存在"),
+    REPORT_SQL_INVALID(1033, "报表数据源仅支持只读查询"),
+    // 批次4：设备物模型/遥测
+    THING_MODEL_TYPE_EXISTS(1034, "物模型类型已存在"),
+    // 批次4：导入导出中心
+    IMPORT_TEMPLATE_CODE_EXISTS(1035, "导入导出模板编码已存在"),
+    // 批次4：低代码表单引擎
+    FORM_CODE_EXISTS(1036, "表单编码已存在"),
+    FORM_SCHEMA_INVALID(1037, "表单定义无效"),
+    FORM_DATA_INVALID(1038, "表单数据校验不通过"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");
 
     private final int code;

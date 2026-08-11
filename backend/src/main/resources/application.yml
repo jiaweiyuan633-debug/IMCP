@@ -48,6 +48,11 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+  flyway:
+    # V44 消息模板列注释含 ${key} 占位符文本（仅注释，非 Flyway 注入），
+    # Flyway 默认占位符替换会解析 ${key} 报 No value provided → 全部环境启动失败。
+    # 无任何迁移依赖 Flyway 占位符，统一关闭替换，保留字面量 ${key}。
+    placeholder-replacement: false
 
 management:
   tracing:
@@ -75,6 +80,26 @@ management:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{40} - %msg%n"
+
+# 可靠性纵深（批次1）：Resilience4j 熔断实例参数
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+    instances:
+      # 告警 Webhook 外发：持续失败即打开熔断，避免对故障第三方无脑重试拖垮自身
+      alertWebhook:
+        base-config: default
+  retry:
+    instances:
+      alertWebhook:
+        max-attempts: 3
+        wait-duration: 1s
 
 mybatis-plus:
   configuration:
@@ -122,12 +147,24 @@ app:
   upload:
     max-size-mb: ${UPLOAD_MAX_SIZE_MB:20}
     allowed-extensions: ${UPLOAD_ALLOWED_EXTENSIONS:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}
+  report:
+    # 报表执行单次查询行数硬上限：执行引擎追加/收紧 LIMIT，防止拉爆结果集
+    max-rows: ${REPORT_MAX_ROWS:5000}
   ai:
     scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
   mcp:
     # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端以 Authorization: Bearer 携带；
     # 非 dev 环境未注入或等于开发默认值时 McpAuthFilter fail-closed 拒绝一切连接
     auth-token: ${MCP_AUTH_TOKEN:dev-mcp-token}
+
+importexport:
+  job:
+    # 任务轮询间隔（毫秒）：处理器每隔该时长取一条 PENDING 任务处理
+    poll-millis: ${IMPORTEXPORT_JOB_POLL_MILLIS:5000}
+    # PROCESSING 卡死回收阈值（毫秒）：超过该时长仍处 PROCESSING 的任务重置为 PENDING 重新排队
+    processing-timeout-millis: ${IMPORTEXPORT_JOB_PROCESSING_TIMEOUT_MILLIS:600000}
+    # 单次导出最大行数：超限拒绝生成文件，防止全量拉爆内存与超大文件
+    export-max-rows: ${IMPORTEXPORT_JOB_EXPORT_MAX_ROWS:100000}
 
 knife4j:
   enable: true

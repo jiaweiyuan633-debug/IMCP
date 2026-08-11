@@ -23,6 +23,8 @@
         <jjwt.version>0.12.6</jjwt.version>
         <hutool.version>5.8.32</hutool.version>
         <knife4j.version>4.5.0</knife4j.version>
+        <!-- 覆盖 Boot BOM 管理的 testcontainers 版本：1.19.8 对 Docker 29.x npipe API 协商失败（BadRequest 400） -->
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -68,6 +70,33 @@
             <groupId>io.milvus</groupId>
             <artifactId>milvus-sdk-java</artifactId>
             <version>2.4.11</version>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：分布式锁 + 接口幂等（Redisson RLock / Idempotent） -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <version>3.30.0</version>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：外部调用重试（spring-retry，版本由 Boot BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：熔断/舱壁/限时（resilience4j 2.2.x 支持 Spring Boot 3.x） -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>2.2.0</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -152,6 +181,14 @@
             <version>3.3.4</version>
         </dependency>
         <dependency>
+            <!-- POI 4.1.2（EasyExcel 传递）锁定 commons-io 2.11，但 commons-compress 1.26 需要
+                 2.13+ 的 org.apache.commons.io.build.AbstractStreamBuilder → EasyExcel 写 xlsx
+                 时 NoClassDefFoundError。显式覆盖到 2.16.1（与 POI 4.1.2 向后兼容）。 -->
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.16.1</version>
+        </dependency>
+        <dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>8.5.12</version>
@@ -176,6 +213,22 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：集成测试容器（MySQL/Redis，版本由 Boot BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -232,6 +285,20 @@
                                 </rule>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- 集成测试（Testcontainers，*IT 后缀）绑定 verify 阶段：mvn test 只跑单测，
+                 mvn verify 全量（CI 用 verify）。无 Docker 时 @Testcontainers 自动跳过。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

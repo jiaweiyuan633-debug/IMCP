@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -57,6 +58,16 @@ public class GlobalExceptionHandler {
     public Result<Void> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         log.error("Data integrity violation, requestId={}", RequestIdHolder.get(), exception);
         return Result.error(ResultCode.INTERNAL_ERROR);
+    }
+
+    /**
+     * 唯一键冲突兜底：并发「先查唯一再插入」的 create 路径预检非原子，后插入者命中数据库唯一键时
+     * 由 DataIntegrityViolationException 细化而来，返回业务码而非 500；各 Service 可捕获后转精确业务码。
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public Result<Void> handleDuplicateKey(DuplicateKeyException exception) {
+        log.warn("Duplicate key constraint, requestId={}", RequestIdHolder.get(), exception);
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), "数据已存在，请检查唯一字段");
     }
 
     @ExceptionHandler(FlowException.class)

@@ -2,6 +2,7 @@ package com.example.admin.module.device;
 
 import com.example.admin.common.PageResult;
 import com.example.admin.common.Result;
+import com.example.admin.common.annotation.Idempotent;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.device.dto.DeviceQuery;
 import com.example.admin.module.device.dto.DeviceSaveRequest;
@@ -35,6 +36,7 @@ public class DeviceController {
     @PostMapping
     @PreAuthorize("hasAuthority('device:device:add')")
     @OperLog(module = "设备管理", action = "新增设备")
+    @Idempotent(key = "#request.deviceCode", expireSeconds = 30)
     public Result<Long> create(@Valid @RequestBody DeviceSaveRequest request) {
         return Result.success(deviceService.create(request));
     }
