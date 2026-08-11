@@ -8,7 +8,10 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      # Redisson 3.30 缺陷:对空字符串 password 也会发送 AUTH "",本机无密码 Redis 会拒绝连接 → 启动失败。
+      # 故默认不配置 password(属性缺失 = null = Redisson 跳过 AUTH)。
+      # 若 Redis 需要密码认证:取消注释下行,通过环境变量 REDIS_PASSWORD 注入。
+      # password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
   flyway:
     enabled: true
