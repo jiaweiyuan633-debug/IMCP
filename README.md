@@ -10,7 +10,7 @@
 - 统一文件服务：本地磁盘/MinIO 统一 SPI、上传校验、文件分类、SHA256、ClamAV 病毒扫描、存储配额、签名内容端点、鉴权下载
 - 消息中心：系统消息、审批待办、全员广播、未读角标、已读管理、顶部铃铛聚合消息与公告、WebSocket + SSE 实时推送
 - 工程能力：Quartz JDBC 持久化定时任务、Excel 导入导出、OpenAPI
-- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V41
+- 数据可靠性：全表审计字段、审计日志、敏感字段脱敏、`version` 乐观锁、逻辑删除、Flyway V1-V52
 - 智能互联：MCP 双端接入，平台 SSE 端点对外暴露只读工具（用户/设备/统计），客户端可配置消费外部 MCP Server
 - 工程规范：阿里巴巴 Java 开发手册分批整改、统一错误码、日志脱敏、核心 Service 单测、Manager 分层
 - 实时协作：SSE Ticket + WebSocket 双通道、未读角标、AI 任务实时状态、服务器/SQL 告警分级与 Webhook
@@ -63,7 +63,7 @@
 ```text
 frontend/    后台管理系统（Vue3 管理端）
 website/     智能管理平台官网
-backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V41）
+backend/     Spring Boot 后端与 Flyway 脚本（当前 V1-V52）
 ai-service/  FastAPI AI 服务
 docs/        接口、数据库、部署、演示材料
 k8s/         Kubernetes 清单与 Helm Chart

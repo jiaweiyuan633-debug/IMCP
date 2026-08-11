@@ -45,6 +45,19 @@ Java 后端统一响应结构：
 | `1023` | 当前流程已结束 |
 | `1024` | 流程定义不可用 |
 | `1025` | 流程定义没有可进入的起始节点 |
+| `1026` | 文件未通过安全检查 |
+| `1027` | 病毒扫描服务不可用 |
+| `1028` | 设备编码已存在 |
+| `1029` | Prompt 模板编码已存在 |
+| `1030` | 请勿重复提交 |
+| `1031` | 系统繁忙，请稍后重试 |
+| `1032` | 报表编码已存在 |
+| `1033` | 报表数据源仅支持只读查询 |
+| `1034` | 物模型类型已存在 |
+| `1035` | 导入导出模板编码已存在 |
+| `1036` | 表单编码已存在 |
+| `1037` | 表单定义无效 |
+| `1038` | 表单数据校验不通过 |
 | `429` | 请求过于频繁 |
 | `500` | 系统繁忙，请稍后重试 |
 
@@ -92,6 +105,65 @@ Java 后端统一响应结构：
 | 工作流详情 | `/api/system/workflow-engine/{id}` | 详情出参：头部信息 + 表单回显(formData) + 完整流程轨迹(trace) + 当前待办节点 |
 | 流程定义 | `/api/system/workflow-engine/def` | 流程定义 CRUD、发布/取消发布、节点查询、定义选项 |
 | 当前节点 | `/api/system/workflow-engine/{id}/nodes` | 当前待办节点查询 |
+
+## 业务模块（批次4）
+
+### 报表定义化
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/report/definition/page` | 报表定义分页查询 |
+| POST | `/api/report/definition` | 新增报表定义（SQL 仅允许只读查询，校验后入库） |
+| PUT | `/api/report/definition` | 编辑报表定义 |
+| DELETE | `/api/report/definition/{id}` | 删除报表定义 |
+| GET | `/api/report/definition/{id}` | 报表定义详情 |
+| POST | `/api/report/definition/{id}/execute` | 执行报表查询（校验 SQL 只读，返回数据行） |
+
+### 设备物模型与遥测
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/device/thing-model/page` | 物模型分页查询 |
+| GET | `/api/device/thing-model/{id}` | 物模型详情 |
+| GET | `/api/device/thing-model/{id}/schema` | 物模型完整结构（属性/事件/服务三要素） |
+| POST | `/api/device/thing-model` | 新增物模型 |
+| PUT | `/api/device/thing-model` | 编辑物模型 |
+| DELETE | `/api/device/thing-model/{id}` | 删除物模型 |
+| POST | `/api/device/telemetry/report` | 设备遥测上报（批量，按物模型校验属性） |
+| GET | `/api/device/telemetry/latest` | 设备最新遥测快照 |
+| GET | `/api/device/telemetry/history` | 设备遥测历史分页 |
+
+### 导入导出中心
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/import-export/template/page` | 导入导出模板分页查询 |
+| POST | `/api/import-export/template` | 新增模板（按实体配置列映射与校验规则） |
+| PUT | `/api/import-export/template` | 编辑模板 |
+| DELETE | `/api/import-export/template/{id}` | 删除模板 |
+| POST | `/api/import-export/job/import` | 创建导入任务（模板 + 文件，异步执行） |
+| POST | `/api/import-export/job/export` | 创建导出任务（模板 + 查询条件，异步执行） |
+| GET | `/api/import-export/job/page` | 导入导出任务分页查询 |
+| GET | `/api/import-export/job/{id}` | 任务详情（进度、成功/失败数、错误信息） |
+| GET | `/api/import-export/job/{id}/download` | 下载任务结果文件（导出成品 / 导入失败明细） |
+
+导入导出通过 `ImportExportHandler` SPI 扩展实体；内置 `dict-data`（字典数据）处理器。
+
+### 低代码表单引擎
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/form/definition/page` | 表单定义分页查询 |
+| GET | `/api/form/definition/{id}` | 表单定义详情 |
+| GET | `/api/form/definition/{id}/schema` | 已发布表单的渲染结构（fields + layout） |
+| POST | `/api/form/definition` | 新增表单定义（schema 校验） |
+| PUT | `/api/form/definition` | 编辑表单定义（乐观锁） |
+| PUT | `/api/form/definition/{id}/publish` | 发布表单（草稿 → 已发布） |
+| DELETE | `/api/form/definition/{id}` | 删除表单定义 |
+| POST | `/api/form/instance/submit` | 提交表单（校验已发布定义 + 字段规则） |
+| GET | `/api/form/instance/page` | 表单实例分页查询 |
+| GET | `/api/form/instance/{id}` | 表单实例详情 |
+| PUT | `/api/form/instance/{id}/status` | 表单审批流转（SUBMITTED → APPROVED/REJECTED） |
 
 ## 监控
 

@@ -20,14 +20,22 @@
 ## 关键机制
 
 - 多租户：`TenantContext` + MyBatis-Plus 租户拦截器
-- 数据权限：`@DataScope` AOP + `DataScopeInnerInterceptor`
+- 数据权限：`@DataScope` AOP + `DataScopeInnerInterceptor`，行级映射表 `sys_data_permission` 可配置热加载（`DataPermissionRuleResolver`）
+- RBAC 资源级权限：按钮级 `@PreAuthorize` + URL 层 `ApiPermAuthorizationFilter`，`sys_api_perm`（method+path → 权限编码）内存注册表实时热加载
 - 审计：操作日志 AOP + `sys_audit_log`
-- 文件访问：HMAC 签名 Token，短期有效
+- 文件访问：HMAC 签名 Token + HTTP Range 206/416 + 预签名直传 URL（MinIO）
+- 文件上传：分片上传（Redis 任务元数据 + 分布式锁合并 + sha256 校验）、秒传（按租户+sha256）
 - 2FA：TOTP 密钥 AES-GCM 加密存储
-- 工作流：流程定义、条件/并行节点、表单数据、超时提醒
+- 工作流：流程定义、条件/并行节点、表单数据、超时提醒；`WorkflowTimeoutScanner` 定时扫描超时节点并通知
+- 消息：站内消息 TEXT/HTML 富文本（`content_type`）、`sys_message_template` 模板渲染发送、渠道发送 `@Retryable` 重试（`ChannelSendException` 触发）
+- 字典：共享字典（tenant_id=0）+ 租户覆盖模型 + 租户粒度缓存失效（共享数据变更清全租户）
+- 报表定义化：`report_definition` 存 SQL 定义，执行前强制只读校验（仅 SELECT、禁 DDL/DML/注释攻击），`/execute` 返回数据行
+- 设备物模型/遥测：`device_thing_model`（属性/事件/服务三要素 JSON）+ `device_telemetry` 时序遥测，上报按物模型校验属性类型
+- 导入导出中心：`import_export_template` 列映射与校验规则 + `import_export_job` 异步任务（`ScheduledTaskLock` 轮询调度），`ImportExportHandler` SPI 扩展实体（内置字典数据处理器），导入失败生成明细文件可下载
+- 低代码表单引擎：`form_definition` 零依赖 schema 校验 + `form_instance` 提交数据校验与审批流转（SUBMITTED → APPROVED/REJECTED），草稿不渲染不接收提交
 - 外部能力：AI 任务、告警 Webhook 通过 Manager 封装，文件存储通过 `FileStorage` 接口隔离
 - 日志安全：操作日志经 `LogMaskUtils` 递归脱敏密码、Token、API Key、手机号、邮箱等字段
-- 统一错误码：`ResultCode` 覆盖认证、参数、AI 回调与工作流状态，前端语言包同步维护
+- 统一错误码：`ResultCode` 覆盖认证、参数、AI 回调、工作流状态与批次4 业务模块（报表/物模型/模板/表单），前端语言包同步维护
 
 ## 当前完成度
 
@@ -40,5 +48,6 @@
 ## 后续方向
 
 - 消息中间件替换 SSE 的跨实例广播
-- 对象存储接入 CDN 与预签名 URL
-- 工作流继续扩展会签、加签与动态表单
+- 对象存储接入 CDN（预签名直传已实现）
+- 工作流继续扩展会签、加签；表单引擎与工作流表单回显打通
+- URL 层资源权限在全部写接口上沉淀 `sys_api_perm` 规则（当前以用户/角色/菜单/字典为示例）

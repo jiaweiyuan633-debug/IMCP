@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V41。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V52。
 
 ## 版本记录
 
@@ -47,6 +47,17 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V39 | AI 增强：`ai_prompt_template`、`ai_knowledge_base`、`ai_knowledge_doc` |
 | V40 | OAuth/SSO：`sys_oauth_config`、`sys_user_oauth`、`sys_oauth_client` |
 | V41 | MCP Server 配置：`sys_mcp_server` |
+| V42 | 可靠投递发件箱：`sys_outbox` |
+| V43 | 数据权限规则可配置：`sys_data_permission` |
+| V44 | 消息模板：`sys_message_template`；`sys_message` 增加 `content_type`（TEXT/HTML 富文本） |
+| V45 | API 资源级权限：`sys_api_perm`（method+path → 所需权限编码），URL 层从"仅认证"升级为"认证+资源权限" |
+| V46 | 共享字典：`sys_dict_type` 增加 `is_shared`（tenant_id=0 全局一份）+ `common_status` 种子共享字典 |
+| V47 | 报表定义：`report_definition`（自定义 SQL 报表，执行期只读守卫 + 行数上限） |
+| V48 | 物模型/遥测：`device_thing_model`、`device_telemetry` |
+| V49 | 导入导出中心：`import_export_template`、`import_export_job` |
+| V50 | 表单引擎：`form_definition`、`form_instance` |
+| V51 | 批次4 菜单权限种子补齐（报表/设备/导入导出/表单） |
+| V52 | 导入导出任务查询字段与索引补充 |
 
 ## 表清单
 
@@ -57,6 +68,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_user` | 用户，含部门、租户、审计字段、乐观锁 |
 | `sys_role` | 角色，含数据权限范围、审计字段、乐观锁 |
 | `sys_menu` | 菜单与按钮权限 |
+| `sys_api_perm` | API 资源权限映射：method+path 模式 → 所需权限编码，URL 层资源级校验 |
+| `sys_data_permission` | 数据权限规则（表 → 行级表达式列映射），可配置热加载 |
 | `sys_user_role` | 用户角色 |
 | `sys_role_menu` | 角色菜单 |
 | `sys_role_dept` | 角色自定义数据权限部门 |
@@ -68,8 +81,8 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 
 | 表 | 说明 |
 | --- | --- |
-| `sys_dict_type` | 字典类型，含审计字段、乐观锁 |
-| `sys_dict_data` | 字典数据，含审计字段、乐观锁 |
+| `sys_dict_type` | 字典类型，含审计字段、乐观锁；`is_shared=1` 表示共享字典（tenant_id=0 全局一份） |
+| `sys_dict_data` | 字典数据，含审计字段、乐观锁；共享类型数据在 tenant_id=0，租户私有数据按 dict_value 覆盖共享层 |
 | `sys_config` | 参数配置，含审计字段、乐观锁 |
 | `sys_tenant` | 租户，含审计字段、乐观锁 |
 
@@ -92,8 +105,11 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | `sys_notice` | 通知公告，含审计字段、乐观锁 |
 | `sys_notice_read` | 通知已读 |
 | `sys_file` | 文件元数据，含租户、存储类型 |
-| `sys_message` | 系统消息，含租户、类型、标题、内容、已读状态 |
+| `sys_message` | 系统消息，含租户、类型、标题、内容（TEXT/HTML 富文本）、已读状态 |
 | `sys_message_read` | 消息已读 |
+| `sys_message_template` | 消息模板：`${key}` 占位符 + TEXT/HTML 内容类型，按模板渲染发送 |
+| `sys_channel_config` | 消息渠道配置（邮件/短信/钉钉/企微） |
+| `sys_channel_log` | 渠道发送记录（含重试失败的错误信息） |
 | `sys_workflow` | 工作流实例，含流程定义、当前节点、审计字段、乐观锁 |
 | `sys_workflow_log` | 工作流审批日志 |
 | `sys_process_def` | 流程定义，含租户、唯一流程标识 |
