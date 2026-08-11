@@ -80,6 +80,15 @@ config:
   redisUrl: redis://redis:6379/0
   callbackBaseUrl: http://admin-backend:8080
   aiBaseUrl: http://ai-service:8000
+  # RAG 向量检索（可选）：false 走 MySQL ngram 全文检索（零依赖）；true 需先部署 k8s/milvus
+  milvusEnabled: false
+  milvusHost: milvus
+  milvusPort: "19530"
+  milvusDatabase: default
+  # OpenAI 兼容 /embeddings 端点：指向 ai-service 的 /api/v1/embeddings；留空则用本地哈希向量
+  milvusEmbeddingEndpoint: ""
+  milvusEmbeddingApiKey: ""
+  milvusEmbeddingModel: text-embedding-3-small
   # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）
   frontendUrl: http://admin-frontend:8080
   corsAllowedOriginPatterns: https://admin.example.com

@@ -156,6 +156,26 @@ app:
     # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端以 Authorization: Bearer 携带；
     # 非 dev 环境未注入或等于开发默认值时 McpAuthFilter fail-closed 拒绝一切连接
     auth-token: ${MCP_AUTH_TOKEN:dev-mcp-token}
+  milvus:
+    # RAG 向量检索（可选）：默认关闭走 MySQL ngram 全文检索（零依赖）；
+    # enabled=true 时启用 Milvus 向量检索，Milvus 运行不可用时检索自动降级回 MySQL。
+    enabled: ${MILVUS_ENABLED:false}
+    host: ${MILVUS_HOST:localhost}
+    port: ${MILVUS_PORT:19530}
+    secure: ${MILVUS_SECURE:false}
+    username: ${MILVUS_USERNAME:}
+    password: ${MILVUS_PASSWORD:}
+    database: ${MILVUS_DATABASE:default}
+    # 向量维度：须与集合已建维度一致（text-embedding-3-small=1536）；变更需重建集合
+    dim: ${MILVUS_DIM:1536}
+    connect-timeout-seconds: ${MILVUS_CONNECT_TIMEOUT_SECONDS:5}
+    embedding:
+      # OpenAI 兼容 /embeddings 端点：留空则用本地确定性哈希向量（可运行但语义性弱）。
+      # 本地全栈：http://ai-service:8000/api/v1/embeddings（鉴权 Bearer 为 AI_AUTH_TOKEN）
+      endpoint: ${MILVUS_EMBEDDING_ENDPOINT:}
+      api-key: ${MILVUS_EMBEDDING_API_KEY:}
+      model: ${MILVUS_EMBEDDING_MODEL:text-embedding-3-small}
+      timeout-seconds: ${MILVUS_EMBEDDING_TIMEOUT_SECONDS:10}
 
 importexport:
   job:

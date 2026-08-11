@@ -16,6 +16,16 @@ data:
   REDIS_URL: {{ .Values.config.redisUrl }}
   CALLBACK_BASE_URL: {{ .Values.config.callbackBaseUrl }}
   AI_BASE_URL: {{ .Values.config.aiBaseUrl }}
+{{- if .Values.config.milvusEnabled }}
+  # RAG 向量检索（可选）：Milvus 接入，需先部署 k8s/milvus
+  MILVUS_ENABLED: "true"
+  MILVUS_HOST: {{ .Values.config.milvusHost }}
+  MILVUS_PORT: {{ .Values.config.milvusPort }}
+  MILVUS_DATABASE: {{ .Values.config.milvusDatabase }}
+  MILVUS_EMBEDDING_ENDPOINT: {{ .Values.config.milvusEmbeddingEndpoint }}
+  MILVUS_EMBEDDING_API_KEY: {{ .Values.config.milvusEmbeddingApiKey }}
+  MILVUS_EMBEDDING_MODEL: {{ .Values.config.milvusEmbeddingModel }}
+{{- end }}
   # 生产配置层必需项：缺失会导致后端启动失败（fail-fast）
   FRONTEND_URL: {{ .Values.config.frontendUrl }}
   CORS_ALLOWED_ORIGIN_PATTERNS: {{ .Values.config.corsAllowedOriginPatterns }}

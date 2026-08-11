@@ -52,6 +52,15 @@ services:
       SERVER_PORT: 8080
       CALLBACK_BASE_URL: http://backend:8080
       AI_BASE_URL: http://ai-service:8000
+      # RAG 向量检索（可选）：默认关闭走 MySQL 全文检索；开启向量检索需同时 --profile milvus
+      MILVUS_ENABLED: ${MILVUS_ENABLED:-false}
+      MILVUS_HOST: milvus
+      MILVUS_PORT: "19530"
+      MILVUS_DATABASE: default
+      # 真实 embedding：指向 ai-service 的 /api/v1/embeddings，Bearer 鉴权与 AUTH_TOKEN 一致
+      MILVUS_EMBEDDING_ENDPOINT: http://ai-service:8000/api/v1/embeddings
+      MILVUS_EMBEDDING_API_KEY: ${AI_AUTH_TOKEN:-dev-ai-service-token}
+      MILVUS_EMBEDDING_MODEL: ${MILVUS_EMBEDDING_MODEL:-text-embedding-3-small}
     depends_on:
       mysql:
         condition: service_healthy
@@ -62,6 +71,34 @@ services:
       - uploads-data:/app/uploads
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+
+  # Milvus 向量检索（可选，profile 门控）：默认不启动，避免本地无谓占用内存。
+  # 启用向量检索知识库：docker compose --profile milvus up -d && 设 MILVUS_ENABLED=true 重启 backend。
+  # 使用官方 standalone 镜像内嵌 etcd/minio（单机演示足够），生产以 k8s StatefulSet 为准（k8s/milvus）。
+  milvus:
+    profiles: ["milvus"]
+    image: milvusdb/milvus:v2.4.11
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      MINIO_USE_EMBED: "true"
+      MINIO_DATA_DIR: /var/lib/milvus/minio
+      MINIO_ROOT_USER: milvusadmin
+      MINIO_ROOT_PASSWORD: milvusadmin123
+      TZ: Asia/Shanghai
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      # 9091 为 Milvus proxy 健康端口；探测失败仅标记 unhealthy，不阻塞 backend（后端会自动降级 MySQL）
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9091/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "9091:9091"
 
   ai-service:
     build:
@@ -108,3 +145,4 @@ volumes:
   mysql-data:
   redis-data:
   uploads-data:
+  milvus-data:

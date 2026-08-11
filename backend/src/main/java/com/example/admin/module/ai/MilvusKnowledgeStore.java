@@ -18,19 +18,26 @@ import io.milvus.param.dml.UpsertParam;
 import io.milvus.response.QueryResultsWrapper;
 import io.milvus.response.SearchResultsWrapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Milvus 向量检索知识库（可选集成）：配置 app.milvus.enabled=true 时启用，
- * 替换默认的 {@link MysqlKeywordStore}。向量由确定性伪嵌入占位生成，
- * 生产环境应替换为真实 embedding 服务（如 text-embedding-3-small）。
+ * 替换默认的 {@link MysqlKeywordStore}。
+ *
+ * <p>能力：真实 embedding（OpenAI 兼容端点，失败自动降级本地哈希向量）；
+ * 连接/集合延迟就绪探测；Milvus 运行不可用时检索自动降级为 MySQL ngram 全文检索，
+ * 写入侧跳过向量同步（文档本体始终在 MySQL，不丢失）。
+ *
+ * <p>注意：milvus-sdk-java 2.4.x 的 {@link MilvusServiceClient} 构造器会立即建连，
+ * 连接失败直接抛 RuntimeException。因此这里采用惰性连接：bean 初始化不建连，
+ * 首次操作时才尝试连接，失败则保持降级并在后续操作中自动重连，避免 Milvus 宕机拖垮后端启动。
  */
 @Slf4j
 @Component
@@ -38,20 +45,37 @@ import java.util.List;
 public class MilvusKnowledgeStore implements KnowledgeVectorStore {
 
     private static final String COLLECTION = "ai_knowledge_doc";
-    private static final int VECTOR_DIM = 64;
 
-    private final MilvusServiceClient client;
+    private final MilvusProperties properties;
+    private final EmbeddingClient embeddingClient;
+    private final MysqlFulltextSearcher fallback;
+    /** 惰性初始化：首次 ensureReady() 时建连；连接失败保持 null，后续操作自动重试。 */
+    private MilvusServiceClient client;
 
-    public MilvusKnowledgeStore(
-            @Value("${app.milvus.host:localhost}") String host,
-            @Value("${app.milvus.port:19530}") int port,
-            @Value("${app.milvus.secure:false}") boolean secure) {
-        this.client = new MilvusServiceClient(ConnectParam.newBuilder()
-                .withHost(host)
-                .withPort(port)
-                .withSecure(secure)
-                .build());
-        ensureCollection();
+    private final AtomicBoolean ready = new AtomicBoolean(false);
+    private final AtomicBoolean degraded = new AtomicBoolean(false);
+
+    public MilvusKnowledgeStore(MilvusProperties properties,
+                                EmbeddingClient embeddingClient,
+                                MysqlFulltextSearcher fallback) {
+        this.properties = properties;
+        this.embeddingClient = embeddingClient;
+        this.fallback = fallback;
+    }
+
+    private ConnectParam buildConnectParam() {
+        ConnectParam.Builder connect = ConnectParam.newBuilder()
+                .withHost(properties.getHost())
+                .withPort(properties.getPort())
+                .withSecure(properties.isSecure())
+                .withConnectTimeout(Math.max(1000, properties.getConnectTimeoutSeconds() * 1000L), TimeUnit.MILLISECONDS);
+        if (StringUtils.hasText(properties.getDatabase())) {
+            connect.withDatabaseName(properties.getDatabase());
+        }
+        if (StringUtils.hasText(properties.getUsername()) && StringUtils.hasText(properties.getPassword())) {
+            connect.withAuthorization(properties.getUsername(), properties.getPassword());
+        }
+        return connect.build();
     }
 
     @Override
@@ -61,33 +85,58 @@ public class MilvusKnowledgeStore implements KnowledgeVectorStore {
 
     @Override
     public void upsert(Long tenantId, AiKnowledgeDocDO doc) {
-        JsonObject row = new JsonObject();
-        row.addProperty("doc_id", doc.getId());
-        row.addProperty("tenant_id", tenantId);
-        row.addProperty("base_id", doc.getBaseId());
-        row.addProperty("text", snippet(doc));
-        row.add("embedding", toJsonArray(embed(titleAndContent(doc))));
-        R<io.milvus.grpc.MutationResult> result = client.upsert(UpsertParam.newBuilder()
-                .withCollectionName(COLLECTION)
-                .withRows(List.of(row))
-                .build());
-        warnOnError(result, "upsert 文档 " + doc.getId());
+        if (!ensureReady()) {
+            // 文档已落库 MySQL，Milvus 不可用时跳过向量写入，恢复后由下一轮同步补
+            return;
+        }
+        try {
+            JsonObject row = new JsonObject();
+            row.addProperty("doc_id", doc.getId());
+            row.addProperty("tenant_id", tenantId);
+            row.addProperty("base_id", doc.getBaseId());
+            row.addProperty("text", snippet(doc));
+            row.add("embedding", toJsonArray(embeddingClient.embed(titleAndContent(doc))));
+            R<io.milvus.grpc.MutationResult> result = client.upsert(UpsertParam.newBuilder()
+                    .withCollectionName(COLLECTION)
+                    .withRows(List.of(row))
+                    .build());
+            throwOnError(result, "upsert 文档 " + doc.getId());
+            resetDegraded();
+        } catch (RuntimeException exception) {
+            degradeAndWarn("upsert", exception);
+        }
     }
 
     @Override
     public void deleteByDoc(Long tenantId, Long docId) {
-        client.delete(DeleteParam.newBuilder()
-                .withCollectionName(COLLECTION)
-                .withExpr("doc_id in [" + docId + "]")
-                .build());
+        if (!ensureReady()) {
+            return;
+        }
+        try {
+            throwOnError(client.delete(DeleteParam.newBuilder()
+                    .withCollectionName(COLLECTION)
+                    .withExpr("doc_id in [" + docId + "]")
+                    .build()), "删除文档 " + docId);
+            resetDegraded();
+        } catch (RuntimeException exception) {
+            degradeAndWarn("deleteByDoc", exception);
+        }
     }
 
     @Override
     public void deleteByBase(Long tenantId, Long baseId) {
-        client.delete(DeleteParam.newBuilder()
-                .withCollectionName(COLLECTION)
-                .withExpr("base_id in [" + baseId + "]")
-                .build());
+        if (!ensureReady()) {
+            return;
+        }
+        try {
+            throwOnError(client.delete(DeleteParam.newBuilder()
+                    .withCollectionName(COLLECTION)
+                    .withExpr("base_id in [" + baseId + "]")
+                    .build()), "删除知识库 " + baseId);
+            resetDegraded();
+        } catch (RuntimeException exception) {
+            degradeAndWarn("deleteByBase", exception);
+        }
     }
 
     @Override
@@ -95,20 +144,34 @@ public class MilvusKnowledgeStore implements KnowledgeVectorStore {
         if (!StringUtils.hasText(query)) {
             return List.of();
         }
+        if (!ensureReady()) {
+            return fallback.search(tenantId, baseId, query, topK);
+        }
+        try {
+            List<String> result = doMilvusSearch(tenantId, baseId, query, topK);
+            resetDegraded();
+            return result;
+        } catch (RuntimeException exception) {
+            if (degraded.compareAndSet(false, true)) {
+                log.warn("Milvus 检索失败（向量维度变更需重建集合？），本次降级为 MySQL 全文检索: {}",
+                        exception.getMessage());
+            }
+            return fallback.search(tenantId, baseId, query, topK);
+        }
+    }
+
+    private List<String> doMilvusSearch(Long tenantId, Long baseId, String query, int topK) {
         SearchParam param = SearchParam.newBuilder()
                 .withCollectionName(COLLECTION)
                 .withMetricType(MetricType.L2)
                 .withVectorFieldName("embedding")
-                .withFloatVectors(List.of(toFloatList(embed(query))))
+                .withFloatVectors(List.of(toFloatList(embeddingClient.embed(query))))
                 .withExpr("tenant_id == " + tenantId + " and base_id == " + baseId)
                 .withOutFields(List.of("text", "doc_id"))
                 .withTopK(topK)
                 .build();
         R<io.milvus.grpc.SearchResults> response = client.search(param);
-        if (response.getException() != null) {
-            log.warn("Milvus 检索失败: {}", response.getException().getMessage());
-            return List.of();
-        }
+        throwOnError(response, "检索");
         SearchResultsWrapper wrapper = new SearchResultsWrapper(response.getData().getResults());
         List<QueryResultsWrapper.RowRecord> records = wrapper.getRowRecords();
         List<String> result = new ArrayList<>(records.size());
@@ -121,11 +184,52 @@ public class MilvusKnowledgeStore implements KnowledgeVectorStore {
         return result;
     }
 
-    private synchronized void ensureCollection() {
-        R<Boolean> has = client.hasCollection(HasCollectionParam.newBuilder()
+    /**
+     * 延迟就绪：构造不建连，首次操作时才连接并探测集合，Milvus 后启动也能接上。
+     * 连接失败不抛异常，返回 false 并保持降级；后续每次操作都会重试连接（自动恢复）。
+     */
+    private boolean ensureReady() {
+        if (ready.get()) {
+            return true;
+        }
+        synchronized (this) {
+            if (ready.get()) {
+                return true;
+            }
+            if (client == null) {
+                try {
+                    client = new MilvusServiceClient(buildConnectParam());
+                } catch (RuntimeException exception) {
+                    if (degraded.compareAndSet(false, true)) {
+                        log.warn("Milvus 连接失败，本次操作降级（后续自动重试）: {}", exception.getMessage());
+                    }
+                    return false;
+                }
+            }
+            try {
+                ensureCollection(client);
+                ready.set(true);
+                if (degraded.compareAndSet(true, false)) {
+                    log.info("Milvus 连接恢复");
+                }
+                return true;
+            } catch (RuntimeException exception) {
+                if (degraded.compareAndSet(false, true)) {
+                    log.warn("Milvus 不可用（连接/集合未就绪），本次操作降级: {}", exception.getMessage());
+                }
+                return false;
+            }
+        }
+    }
+
+    private void ensureCollection(MilvusServiceClient connected) {
+        R<Boolean> has = connected.hasCollection(HasCollectionParam.newBuilder()
                 .withCollectionName(COLLECTION)
                 .build());
-        if (has.getData() != null && has.getData()) {
+        if (has.getException() != null) {
+            throw new IllegalStateException(has.getException().getMessage());
+        }
+        if (Boolean.TRUE.equals(has.getData())) {
             return;
         }
         List<FieldType> fields = List.of(
@@ -133,17 +237,33 @@ public class MilvusKnowledgeStore implements KnowledgeVectorStore {
                 FieldType.newBuilder().withName("tenant_id").withDataType(DataType.Int64).build(),
                 FieldType.newBuilder().withName("base_id").withDataType(DataType.Int64).build(),
                 FieldType.newBuilder().withName("text").withDataType(DataType.VarChar).withMaxLength(65535).build(),
-                FieldType.newBuilder().withName("embedding").withDataType(DataType.FloatVector).withDimension(VECTOR_DIM).build());
-        R<RpcStatus> result = client.createCollection(CreateCollectionParam.newBuilder()
+                FieldType.newBuilder().withName("embedding").withDataType(DataType.FloatVector)
+                        .withDimension(properties.getDim()).build());
+        R<RpcStatus> result = connected.createCollection(CreateCollectionParam.newBuilder()
                 .withCollectionName(COLLECTION)
                 .withFieldTypes(fields)
                 .build());
-        warnOnError(result, "创建集合 " + COLLECTION);
+        if (result.getException() != null) {
+            throw new IllegalStateException("创建集合失败: " + result.getException().getMessage());
+        }
+        log.info("Milvus 集合 {} 已创建（dim={}）", COLLECTION, properties.getDim());
     }
 
-    private void warnOnError(R<?> result, String action) {
+    private void throwOnError(R<?> result, String action) {
         if (result.getException() != null) {
-            log.warn("Milvus {} 失败: {}", action, result.getException().getMessage());
+            throw new IllegalStateException("Milvus " + action + " 失败: " + result.getException().getMessage());
+        }
+    }
+
+    private void degradeAndWarn(String action, RuntimeException exception) {
+        if (degraded.compareAndSet(false, true)) {
+            log.warn("Milvus {} 失败（已降级，恢复前限频提示）: {}", action, exception.getMessage());
+        }
+    }
+
+    private void resetDegraded() {
+        if (degraded.compareAndSet(true, false)) {
+            log.info("Milvus 已恢复在线");
         }
     }
 
@@ -181,26 +301,5 @@ public class MilvusKnowledgeStore implements KnowledgeVectorStore {
             array.add(value);
         }
         return array;
-    }
-
-    /** 确定性伪向量（占位）：无外部 embedding 服务时的可运行实现，语义性弱但确定性可复现。 */
-    private static float[] embed(String text) {
-        float[] vector = new float[VECTOR_DIM];
-        byte[] bytes = text == null ? new byte[0] : text.getBytes(StandardCharsets.UTF_8);
-        for (int i = 0; i < bytes.length; i++) {
-            int bucket = Math.floorMod(i * 7 + bytes[i], VECTOR_DIM);
-            vector[bucket] += (bytes[i] - 127f) / 127f;
-        }
-        float norm = 0f;
-        for (float value : vector) {
-            norm += value * value;
-        }
-        if (norm > 0f) {
-            float scale = (float) Math.sqrt(norm);
-            for (int i = 0; i < vector.length; i++) {
-                vector[i] /= scale;
-            }
-        }
-        return vector;
     }
 }
