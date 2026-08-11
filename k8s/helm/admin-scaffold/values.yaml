@@ -100,6 +100,11 @@ config:
   redisSentinelNodes: ""
   # 哨兵节点自身认证口令（可选）
   redisSentinelPassword: ""
+  # 链路追踪（可选）：Zipkin HTTP 上报端点，如 http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans。
+  # 留空时模板注入 MANAGEMENT_TRACING_ENABLED=false 显式关闭链路追踪——空 endpoint 下 Spring Boot 仍会
+  # 实例化 Zipkin Sender/AsyncZipkinSpanHandler（zipkin auto-config 无端点非空条件），每次 flush 构造
+  # 非法 URI 失败丢 span，故必须显式关闭而非仅"不注入"。配置端点时注入 true + ZIPKIN_ENDPOINT 开启上报。
+  zipkinEndpoint: ""
 
 # 上传文件持久化：本地存储（app.storage.type=local，默认）多副本必须共享同一存储卷，
 # 否则文件散落在各 Pod 本地盘且 Pod 重建即丢。多副本需 ReadWriteMany（RWX）存储类。

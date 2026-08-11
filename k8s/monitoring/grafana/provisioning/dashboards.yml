@@ -1,0 +1,14 @@
+# Grafana Dashboard 提供方预置：扫描 /var/lib/grafana/dashboards 下的 JSON 自动加载。
+# 该目录由 grafana-dashboards ConfigMap（--from-file=dashboards/）挂载，
+# 修改 JSON 后 updateIntervalSeconds 内自动热更新，无需重启 Grafana。
+apiVersion: 1
+providers:
+  - name: 'admin-scaffold'
+    orgId: 1
+    folder: 'admin-scaffold'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -96,8 +96,10 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 - 后端健康检查：`/actuator/health`（Kubernetes 探针细分使用 `/actuator/health/readiness` 与 `/actuator/health/liveness`）
 - 后端指标：`/actuator/prometheus`（Micrometer，指标带 `application=admin-backend` 标签）
 - AI 指标：`/api/v1/metrics`
+- **Prometheus 本体需预先部署**：本仓库仅提供采集/告警配置与 Grafana 数据源，不含 Prometheus 服务端清单。本地演示：`docker run -d --name prometheus -p 9090:9090 -v "$(pwd)/k8s/monitoring:/etc/prometheus:ro" prom/prometheus --config.file=/etc/prometheus/prometheus.yml`；生产：`helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n monitoring`。
+- **命名空间对齐（关键）**：监控栈（Prometheus + Grafana）部署于 `monitoring` 命名空间，`prometheus.yml` 抓取目标用全限定名跨命名空间指向 `admin-scaffold` 命名空间的业务 Service（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080` / `admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000`）。若 Helm release 或命名空间不同，须同步修改 `prometheus.yml` 的 targets FQDN。
 - 采集配置与告警规则位于 [k8s/monitoring/](../../k8s/monitoring/)：
-  - `prometheus.yml` —— 抓取 admin-backend / ai-service，Redis/MySQL exporter 按需启用
+  - `prometheus.yml` —— 抓取 admin-backend / ai-service（FQDN 目标），Redis/MySQL exporter 按需启用
   - `prometheus-rules.yml` —— 服务宕机、5xx 错误率、P95 延迟、JVM 堆、Tomcat 线程、Redis 内存等告警
   - `alertmanager.yml` —— 告警收敛路由与接收人占位（钉钉/企微/邮件等按需填写）
 
@@ -113,9 +115,17 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 - 告警规则：CPU/内存/JVM/磁盘阈值触发后写入通知公告，并通过 SSE 实时推送
 - 审计日志：操作参数与结果自动落库，可在后台审计日志页查询
 
-### 链路追踪
+### 链路追踪（Zipkin）
 
-- Micrometer Tracing（Brave），采样率：dev 默认 1.0，prod 默认 0.1（`TRACING_SAMPLING_PROBABILITY` 可覆盖）；配置 `ZIPKIN_ENDPOINT` 后可上报 Zipkin
+- Micrometer Tracing（Brave），采样率：dev 默认 1.0，prod 默认 0.1（`TRACING_SAMPLING_PROBABILITY` 可覆盖）
+- **本地**：`docker compose --profile monitoring up -d zipkin` 启动 Zipkin（端口 9411），后端默认注入 `ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans`；访问 `http://localhost:9411` 查看调用链
+- **生产**：Helm 设 `--set config.zipkinEndpoint=http://<zipkin>/api/v2/spans` 注入上报端点；未配置时 Chart 注入 `MANAGEMENT_TRACING_ENABLED=false` 显式关闭 tracing（空 endpoint 下 Zipkin 自动装配仍会实例化 Sender/SpanHandler、每次 flush 失败丢 span），配置端点后注入 `true` + `ZIPKIN_ENDPOINT` 开启上报
+- 结构化日志字段含 `traceId/spanId`，可与 Zipkin 联动检索
+
+### 可视化（Grafana）
+
+- `k8s/monitoring/grafana/` 提供 Grafana Deployment + 预置 Prometheus 数据源 + 平台总览 dashboard（后端 JVM/HTTP/连接池、AI 服务进程指标），按该目录 `README.md` 部署（含创建 `monitoring` 命名空间；Prometheus 需预先部署于该命名空间）
+- 指标来源：后端 `/actuator/prometheus`、AI 服务 `/api/v1/metrics`（`prometheus.yml` 的 ai-service job 已修正为此路径）
 
 ## 4. 运维脚本
 

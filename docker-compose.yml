@@ -37,6 +37,14 @@ services:
       # 主机 6380，避免与本机原生 Redis(6379) 冲突；应用间走容器网络 redis:6379
       - "${REDIS_PORT:-6380}:6379"
 
+  # Zipkin 链路追踪（可选，profile 门控）：docker compose --profile monitoring up -d zipkin。
+  # 后端 Micrometer Tracing(Brave) 经 ZIPKIN_ENDPOINT 上报，未启动时上报自动丢弃不影响业务。
+  zipkin:
+    profiles: ["monitoring"]
+    image: openzipkin/zipkin:3
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+
   backend:
     build:
       context: ./backend
@@ -49,6 +57,9 @@ services:
       DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # 链路追踪（可选）：Zipkin 上报端点（docker compose --profile monitoring 启动 zipkin 服务）；
+      # 未启动时 Brave 异步发送自动丢弃，不阻塞业务
+      ZIPKIN_ENDPOINT: ${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
       SERVER_PORT: 8080
       CALLBACK_BASE_URL: http://backend:8080
       AI_BASE_URL: http://ai-service:8000

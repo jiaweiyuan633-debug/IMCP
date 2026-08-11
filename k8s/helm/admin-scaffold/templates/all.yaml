@@ -37,6 +37,14 @@ data:
   REDIS_SENTINEL_NODES: {{ .Values.config.redisSentinelNodes }}
   REDIS_SENTINEL_PASSWORD: {{ .Values.config.redisSentinelPassword }}
 {{- end }}
+  # 链路追踪（可选）：配置了端点才启用；留空显式关闭 tracing，避免空 endpoint 下
+  # Sender/AsyncZipkinSpanHandler 仍被实例化、每次 flush 构造非法 URI 失败丢 span
+  # （management.tracing.enabled=false 使 spanHandler 不注册，application.yml 同名属性）
+  MANAGEMENT_TRACING_ENABLED: {{ if .Values.config.zipkinEndpoint }}true{{ else }}false{{ end }}
+  {{- if .Values.config.zipkinEndpoint }}
+  # Zipkin 上报端点，与 MANAGEMENT_TRACING_ENABLED 配套（application.yml management.zipkin.tracing.endpoint）
+  ZIPKIN_ENDPOINT: {{ .Values.config.zipkinEndpoint }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: Secret

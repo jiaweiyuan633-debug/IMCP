@@ -38,6 +38,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 | `config.redisSentinelMaster` | 空（可选） | 设置后后端切换 Redis 主从哨兵拓扑（须与 `redisSentinelNodes` 成对） |
 | `config.redisSentinelNodes` | 空（可选） | 逗号分隔哨兵节点，如 `host1:26379,host2:26379` |
 | `config.redisSentinelPassword` | 空（可选） | 哨兵节点认证口令 |
+| `config.zipkinEndpoint` | 空（可选） | Zipkin 上报端点（如 `http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans`）；留空时 Chart 注入 `MANAGEMENT_TRACING_ENABLED=false` 显式关闭链路追踪（避免空 endpoint 下 Sender/SpanHandler 仍被实例化、flush 失败丢 span），配置端点后注入 `true` + `ZIPKIN_ENDPOINT` 开启上报 |
 | `storage.enabled` | `true` | 是否创建上传 PVC 并挂载（关掉则后端用本地临时盘） |
 | `storage.className` | 空（默认存储类） | PVC 存储类名；多副本需 ReadWriteMany（RWX） |
 | `storage.accessMode` | `ReadWriteMany` | 上传卷访问模式，多副本共享必须 RWX |
@@ -57,6 +58,13 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 - **Redis 主从哨兵**：设置 `config.redisSentinelMaster` + `config.redisSentinelNodes` 后，后端自动切换为主从哨兵拓扑（`application-prod.yml` 以 `spring.config.activate.on-property: REDIS_SENTINEL_MASTER` 条件激活，连接工厂优先 sentinel 配置）；留空则走单实例 `redisHost/redisPort`。空 master 不注入 env，避免空字符串误激活哨兵段。哨兵连接为惰性，主节点故障自动切换。
 - **多副本打散**：backend/ai 加 `topologySpreadConstraints`（`kubernetes.io/hostname`，`ScheduleAnyway` 软约束），避免单节点故障拖垮全部实例。
 - **优雅停机**：prod 开启 `server.shutdown: graceful`（30s 关闭超时），滚动更新时 readiness 先转 Down 摘流量再关闭，不中断在途请求；K8s `terminationGracePeriodSeconds: 60` 兜底。
+
+## 可观测性（批次 F）
+
+- **指标可视化（Grafana）**：`k8s/monitoring/grafana/` 提供 Grafana Deployment + Service 与预置配置（Prometheus 数据源、Dashboard 提供方、平台总览 dashboard JSON）。配置以独立文件为单一来源，按该目录 `README.md` 部署（含创建 `monitoring` 命名空间；Prometheus 需预先部署于该命名空间，仓库不含其服务端清单）。
+- **链路追踪（Zipkin）**：后端已内置 Micrometer Tracing（Brave），设置 `config.zipkinEndpoint` 后 Chart 注入 `MANAGEMENT_TRACING_ENABLED=true` + `ZIPKIN_ENDPOINT` 自动上报；留空时注入 `MANAGEMENT_TRACING_ENABLED=false` 显式关闭（见上表）。本地演示：`docker compose --profile monitoring up -d zipkin`（`openzipkin/zipkin:3`，端口 9411）；生产可在集群内自部署 Zipkin，把端点配到 `config.zipkinEndpoint` 即可。
+- **采集**：`k8s/monitoring/prometheus.yml` 抓取目标以 FQDN 跨命名空间指向业务 Service（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080` / `admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000`，随 Helm release/命名空间变化）；注意 ai-service 抓取端点为 `/api/v1/metrics`（已修正，`/metrics` 会 404 误报宕机）。
+- **告警**：`k8s/monitoring/prometheus-rules.yml` + `alertmanager.yml` 为告警收敛路由配置。
 
 生产建议：
 
