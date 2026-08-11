@@ -15,6 +15,9 @@ data:
   REDIS_PORT: {{ .Values.config.redisPort }}
   REDIS_URL: {{ .Values.config.redisUrl }}
   CALLBACK_BASE_URL: {{ .Values.config.callbackBaseUrl }}
+  # AI 回调 SSRF 防护白名单：由 callbackBaseUrl 推导（避免手工同步漂移）。
+  # AI 服务出站任务回调仅允许打回后端回调 origin；如需多 origin 改此模板为静态 JSON 数组。
+  CALLBACK_ALLOWED_ORIGINS: {{ list .Values.config.callbackBaseUrl | toJson | quote }}
   AI_BASE_URL: {{ .Values.config.aiBaseUrl }}
 {{- if .Values.config.milvusEnabled }}
   # RAG 向量检索（可选）：Milvus 接入，需先部署 k8s/milvus

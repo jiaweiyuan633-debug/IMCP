@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     auth_token: str = "dev-ai-service-token"
     # 回调 HMAC 时间戳允许偏差（秒），防重放
     callback_clock_skew_seconds: int = 300
+    # 出站任务回调允许的 origin 白名单（JSON 数组，如 ["http://admin-backend:8080"]）：
+    # 配置后回调地址必须与其中一项 origin 精确匹配；留空则仅允许 localhost/127.0.0.1
+    # 回环地址（本地开发）。无论何种模式，云元数据（169.254.169.254）与链路本地/保留
+    # 地址一律拒绝（SSRF 防护，见 app/core/callback_security.py）。生产必须显式注入。
+    callback_allowed_origins: list[str] = []
     default_timeout_seconds: int = 60
     # 内部服务默认不开放跨域；如需浏览器直连，显式配置允许来源
     cors_origins: list[str] = []

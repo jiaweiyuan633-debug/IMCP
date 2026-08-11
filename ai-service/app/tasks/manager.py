@@ -23,6 +23,7 @@ import httpx
 from fastapi import HTTPException
 from redis.asyncio import Redis
 
+from app.core.callback_security import CallbackUrlGuard
 from app.core.config import Settings
 from app.schemas.task import TaskCreateRequest, TaskStatusResponse
 from app.tasks.errors import NonRetryableError
@@ -43,12 +44,20 @@ class TaskManager:
         self._services_loaded = services is not None
         self._workers: set[asyncio.Task[None]] = set()
         self._closing = False
+        # 回调 URL SSRF 守卫：建单 fail-fast + 执行回调前重检
+        self._callback_guard = CallbackUrlGuard(settings)
 
     # ---------- 对外 API ----------
 
     async def create_task(self, request: TaskCreateRequest, request_id: str | None = None) -> TaskStatusResponse:
         if request.biz_type not in self._service_names():
             raise HTTPException(status_code=400, detail=f"unsupported biz_type: {request.biz_type}")
+        # 回调 SSRF 防护：非法回调地址（非回环/不在白名单/含凭据等）建单即 400，失败快速
+        if request.callback_url:
+            try:
+                await asyncio.to_thread(self._callback_guard.validate, request.callback_url)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"非法回调地址: {exc}") from exc
         # 去重：同名任务已存在（含已结束）直接 409，避免重复提交
         if await self._get(request.task_no) is not None:
             raise HTTPException(status_code=409, detail=f"task already exists: {request.task_no}")
@@ -234,6 +243,14 @@ class TaskManager:
         callback_url = data.get("callback_url")
         if not callback_url:
             return
+        # 防御纵深：执行回调前重检回调地址（兼容修复前已入库的任务 / 越权写入的地址），
+        # 不合法则跳过并告警——回调失败不应反过来影响任务终态判定
+        if not await asyncio.to_thread(self._callback_guard.is_safe, callback_url):
+            logger.warning(
+                "AI callback for %s skipped: 回调地址不在允许范围（未配置白名单时仅回环）: %s",
+                task_no, callback_url,
+            )
+            return
         payload = {
             "task_no": task_no,
             "biz_type": data.get("biz_type"),
@@ -258,7 +275,8 @@ class TaskManager:
         last_error: Exception | None = None
         for attempt in range(3):
             try:
-                async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
+                # follow_redirects=False：禁止回调被重定向到未校验的地址（SSRF 纵深）
+                async with httpx.AsyncClient(timeout=5, trust_env=False, follow_redirects=False) as client:
                     response = await client.post(callback_url, json=payload, headers=headers)
                     response.raise_for_status()
                 logger.info("AI callback for %s returned status %s", task_no, response.status_code)
