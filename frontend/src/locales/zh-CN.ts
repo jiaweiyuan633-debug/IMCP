@@ -714,6 +714,7 @@ export default {
     noticeChannelTypeSms: '短信',
     noticeChannelTypeDingtalk: '钉钉',
     noticeChannelTypeWecom: '企业微信',
+    noticeChannelTypeWebhook: '通用 Webhook',
     noticeChannelConfigHint: '渠道参数 JSON，示例：',
     noticeChannelRequired: '请填写完整渠道信息',
     noticeChannelSaved: '保存成功',

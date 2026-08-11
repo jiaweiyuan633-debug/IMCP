@@ -714,6 +714,7 @@ export default {
     noticeChannelTypeSms: 'SMS',
     noticeChannelTypeDingtalk: 'DingTalk',
     noticeChannelTypeWecom: 'WeCom',
+    noticeChannelTypeWebhook: 'Webhook',
     noticeChannelConfigHint: 'Config JSON, e.g.:',
     noticeChannelRequired: 'Please complete the channel info',
     noticeChannelSaved: 'Saved',

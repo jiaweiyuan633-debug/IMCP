@@ -3,6 +3,7 @@ package com.example.admin.module.system;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.DeptSaveRequest;
 import com.example.admin.module.system.entity.SysDeptDO;
 import com.example.admin.module.system.mapper.SysDeptMapper;
@@ -37,6 +38,7 @@ public class SystemDeptService {
         return dept.getId();
     }
 
+    @FieldAudit(entity = SysDeptDO.class, action = "UPDATE", module = "部门管理")
     public void update(DeptSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "部门 ID 不能为空");

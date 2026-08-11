@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.ConfigQuery;
 import com.example.admin.module.system.dto.ConfigSaveRequest;
 import com.example.admin.module.system.entity.SysConfigDO;
@@ -57,6 +58,7 @@ public class SystemConfigService {
     }
 
     @CacheEvict(value = "configs", allEntries = true)
+    @FieldAudit(entity = SysConfigDO.class, action = "UPDATE", module = "参数配置")
     public void update(ConfigSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "参数 ID 不能为空");

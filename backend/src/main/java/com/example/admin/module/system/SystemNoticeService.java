@@ -12,6 +12,7 @@ import com.example.admin.module.system.mapper.SysNoticeReadMapper;
 import com.example.admin.module.system.entity.SysNoticeReadDO;
 import com.example.admin.security.SecurityUtils;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.FieldAudit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -65,6 +66,7 @@ public class SystemNoticeService {
         return notice.getId();
     }
 
+    @FieldAudit(entity = SysNoticeDO.class, action = "UPDATE", module = "公告管理")
     public void update(SysNoticeDO notice) {
         if (notice.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "公告 ID 不能为空");

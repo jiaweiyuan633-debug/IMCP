@@ -138,6 +138,7 @@ const channelTypeOptions = [
   { label: t('page.noticeChannelTypeSms'), value: 'SMS' },
   { label: t('page.noticeChannelTypeDingtalk'), value: 'DINGTALK' },
   { label: t('page.noticeChannelTypeWecom'), value: 'WECOM' },
+  { label: t('page.noticeChannelTypeWebhook'), value: 'WEBHOOK' },
 ]
 
 const statusOptions = [
@@ -150,6 +151,7 @@ const TYPE_COLORS: Record<string, string> = {
   SMS: 'orange',
   DINGTALK: 'cyan',
   WECOM: 'green',
+  WEBHOOK: 'purple',
 }
 
 const TYPE_LABELS: Record<string, () => string> = {
@@ -157,6 +159,7 @@ const TYPE_LABELS: Record<string, () => string> = {
   SMS: () => t('page.noticeChannelTypeSms'),
   DINGTALK: () => t('page.noticeChannelTypeDingtalk'),
   WECOM: () => t('page.noticeChannelTypeWecom'),
+  WEBHOOK: () => t('page.noticeChannelTypeWebhook'),
 }
 
 const CONFIG_TEMPLATES: Record<string, string> = {
@@ -164,6 +167,7 @@ const CONFIG_TEMPLATES: Record<string, string> = {
   SMS: `{\n  "url": "https://sms-gateway.example.com/send",\n  "apiKey": "xxx",\n  "signName": "签名",\n  "templateId": "template_id"\n}`,
   DINGTALK: `{\n  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=xxx",\n  "secret": ""\n}`,
   WECOM: `{\n  "webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"\n}`,
+  WEBHOOK: `{\n  "url": "https://example.com/hook",\n  "method": "POST",\n  "headers": {\n    "Authorization": "Bearer xxx"\n  }\n}`,
 }
 
 function typeLabel(type?: string): string {

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 /**
  * 消息渠道配置。config_json 按渠道类型存不同参数：
  * MAIL {host,port,username,password,from}；SMS {url,apiKey,signName,templateId}；
- * DINGTALK {webhook,secret}；WECOM {webhook}。
+ * DINGTALK {webhook,secret}；WECOM {webhook}；WEBHOOK {url,method,headers}。
  */
 @Data
 @TableName("sys_channel_config")

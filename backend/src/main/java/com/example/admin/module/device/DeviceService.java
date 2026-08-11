@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.device.dto.DeviceQuery;
 import com.example.admin.module.device.dto.DeviceSaveRequest;
 import com.example.admin.module.device.entity.DeviceDO;
@@ -50,6 +51,7 @@ public class DeviceService {
         return device.getId();
     }
 
+    @FieldAudit(entity = DeviceDO.class, action = "UPDATE", module = "设备管理")
     public void update(DeviceSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "设备 ID 不能为空");

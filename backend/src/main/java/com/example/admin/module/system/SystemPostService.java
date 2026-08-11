@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.PostQuery;
 import com.example.admin.module.system.dto.PostSaveRequest;
 import com.example.admin.module.system.entity.SysPostDO;
@@ -60,6 +61,7 @@ public class SystemPostService {
         return post.getId();
     }
 
+    @FieldAudit(entity = SysPostDO.class, action = "UPDATE", module = "岗位管理")
     public void update(PostSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "岗位 ID 不能为空");

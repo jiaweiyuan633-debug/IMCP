@@ -25,6 +25,7 @@ import com.example.admin.module.system.entity.SysTenantDO;
 import com.example.admin.security.TokenService;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.DataScope;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.vo.UserVo;
 import com.alibaba.excel.EasyExcel;
 import com.example.admin.module.system.entity.SysConfigDO;
@@ -139,6 +140,7 @@ public class SystemUserService {
     }
 
     @Transactional
+    @FieldAudit(entity = SysUserDO.class, action = "UPDATE", module = "用户管理")
     public void update(UserSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户 ID 不能为空");

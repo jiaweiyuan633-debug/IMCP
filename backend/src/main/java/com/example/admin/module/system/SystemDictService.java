@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.DictDataQuery;
 import com.example.admin.module.system.dto.DictDataSaveRequest;
 import com.example.admin.module.system.dto.DictTypeQuery;
@@ -88,6 +89,7 @@ public class SystemDictService {
         return type.getId();
     }
 
+    @FieldAudit(entity = SysDictTypeDO.class, action = "UPDATE", module = "字典管理")
     public void typeUpdate(DictTypeSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "字典类型 ID 不能为空");
@@ -169,6 +171,7 @@ public class SystemDictService {
         return data.getId();
     }
 
+    @FieldAudit(entity = SysDictDataDO.class, action = "UPDATE", module = "字典管理")
     public void dataUpdate(DictDataSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "字典数据 ID 不能为空");

@@ -11,7 +11,8 @@ public enum ChannelType {
     MAIL("邮件"),
     SMS("短信"),
     DINGTALK("钉钉"),
-    WECOM("企业微信");
+    WECOM("企业微信"),
+    WEBHOOK("通用 Webhook");
 
     private final String displayName;
 }
