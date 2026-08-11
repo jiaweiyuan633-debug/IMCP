@@ -206,4 +206,69 @@ class ReportSqlGuardTest {
         assertThatThrownBy(() -> guard.validate("SELECT * FROM sys_device FOR UPDATE"))
                 .isInstanceOf(BusinessException.class);
     }
+
+    // ---------- 敏感列 / 通配符（R1-1.2 列级黑名单）----------
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT password FROM sys_user",
+            "SELECT totp_secret FROM sys_user WHERE id = 1",
+            "SELECT u.password FROM sys_user u WHERE u.id = 1",
+            "SELECT u.totp_secret FROM sys_user u JOIN sys_device d ON d.id = u.id",
+            "SELECT api_key FROM ai_service_config WHERE enabled = 1",
+            "SELECT config_value FROM sys_config WHERE config_key = 'smtp.password'",
+            "SELECT config_json FROM sys_channel_config WHERE channel_type = 'MAIL'",
+            "SELECT id, password FROM sys_user ORDER BY password",
+            "SELECT (SELECT totp_secret FROM sys_user WHERE id = 1) AS s",
+            "SELECT CONCAT('x', api_key) FROM ai_service_config",
+    })
+    void rejectsSensitiveColumns(String sql) {
+        assertThatThrownBy(() -> guard.guard(sql)).isInstanceOf(BusinessException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT * FROM sys_user",
+            "SELECT * FROM sys_user u WHERE u.status = 1",
+            "SELECT u.* FROM sys_user u",
+            "SELECT * FROM (SELECT * FROM sys_user) x",
+    })
+    void rejectsWildcardExpandingSensitiveColumns(String sql) {
+        assertThatThrownBy(() -> guard.guard(sql)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void allowsWildcardOnBenignTable() {
+        assertThat(guard.guard("SELECT * FROM sys_device")).contains("tenant_id = 1").contains("LIMIT 5");
+    }
+
+    @Test
+    void allowsBenignColumnsOfSensitiveTable() {
+        // sys_user 可查非敏感列：白名单表仍可正常做报表，仅凭据列被拦
+        assertThatCode(() -> guard.guard("SELECT username, nickname, status FROM sys_user WHERE id = 1"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void allowsConfigJsonOnBenignImportExportTemplate() {
+        // import_export_template.config_json 是列映射配置（非渠道密钥），按表精确判定不误伤
+        assertThatCode(() -> guard.guard("SELECT config_json FROM import_export_template"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void allowsQualifiedBenignColumnEvenWhenSensitiveTableJoined() {
+        // 精确到表：即便 JOIN 了敏感表 sys_channel_config，限定到 import_export_template 的 config_json 仍放行
+        assertThatCode(() -> guard.guard(
+                "SELECT t.config_json FROM import_export_template t "
+                        + "JOIN sys_channel_config c ON c.id = t.created_by"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateRejectsSensitiveColumnOnSave() {
+        assertThatThrownBy(() -> guard.validate("SELECT password FROM sys_user"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.REPORT_SQL_INVALID.getMessage());
+    }
 }
