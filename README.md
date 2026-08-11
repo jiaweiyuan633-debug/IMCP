@@ -83,11 +83,13 @@ scripts/start-dev.ps1
 手动启动：
 
 ```bash
-cd backend && mvn spring-boot:run
+cd backend && SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && pnpm install && pnpm dev
 cd website && pnpm install && pnpm dev --port 5174
 ```
+
+> application.yml 默认 `prod` profile（未注入密钥即启动失败，杜绝静默携带公开 dev 密钥上线）；本地开发必须显式注入 `SPRING_PROFILES_ACTIVE=dev`。Windows 一键启动脚本 [scripts/start-dev.ps1](scripts/start-dev.ps1) 已自动处理。
 
 访问入口：
 

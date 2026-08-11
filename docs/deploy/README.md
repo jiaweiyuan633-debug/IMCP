@@ -6,11 +6,11 @@
 
 | 环境 | Profile | 定位 | 接口文档 | 密钥策略 | 采样率 |
 | --- | --- | --- | --- | --- | --- |
-| dev | `dev`（默认） | 本地开发 | 开启 | 明文默认密钥（仅限本地） | 1.0 |
+| dev | `dev` | 本地开发 | 开启 | 明文默认密钥（仅限本地） | 1.0 |
 | test | `test` | 联调 / QA / CI 基线 | 开启 | fail-fast，必须注入 | 1.0 |
 | prod | `prod` | 生产 | 关闭 | fail-fast，必须注入 | 0.1 |
 
-- dev：默认激活，无需显式指定；依赖本地 MySQL/Redis，缺省密钥走 dev 明文兜底。
+- dev：application.yml 默认 prod（未注入密钥即启动失败），本地开发须显式指定 `SPRING_PROFILES_ACTIVE=dev`；依赖本地 MySQL/Redis，缺省密钥走 dev 明文兜底。
 - test：`SPRING_PROFILES_ACTIVE=test`，数据源默认 `admin_scaffold_test`（与本地开发库隔离）；`JWT_SECRET / TOTP_ENCRYPTION_KEY / MCP_AUTH_TOKEN` 必须注入，缺失即启动失败。
 - prod：`SPRING_PROFILES_ACTIVE=prod`，见第 5 节生产检查项；与 test 的差异是关闭接口文档、健康详情与采样率降至 0.1。
 
@@ -19,7 +19,7 @@
 环境要求：Java 21、Maven 3.9+、Node.js 20+、pnpm、Python 3.11+、MySQL 8、Redis 7。
 
 ```bash
-cd backend && mvn spring-boot:run
+cd backend && SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && pnpm install && pnpm dev
 cd website && pnpm install && pnpm dev --port 5174
@@ -31,7 +31,7 @@ cd website && pnpm install && pnpm dev --port 5174
 scripts/start-dev.ps1
 ```
 
-后端通过环境变量连接基础设施（本地开发默认加载 `dev` profile，密钥缺省时使用开发兜底；**生产必须注入 `SPRING_PROFILES_ACTIVE=prod`，缺省/默认密钥会导致启动失败**）：
+后端通过环境变量连接基础设施（application.yml 默认 `prod`，本地开发必须注入 `SPRING_PROFILES_ACTIVE=dev` 以启用 swagger 与开发兜底密钥；**默认 profile 为 prod，未注入密钥即启动失败，杜绝静默携带公开 dev 密钥上线**）：
 
 ```text
 DB_HOST=localhost

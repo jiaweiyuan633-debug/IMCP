@@ -38,6 +38,8 @@ $env:DB_PORT = if ($env:DB_PORT) { $env:DB_PORT } else { '3306' }
 $env:DB_PASSWORD = if ($env:DB_PASSWORD) { $env:DB_PASSWORD } else { '' }
 $env:SERVER_PORT = $BackendPort
 $env:CALLBACK_BASE_URL = "http://127.0.0.1:$BackendPort"
+# application.yml 默认 prod（无密钥即启动失败）；本地开发显式切到 dev 配置层，启用 swagger 与明文兜底密钥
+$env:SPRING_PROFILES_ACTIVE = 'dev'
 
 Start-HiddenProcess `
     -Name 'backend' `

@@ -1,7 +1,8 @@
 # 本地全栈容器编排（开发/演示用）：docker compose up -d --build
 #
 # 注意：生产部署以 Helm（k8s/helm/admin-scaffold）为唯一来源，本文件不参与生产。
-# 后端在此走 dev 配置层（默认 profile）：swagger 开、dev 明文密钥兜底、Flyway 自动迁移 V1-V41。
+# 后端在此显式注入 dev 配置层（application.yml 默认 prod，本文件必须覆盖为 dev）：
+# swagger 开、dev 明文密钥兜底、Flyway 自动迁移 V1-V41。
 # 前端容器镜像内的 nginx 不代理 /api（K8s 由 Ingress 直达后端），本地无 Ingress，
 # 故挂载 docker/nginx.conf 覆盖代理配置，把 /api 与 /uploads 反代到 backend 容器。
 name: admin-scaffold
@@ -60,6 +61,8 @@ services:
       # 链路追踪（可选）：Zipkin 上报端点（docker compose --profile monitoring 启动 zipkin 服务）；
       # 未启动时 Brave 异步发送自动丢弃，不阻塞业务
       ZIPKIN_ENDPOINT: ${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
+      # 本地全栈默认 dev 配置层：swagger 开、dev 明文密钥兜底、Flyway 基线迁移
+      SPRING_PROFILES_ACTIVE: dev
       SERVER_PORT: 8080
       CALLBACK_BASE_URL: http://backend:8080
       AI_BASE_URL: http://ai-service:8000

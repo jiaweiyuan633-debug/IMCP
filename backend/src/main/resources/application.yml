@@ -9,9 +9,10 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 20s
   profiles:
-    # 默认 dev（本地开箱即用）；生产部署必须显式注入 SPRING_PROFILES_ACTIVE=prod，
-    # 否则 JwtProperties/TotpService 的"生产禁止默认密钥"校验会被 dev 兜底绕过
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    # 默认 prod：忘记注入 SPRING_PROFILES_ACTIVE 的部署将直接 fail-fast
+    # （JWT/TOTP/MCP 密钥缺失即启动失败），杜绝静默携带公开 dev 密钥上线。
+    # 本地开发/联调请显式注入 SPRING_PROFILES_ACTIVE=dev（或 test）。
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
