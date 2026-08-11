@@ -13,6 +13,41 @@ class Settings(BaseSettings):
     # 内部服务默认不开放跨域；如需浏览器直连，显式配置允许来源
     cors_origins: list[str] = []
 
+    # ---------- 大模型（真实 LLM + 多供应商） ----------
+    # 默认提供方：mock（确定性降级实现，开箱即用、测试可重复）；
+    # 生产通过 LLM_PROVIDERS 配置一个或多个 OpenAI 兼容提供方（OpenAI/DeepSeek/通义/Ollama/vLLM 等）
+    llm_default_provider: str = "mock"
+    # 提供方字典：{"deepseek": {"base_url": "https://api.deepseek.com",
+    #   "api_key": "sk-xxx", "model": "deepseek-chat", "embedding_model": "..."}}
+    # 环境变量以 JSON 字符串注入（LLM_PROVIDERS），pydantic-settings 自动解析
+    llm_providers: dict[str, dict] = {}
+    llm_timeout_seconds: int = 120
+
+    # ---------- 向量存储（Redis 精确余弦；scaffold 规模够用，大规模换 Milvus/pgvector） ----------
+    vector_namespace_prefix: str = "ai:vec"
+    vector_default_dim: int = 384
+
+    # ---------- 任务队列（优先级 + 延迟重试 + 死信） ----------
+    worker_count: int = 2
+    retry_backoff_seconds: float = 0.5
+    task_max_retry: int = 3
+    queue_ready_key: str = "ai:queue:ready"
+    queue_delayed_key: str = "ai:queue:delayed"
+    queue_dead_key: str = "ai:queue:dead"
+    task_ttl_seconds: int = 60 * 60 * 24
+
+    # ---------- OCR（可插拔：mock / tesseract） ----------
+    ocr_provider: str = "mock"
+
+    # ---------- PII 脱敏 ----------
+    pii_mask_char: str = "*"
+
+    # ---------- 定时管道 ----------
+    scheduler_spec_key: str = "ai:sched:spec"
+    scheduler_due_key: str = "ai:sched:due"
+    scheduler_poll_seconds: float = 1.0
+    scheduler_ttl_days: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

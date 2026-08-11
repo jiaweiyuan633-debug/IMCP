@@ -1,0 +1,87 @@
+"""新 AI 能力入参/出参：对话、流式、Embedding、向量检索、定时管道。"""
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(pattern="^(system|user|assistant|tool)$")
+    content: str
+    name: str | None = None
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1)
+    model: str | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    max_tokens: int | None = Field(default=None, ge=1)
+    provider: str | None = None
+
+
+class ChatResponse(BaseModel):
+    content: str
+    model: str | None = None
+    provider: str | None = None
+    usage: dict | None = None
+
+
+class EmbedRequest(BaseModel):
+    texts: list[str] = Field(min_length=1, max_length=128)
+    model: str | None = None
+    provider: str | None = None
+
+
+class EmbedResponse(BaseModel):
+    vectors: list[list[float]]
+    dim: int
+    model: str | None = None
+    provider: str | None = None
+
+
+class VectorUpsertRequest(BaseModel):
+    namespace: str = Field(min_length=1, max_length=128)
+    doc_id: str = Field(min_length=1, max_length=255)
+    text: str = Field(min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    provider: str | None = None
+
+
+class VectorSearchRequest(BaseModel):
+    namespace: str = Field(min_length=1, max_length=128)
+    text: str | None = None
+    vector: list[float] | None = None
+    top_k: int = Field(default=5, ge=1, le=100)
+    threshold: float = Field(default=0.0, ge=-1, le=1)
+    provider: str | None = None
+
+
+class VectorHit(BaseModel):
+    doc_id: str
+    score: float
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class VectorSearchResponse(BaseModel):
+    namespace: str
+    hits: list[VectorHit]
+
+
+class ScheduleCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    # 触发表达式："interval:60"（每 60 秒）或 "cron:* * * * *"（5 段：分 时 日 月 周）
+    schedule: str = Field(min_length=1, max_length=64)
+    biz_type: str = Field(min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class ScheduleResponse(BaseModel):
+    id: str
+    name: str
+    schedule: str
+    biz_type: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    enabled: bool
+    next_run_at: float | None = None
+    run_count: int = 0

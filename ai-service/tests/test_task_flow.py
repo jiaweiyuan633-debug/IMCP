@@ -41,7 +41,8 @@ async def test_task_failure_retries_then_failed() -> None:
         params={"content": "测试", "force_fail": True},
     ))
 
-    current = await _wait_for_terminal(manager, "task-fail", attempts=40)
+    # 重试带 0.5s 退避（3 次退避 ≈ 1.5s），放大轮询窗口
+    current = await _wait_for_terminal(manager, "task-fail", attempts=200)
     assert current is not None
     assert current.status == "FAILED"
     assert current.retry_count == 3

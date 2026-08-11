@@ -6,16 +6,47 @@ from redis.asyncio import Redis
 
 from app.api.routes import router as api_router
 from app.core.config import settings
+from app.llm import build_registry
+from app.scheduler import Scheduler
+from app.services import ServiceContext, build_services
 from app.tasks.manager import TaskManager
+from app.vectors import RedisVectorStore
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
-    app.state.task_manager = TaskManager(redis, settings)
     app.state.redis = redis
+
+    providers = build_registry(settings)
+    app.state.providers = providers
+
+    vector_store = RedisVectorStore(redis, settings.vector_namespace_prefix)
+    app.state.vector_store = vector_store
+
+    context = ServiceContext(
+        redis=redis,
+        settings=settings,
+        providers=providers,
+        vectors=vector_store,
+        scheduler=None,
+    )
+    services = build_services(context)
+    task_manager = TaskManager(redis, settings, services=services)
+    app.state.task_manager = task_manager
+
+    scheduler = Scheduler(redis, settings)
+    scheduler.attach_task_manager(task_manager)
+    context.scheduler = scheduler
+    app.state.scheduler = scheduler
+    await scheduler.start()
+
     yield
+
+    await task_manager.close()
+    await scheduler.stop()
     await redis.aclose()
+
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 

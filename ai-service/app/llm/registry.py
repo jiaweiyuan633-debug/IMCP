@@ -1,0 +1,62 @@
+"""多供应商注册表：按名称解析 LLM 提供方，提供默认提供方与 Embedding 入口。
+
+默认注册确定性 ``mock`` 提供方（无外部依赖）；配置了 ``LLM_PROVIDERS`` 时，
+每个条目注册为一个 OpenAI 兼容提供方（OpenAI/DeepSeek/通义/Ollama 等共用同一协议）。
+"""
+
+from __future__ import annotations
+
+from typing import cast
+
+from app.core.config import Settings
+from app.llm.base import Embedder, LLMProvider
+from app.llm.mock import MockProvider
+from app.llm.openai_compat import OpenAICompatibleProvider
+
+
+class ProviderRegistry:
+    def __init__(self) -> None:
+        self._providers: dict[str, LLMProvider] = {}
+        self._default: str = "mock"
+
+    def register(self, name: str, provider: LLMProvider) -> None:
+        self._providers[name] = provider
+
+    def set_default(self, name: str) -> None:
+        if name not in self._providers:
+            raise KeyError(f"未注册提供方: {name}")
+        self._default = name
+
+    def names(self) -> list[str]:
+        return sorted(self._providers)
+
+    def get(self, name: str) -> LLMProvider:
+        if name not in self._providers:
+            raise KeyError(f"未注册提供方: {name}")
+        return self._providers[name]
+
+    def default(self) -> LLMProvider:
+        return self._providers[self._default]
+
+    def embedder(self, name: str | None = None) -> Embedder:
+        provider = self.get(name) if name else self.default()
+        return cast(Embedder, provider)
+
+
+def build_registry(settings: Settings) -> ProviderRegistry:
+    registry = ProviderRegistry()
+    registry.register("mock", MockProvider())
+    for name, config in (settings.llm_providers or {}).items():
+        registry.register(
+            name,
+            OpenAICompatibleProvider(
+                base_url=config.get("base_url", ""),
+                api_key=config.get("api_key", ""),
+                default_model=config.get("model"),
+                embedding_model=config.get("embedding_model"),
+                timeout_seconds=int(config.get("timeout_seconds", settings.llm_timeout_seconds)),
+                name=name,
+            ),
+        )
+    registry.set_default(settings.llm_default_provider or "mock")
+    return registry

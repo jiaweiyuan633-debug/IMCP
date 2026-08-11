@@ -1,3 +1,15 @@
+"""任务队列深化：优先级 + 超时 + 可重试分类 + 去重 + 死信 + 有界工作池。
+
+队列结构（Redis）：
+- ``ai:queue:ready``     zset，score = -priority（优先级越大越先执行；同优先级按任务号字典序）
+- ``ai:queue:delayed``   zset，score = 就绪时间戳（重试退避到期后由工作线程提升到 ready）
+- ``ai:queue:dead``      list，超出重试或不可重试的失败任务（JSON 记录）
+
+执行模型：固定数量工作线程（settings.worker_count）持续消费 ready 队列；
+单任务执行受 ``asyncio.wait_for`` 超时保护；可重试异常按指数式/固定退避重新入队，
+不可重试异常（NonRetryableError/超时）直接失败并写死信。
+"""
+
 import asyncio
 import hashlib
 import hmac
@@ -13,7 +25,7 @@ from redis.asyncio import Redis
 
 from app.core.config import Settings
 from app.schemas.task import TaskCreateRequest, TaskStatusResponse
-from app.services import SERVICE_REGISTRY, get_service
+from app.tasks.errors import NonRetryableError
 
 MAX_RETRY = 3
 KEY_PREFIX = "ai:task:"
@@ -24,14 +36,22 @@ logger = logging.getLogger(__name__)
 
 class TaskManager:
 
-    def __init__(self, redis: Redis, settings: Settings) -> None:
+    def __init__(self, redis: Redis, settings: Settings, services: dict[str, Any] | None = None) -> None:
         self.redis = redis
         self.settings = settings
-        self._background_tasks: set[asyncio.Task[None]] = set()
+        self._services = services
+        self._services_loaded = services is not None
+        self._workers: set[asyncio.Task[None]] = set()
+        self._closing = False
+
+    # ---------- 对外 API ----------
 
     async def create_task(self, request: TaskCreateRequest, request_id: str | None = None) -> TaskStatusResponse:
-        if request.biz_type not in SERVICE_REGISTRY:
+        if request.biz_type not in self._service_names():
             raise HTTPException(status_code=400, detail=f"unsupported biz_type: {request.biz_type}")
+        # 去重：同名任务已存在（含已结束）直接 409，避免重复提交
+        if await self._get(request.task_no) is not None:
+            raise HTTPException(status_code=409, detail=f"task already exists: {request.task_no}")
 
         now = _now()
         data = {
@@ -44,19 +64,22 @@ class TaskManager:
             "result": None,
             "error": None,
             "retry_count": 0,
-            "max_retry": MAX_RETRY,
+            "max_retry": self.settings.task_max_retry,
+            "priority": request.priority,
+            "timeout": request.timeout or self.settings.default_timeout_seconds,
             "created_at": now,
             "updated_at": now,
         }
         await self._save(request.task_no, data)
-        self._spawn(request.task_no)
+        await self._enqueue_ready(request.task_no, request.priority)
+        self._ensure_workers()
         return TaskStatusResponse(**data)
 
     async def get_task(self, task_no: str) -> TaskStatusResponse | None:
         data = await self._get(task_no)
         if data is None:
             return None
-        return TaskStatusResponse(**data)
+        return TaskStatusResponse(**{k: v for k, v in data.items() if k in TaskStatusResponse.model_fields})
 
     async def retry(self, task_no: str) -> TaskStatusResponse:
         data = await self._get(task_no)
@@ -66,47 +89,146 @@ class TaskManager:
         data["error"] = None
         data["updated_at"] = _now()
         await self._save(task_no, data)
-        self._spawn(task_no)
-        return TaskStatusResponse(**data)
+        await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+        self._ensure_workers()
+        return TaskStatusResponse(**{k: v for k, v in data.items() if k in TaskStatusResponse.model_fields})
 
-    def _spawn(self, task_no: str) -> None:
-        task = asyncio.create_task(self._execute(task_no))
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+    # ---------- 队列与工作线程 ----------
+
+    def _ensure_workers(self) -> None:
+        if self._workers or self._closing:
+            return
+        for _ in range(max(self.settings.worker_count, 1)):
+            task = asyncio.create_task(self._worker_loop())
+            self._workers.add(task)
+            task.add_done_callback(self._workers.discard)
+
+    async def close(self) -> None:
+        """优雅停机：停止拉取并取消工作线程（运行中的任务被取消并记录为失败）。"""
+        self._closing = True
+        for task in list(self._workers):
+            task.cancel()
+        if self._workers:
+            await asyncio.gather(*list(self._workers), return_exceptions=True)
+        self._workers.clear()
+
+    async def _worker_loop(self) -> None:
+        ready_key = self.settings.queue_ready_key
+        delayed_key = self.settings.queue_delayed_key
+        while not self._closing:
+            await self._promote_due(delayed_key, ready_key)
+            popped = await self.redis.zpopmin(ready_key)
+            if not popped:
+                await asyncio.sleep(0.02)
+                continue
+            task_no = popped[0][0]
+            await self._execute(task_no)
+
+    async def _promote_due(self, delayed_key: str, ready_key: str) -> None:
+        now = time.time()
+        due = await self.redis.zrangebyscore(delayed_key, 0, now)
+        if not due:
+            return
+        await self.redis.zrem(delayed_key, *due)
+        for task_no in due:
+            data = await self._get(task_no)
+            if data is None:
+                continue
+            await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+
+    async def _enqueue_ready(self, task_no: str, priority: int) -> None:
+        # score 取负：优先级越高（数值越大）score 越小，zpopmin 先弹出
+        await self.redis.zadd(self.settings.queue_ready_key, {task_no: -int(priority)})
 
     async def _execute(self, task_no: str) -> None:
         data = await self._get(task_no)
-        if data is None:
+        if data is None or data.get("status") == "RUNNING":
             return
-
         data["status"] = "RUNNING"
         data["updated_at"] = _now()
         await self._save(task_no, data)
 
+        timeout = float(data.get("timeout") or self.settings.default_timeout_seconds)
         try:
-            service = get_service(data["biz_type"])
-            result = await service.run(data["params"])
-            data["status"] = "SUCCEEDED"
-            data["result"] = result
-            data["error"] = None
-            data["updated_at"] = _now()
-            await self._save(task_no, data)
-            await self._expire(task_no)
-            await self._callback(task_no, data)
-        except Exception as exception:  # noqa: BLE001
+            service = self._get_service(data["biz_type"])
+            result = await asyncio.wait_for(service.run(data["params"]), timeout=timeout)
+        except asyncio.TimeoutError:
+            data["error"] = f"task timeout after {timeout:g}s"
+            data["retry_count"] = data.get("retry_count", 0) + 1
+            await self._fail(task_no, data)
+            return
+        except NonRetryableError as exception:
             data["error"] = str(exception)
-            data["retry_count"] += 1
+            data["retry_count"] = data.get("retry_count", 0) + 1
+            await self._fail(task_no, data)
+            return
+        except Exception as exception:  # noqa: BLE001 —— 其余异常按可重试处理
+            data["error"] = str(exception)
+            data["retry_count"] = data.get("retry_count", 0) + 1
             data["updated_at"] = _now()
             if data["retry_count"] < data.get("max_retry", MAX_RETRY):
                 data["status"] = "QUEUED"
                 await self._save(task_no, data)
-                await asyncio.sleep(0)
-                self._spawn(task_no)
+                await self._schedule_retry(task_no, data)
             else:
-                data["status"] = "FAILED"
-                await self._save(task_no, data)
-                await self._expire(task_no)
-                await self._callback(task_no, data)
+                await self._fail(task_no, data)
+            return
+
+        data["status"] = "SUCCEEDED"
+        data["result"] = result
+        data["error"] = None
+        data["updated_at"] = _now()
+        await self._save(task_no, data)
+        await self._expire(task_no)
+        await self._callback(task_no, data)
+
+    async def _schedule_retry(self, task_no: str, data: dict[str, Any]) -> None:
+        backoff = float(self.settings.retry_backoff_seconds)
+        await self.redis.zadd(self.settings.queue_delayed_key, {task_no: time.time() + backoff})
+
+    async def _fail(self, task_no: str, data: dict[str, Any]) -> None:
+        data["status"] = "FAILED"
+        data["updated_at"] = _now()
+        await self.redis.rpush(
+            self.settings.queue_dead_key,
+            json.dumps({"task_no": task_no, "error": data.get("error")}, ensure_ascii=False),
+        )
+        await self._save(task_no, data)
+        await self._expire(task_no)
+        await self._callback(task_no, data)
+
+    # ---------- 服务解析 ----------
+
+    def _service_names(self) -> list[str]:
+        services = self._services if self._services_loaded else self._load_services()
+        return list(services)
+
+    def _get_service(self, biz_type: str) -> Any:
+        services = self._services if self._services_loaded else self._load_services()
+        service = services.get(biz_type)
+        if service is None:
+            raise NonRetryableError(f"unsupported biz_type: {biz_type}")
+        return service
+
+    def _load_services(self) -> dict[str, Any]:
+        """惰性装配默认服务上下文：未显式注入 services 时，用自身 redis/settings 构建
+        （Mock 提供方 + Redis 向量存储），保证测试与单实例场景开箱即用。"""
+        from app.llm import build_registry
+        from app.services import ServiceContext, build_services
+        from app.vectors import RedisVectorStore
+
+        context = ServiceContext(
+            redis=self.redis,
+            settings=self.settings,
+            providers=build_registry(self.settings),
+            vectors=RedisVectorStore(self.redis, self.settings.vector_namespace_prefix),
+            scheduler=None,
+        )
+        self._services = build_services(context)
+        self._services_loaded = True
+        return self._services
+
+    # ---------- 回调（HMAC 签名，字节级与后端 AiTaskService 对齐） ----------
 
     async def _callback(self, task_no: str, data: dict[str, Any]) -> None:
         callback_url = data.get("callback_url")
@@ -120,8 +242,6 @@ class TaskManager:
             "error": data.get("error"),
             "retry_count": data.get("retry_count", 0),
         }
-        # HMAC-SHA256(timestamp + "\n" + body)，密钥与后端 AiServiceConfig.apiKey 一致；
-        # 后端校验时间戳窗口（防重放）与签名（防伪造/篡改），不再透传明文 token
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         timestamp = str(int(time.time()))
         signature = hmac.new(
@@ -148,6 +268,8 @@ class TaskManager:
                 logger.warning("AI callback for %s failed attempt %s: %s", task_no, attempt + 1, exception)
                 await asyncio.sleep(1 + attempt)
         logger.error("AI callback for %s failed after retries: %s", task_no, last_error)
+
+    # ---------- 存储 ----------
 
     async def _save(self, task_no: str, data: dict[str, Any]) -> None:
         await self.redis.set(KEY_PREFIX + task_no, json.dumps(data, ensure_ascii=False))
