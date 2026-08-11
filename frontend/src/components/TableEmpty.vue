@@ -1,6 +1,7 @@
 <template>
   <a-empty :description="description || t('common.noData')" :image="simpleImage">
-    <template v-if="$slots.action" #extra>
+    <!-- antd Empty 无 extra 插槽，footer 区域由 default 插槽承载 -->
+    <template v-if="$slots.action" #default>
       <slot name="action" />
     </template>
   </a-empty>

@@ -7,7 +7,8 @@
     :pagination="pagination"
     @change="onChange"
   >
-    <template #empty>
+    <!-- antd Table 的空态插槽是 emptyText（empty 无效），此处对接并保留对外 empty 插槽 -->
+    <template #emptyText>
       <TableError v-if="error" :error="error" @retry="emit('retry')" />
       <slot name="empty" v-else />
     </template>
