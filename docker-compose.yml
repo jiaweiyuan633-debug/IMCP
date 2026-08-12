@@ -120,7 +120,8 @@ services:
       dockerfile: Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
-      # 与后端 AiServiceConfig.apiKey 保持一致；仅本地开发默认值，生产由 k8s Secret 注入
+      # 与后端 AiServiceConfig.apiKey 保持一致；本文件为本地开发兜底默认，
+      # 生产由 k8s Secret 注入（AUTH_TOKEN 代码中无默认值，未注入时 AI 服务启动失败）
       AUTH_TOKEN: ${AI_AUTH_TOKEN:-dev-ai-service-token}
       # 回调 SSRF 防护白名单：任务回调只允许打到后端（与 backend 的 CALLBACK_BASE_URL 对齐）。
       # 留空则 AI 服务仅允许回调 localhost 回环地址——容器间回调（backend:8080）必须显式注入。

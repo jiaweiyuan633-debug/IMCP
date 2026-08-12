@@ -77,7 +77,7 @@ backend (Spring Boot)                 ai-service (FastAPI)
 ## 配置
 
 ```bash
-AUTH_TOKEN=dev-ai-service-token        # 与后端 AiServiceConfig.apiKey 一致
+AUTH_TOKEN=dev-ai-service-token        # 必填：与后端 AiServiceConfig.apiKey 一致，缺失即启动失败
 LLM_DEFAULT_PROVIDER=mock              # 默认提供方
 LLM_PROVIDERS='{"deepseek":{"base_url":"https://api.deepseek.com","api_key":"sk-...","model":"deepseek-chat","embedding_model":"text-embedding-v3"}}'
 WORKER_COUNT=2                         # 工作线程数

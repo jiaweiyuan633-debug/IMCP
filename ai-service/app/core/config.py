@@ -5,8 +5,10 @@ class Settings(BaseSettings):
     app_name: str = "ai-service"
     redis_url: str = "redis://localhost:6379/0"
     # 共享鉴权密钥：入站任务接口校验（Authorization: Bearer）与出站回调 HMAC 签名共用，
-    # 必须与后端 AiServiceConfig.apiKey 保持一致；生产由 k8s Secret 注入（AUTH_TOKEN）
-    auth_token: str = "dev-ai-service-token"
+    # 必须与后端 AiServiceConfig.apiKey 保持一致。无默认值：未注入 AUTH_TOKEN 时构造
+    # Settings 即抛错、服务启动失败（fail-fast），杜绝静默携带公开 dev 密钥上线；
+    # 本地开发由 .env（.env.example 模板）显式提供，生产由 k8s Secret 注入。
+    auth_token: str
     # 回调 HMAC 时间戳允许偏差（秒），防重放
     callback_clock_skew_seconds: int = 300
     # 出站任务回调允许的 origin 白名单（JSON 数组，如 ["http://admin-backend:8080"]）：

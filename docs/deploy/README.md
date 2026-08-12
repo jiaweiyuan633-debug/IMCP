@@ -20,7 +20,7 @@
 
 ```bash
 cd backend && SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
-cd ai-service && uv sync && uv run uvicorn app.main:app --port 8000
+cd ai-service && cp .env.example .env && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && pnpm install && pnpm dev
 cd website && pnpm install && pnpm dev --port 5174
 ```
