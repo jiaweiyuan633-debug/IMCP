@@ -76,7 +76,15 @@ public class MybatisPlusConfig {
             "import_export_template",
             "import_export_job",
             "form_definition",
-            "form_instance");
+            "form_instance",
+            // 批次5：AI 知识库 / 提示词模板、消息模板、字段级审计日志
+            // （R1-1.5 租户白名单补漏：上述表均带 tenant_id 列，此前漏加入名单，
+            //  BaseMapper 标准 CRUD 不注入租户条件，租户间存在越权读写风险）
+            "ai_knowledge_base",
+            "ai_knowledge_doc",
+            "ai_prompt_template",
+            "sys_message_template",
+            "sys_field_audit_log");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
