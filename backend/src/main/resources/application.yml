@@ -2,6 +2,11 @@ server:
   port: ${SERVER_PORT:8080}
   # 优雅停机：先停止接收新请求，给在途请求留出完成窗口
   shutdown: graceful
+  # R2-1.3：限流/登录按 request.getRemoteAddr() 计算匿名身份，从不信任客户端可伪造的 X-Forwarded-For。
+  # 默认 none = remoteAddr 恒为 TCP 源地址（反代部署时为反代出口 IP，不可伪造；全站共享桶，更严不更松）。
+  # 仅当部署在受信任反向代理之后且代理已正确覆盖/重写 XFF 时，由运维显式注入
+  # SERVER_FORWARD_HEADERS_STRATEGY=native（或 framework），remoteAddr 才反映真实客户端 IP，获得精确限流。
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   application:
