@@ -51,6 +51,7 @@ class ChunkFileServiceTest {
     private FileStorageManager fileStorageManager;
     private DistributedLock distributedLock;
     private ObjectMapper objectMapper;
+    private FileUploadProperties uploadProperties;
     private ChunkFileService service;
 
     private ChunkFileService.ChunkTask task(int totalChunks, int chunkSize, long totalSize) {
@@ -67,7 +68,9 @@ class ChunkFileServiceTest {
         fileStorageManager = mock(FileStorageManager.class);
         distributedLock = mock(DistributedLock.class);
         objectMapper = new ObjectMapper();
-        service = new ChunkFileService(fileMapper, redisTemplate, fileStorageManager, distributedLock, objectMapper);
+        uploadProperties = new FileUploadProperties();
+        service = new ChunkFileService(fileMapper, redisTemplate, fileStorageManager, distributedLock,
+                objectMapper, uploadProperties);
         ReflectionTestUtils.setField(service, "chunkDirConfig", tempDir.toString());
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(redisTemplate.opsForSet()).thenReturn(setOps);
@@ -174,6 +177,41 @@ class ChunkFileServiceTest {
         // 任务与分片目录清理
         verify(redisTemplate).delete(List.of("file:chunk:" + UPLOAD_ID, "file:chunk:" + UPLOAD_ID + ":parts"));
         assertThat(Files.exists(chunkDir)).isFalse();
+    }
+
+    @Test
+    void initRejectsTotalSizeOverLimit() {
+        ChunkInitRequest request = initRequest();
+        request.setTotalSize(21L * 1024 * 1024); // 21MB > 默认 20MB 上限
+
+        assertThatThrownBy(() -> service.init(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("文件总大小不能超过 20MB");
+    }
+
+    @Test
+    void initRejectsChunkSizeOverLimit() {
+        ChunkInitRequest request = initRequest();
+        request.setChunkSize(21 * 1024 * 1024); // 21MB > 默认 20MB 上限
+
+        assertThatThrownBy(() -> service.init(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("分片大小不能超过 20MB");
+    }
+
+    @Test
+    void completeRejectsOversizedTaskBeforeMerge() throws Exception {
+        // R2-1.2：任务元数据来自 Redis，可能残留修复前构造的超大 totalSize 任务；
+        // complete 必须先拒绝再合并，杜绝 new ByteArrayOutputStream((int) totalSize) 超大预分配
+        stubTask(task(2, 5, 21L * 1024 * 1024));
+        when(setOps.size("file:chunk:" + UPLOAD_ID + ":parts")).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.complete(UPLOAD_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("文件总大小不能超过 20MB");
+        // 拒绝发生在合并与入库之前，不触碰存储层
+        verify(fileStorageManager, never())
+                .storeBytes(any(byte[].class), anyString(), anyString(), anyString(), anyString());
     }
 
     private String startsWith(String prefix) {

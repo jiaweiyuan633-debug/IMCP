@@ -52,21 +52,27 @@ public class ChunkFileService {
     private final FileStorageManager fileStorageManager;
     private final DistributedLock distributedLock;
     private final ObjectMapper objectMapper;
+    private final FileUploadProperties uploadProperties;
 
     @Value("${app.upload.chunk-dir:}")
     private String chunkDirConfig;
 
     public ChunkFileService(SysFileMapper fileMapper, StringRedisTemplate redisTemplate,
                             FileStorageManager fileStorageManager, DistributedLock distributedLock,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper, FileUploadProperties uploadProperties) {
         this.fileMapper = fileMapper;
         this.redisTemplate = redisTemplate;
         this.fileStorageManager = fileStorageManager;
         this.distributedLock = distributedLock;
         this.objectMapper = objectMapper;
+        this.uploadProperties = uploadProperties;
     }
 
     public ChunkInitResponse init(ChunkInitRequest request) {
+        // R2-1.2：init 即校验声明大小，杜绝认证攻击者声明超大 totalSize/chunkSize，
+        // 让 complete 合并时 new ByteArrayOutputStream((int) totalSize) 做超大预分配触发堆 OOM（DoS）。
+        checkSizeWithinLimit(request.getTotalSize(), "文件总大小");
+        checkSizeWithinLimit(request.getChunkSize(), "分片大小");
         if (StringUtils.hasText(request.getSha256())) {
             SysFileDO existing = fileMapper.selectOne(new LambdaQueryWrapper<SysFileDO>()
                     .eq(SysFileDO::getTenantId, TenantContext.getTenantId())
@@ -126,6 +132,9 @@ public class ChunkFileService {
 
     private UploadResponse doComplete(String uploadId) {
         ChunkTask task = getTask(uploadId);
+        // R2-1.2：合并前复检 totalSize（任务元数据来自 Redis，可能残留修复前构造的超大任务），
+        // 确保 ByteArrayOutputStream 预分配不超上限，杜绝超大预分配导致的堆 OOM。
+        checkSizeWithinLimit(task.totalSize(), "文件总大小");
         Long received = redisTemplate.opsForSet().size(partsKey(uploadId));
         if (received == null || received.intValue() != task.totalChunks()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "分片未上传完整");
@@ -165,6 +174,15 @@ public class ChunkFileService {
             return chunk.getBytes();
         } catch (IOException exception) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "读取分片失败");
+        }
+    }
+
+    /** 声明大小不得超过上传上限（与 FileStorageManager 同一来源 FileUploadProperties），防止超大预分配 DoS。 */
+    private void checkSizeWithinLimit(long size, String label) {
+        long maxBytes = uploadProperties.getMaxSizeMb() * 1024L * 1024L;
+        if (size > maxBytes) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    label + "不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
         }
     }
 
