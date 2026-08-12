@@ -99,6 +99,21 @@ class SsoAuthServiceTest {
     }
 
     @Test
+    void tokenRejectsWrongClientSecret() {
+        // R2-1.1：client_secret 校验失败必须抛业务异常而非放行；恒定时间比较不改变拒绝语义
+        SysOauthClientDO client = enabledClient("https://app.com/callback");
+        client.setClientSecret("secret");
+        when(oauthClientMapper.selectOne(any())).thenReturn(client);
+
+        SsoTokenRequest request = new SsoTokenRequest();
+        request.setClientId("app-1");
+        request.setClientSecret("wrong-secret");
+        request.setCode("code-1");
+
+        assertThrows(BusinessException.class, () -> ssoAuthService.token(request));
+    }
+
+    @Test
     void tokenExchangeSetsTenantFromCodeBeforeUserQuery() {
         // R1-1.7：授权码携带租户段，兑换时先就位租户上下文再查用户，
         // 避免租户拦截器注入默认 tenant_id=1 使非租户 1 用户兑换失败。

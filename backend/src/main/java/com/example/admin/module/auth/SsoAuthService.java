@@ -22,6 +22,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.List;
 
@@ -66,7 +68,9 @@ public class SsoAuthService {
     /** 第三方应用用授权码换访问令牌。 */
     public SsoTokenVo token(SsoTokenRequest request) {
         SysOauthClientDO client = requireEnabledClient(request.getClientId());
-        if (!client.getClientSecret().equals(request.getClientSecret())) {
+        // R2-1.1：client_secret 必须恒定时间比较。String.equals 按字节短路，逐位差异产生
+        // 可观测的耗时差（时序侧信道），允许远程枚举密钥；MessageDigest.isEqual 固定遍历全部字节。
+        if (!constantTimeEquals(client.getClientSecret(), request.getClientSecret())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "client_secret 无效");
         }
         String value = redisTemplate.opsForValue().get(SSO_CODE_PREFIX + request.getCode());
@@ -109,5 +113,14 @@ public class SsoAuthService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "应用不存在或已停用");
         }
         return client;
+    }
+
+    /** 恒定时间字符串比较（防时序侧信道枚举密钥）。任一为 null 均判定不等。 */
+    private static boolean constantTimeEquals(String expected, String presented) {
+        if (expected == null || presented == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                presented.getBytes(StandardCharsets.UTF_8));
     }
 }
