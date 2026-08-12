@@ -89,8 +89,11 @@ public class MybatisPlusConfig {
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
-        interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
+        // R1-1.6 拦截器顺序修正：条件注入类（租户/数据权限）必须在分页之前。
+        // 根因：PaginationInnerInterceptor 的 COUNT 查询在 willDoQuery 中直接经真实
+        // Executor 执行（不重入拦截器链），COUNT SQL 只取自「当前时刻」的 boundSql。
+        // 分页在前时 COUNT 在租户/数据权限条件注入前生成，分页 total 会统计到全租户/越权行。
+        // 顺序对齐官方推荐「多租户 → 分页 → 乐观锁」。
         interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
@@ -108,6 +111,8 @@ public class MybatisPlusConfig {
             }
         }));
         interceptor.addInnerInterceptor(new DataScopeInnerInterceptor(dataPermissionRuleResolver::getObject));
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+        interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
         return interceptor;
     }
 }
