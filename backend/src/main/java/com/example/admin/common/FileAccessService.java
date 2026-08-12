@@ -12,9 +12,12 @@ import java.util.Base64;
 
 /**
  * 文件访问令牌：签发时绑定文件路径与签发用户，消费时校验。
- * token 结构：{expires}.{userId}.{HMAC-SHA256(path:expires:userId)}。
- * 已登录请求必须与令牌绑定用户一致，防止令牌跨用户复用；
+ * token 结构：{expires}.{userId}.{HMAC-SHA256(path:expires:userId)}，userId 为空表示公开资源令牌。
+ * 绑定用户的令牌：已登录请求必须与绑定用户一致，防止令牌跨用户复用；
  * 匿名请求（img 预览等浏览器无法携带登录态的场合）凭签名与有效期访问，保持 URL 分享语义。
+ * 系统签发的公开资源令牌（未绑定用户）：匿名与已登录请求一律凭签名访问——签发分享链接时
+ * 发起方可能处于未登录态（如匿名上传），若登录用户访问被拒则出现「匿名可看、登录反被拒」，
+ * 破坏分享语义。绑定段被签名整体覆盖，无法篡改伪装。
  */
 @Service
 public class FileAccessService {
@@ -51,12 +54,12 @@ public class FileAccessService {
                 return false;
             }
             String boundUserId = parts[1];
-            // 已登录请求必须与令牌绑定用户一致，防止他人复用令牌；
-            // 匿名请求凭签名校验；系统签发的公开资源（未绑定用户）可匿名访问
-            if (currentUserId != null && !String.valueOf(currentUserId).equals(boundUserId)) {
-                return false;
-            }
-            if (currentUserId != null && !String.valueOf(currentUserId).equals(boundUserId)) {
+            // R2-1.4：绑定用户的令牌要求已登录请求与绑定用户一致，防止令牌跨用户复用；
+            // 公开资源令牌（boundUserId 为空，如匿名上传时签发）任何请求（含已登录用户）均可访问，
+            // 否则同一分享链接匿名可看、登录反被拒，破坏 URL 分享语义；
+            // 匿名请求（img 预览等浏览器无法携带登录态的场合）一律凭签名与有效期校验。
+            if (currentUserId != null && !boundUserId.isEmpty()
+                    && !String.valueOf(currentUserId).equals(boundUserId)) {
                 return false;
             }
             String expected = sign(path + ":" + expires + ":" + boundUserId);
