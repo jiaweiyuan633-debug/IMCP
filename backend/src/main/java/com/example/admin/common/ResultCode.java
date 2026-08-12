@@ -55,6 +55,8 @@ public enum ResultCode {
     FORM_DATA_INVALID(1038, "表单数据校验不通过"),
     // 批次 C：数据大屏
     SCREEN_TEMPLATE_CODE_EXISTS(1039, "大屏模板编码已存在"),
+    // R1-1.7：跨租户同名账号且未指定租户时无法唯一定位
+    USERNAME_AMBIGUOUS(1040, "存在同名账号，请填写租户ID后重试"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");
 
     private final int code;

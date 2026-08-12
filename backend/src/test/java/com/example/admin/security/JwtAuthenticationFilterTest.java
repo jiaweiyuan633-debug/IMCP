@@ -18,7 +18,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -146,6 +148,29 @@ class JwtAuthenticationFilterTest {
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(userMapper, never()).selectById(anyLong());
         verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void tenantClaimInitializesContextBeforeQueries() throws Exception {
+        // R1-1.7：access token 携带 tenantId，角色/权限/用户查询前租户上下文必须已就位，
+        // 否则默认 tenant_id=1 会让非租户 1 用户的认证查询全部落空（401）
+        Claims claims = validClaims();
+        when(claims.get("tenantId")).thenReturn(2L);
+        when(request.getHeader("Authorization")).thenReturn("Bearer abc");
+        when(jwtUtil.parse("abc")).thenReturn(claims);
+        when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
+        AtomicLong tenantAtRoleQuery = new AtomicLong();
+        when(roleMapper.selectRoleCodesByUserId(1L)).thenAnswer(invocation -> {
+            tenantAtRoleQuery.set(TenantContext.getTenantId());
+            return List.of("admin");
+        });
+        when(tokenService.getCachedPermissions(1L)).thenReturn(List.of());
+        when(userMapper.selectById(1L)).thenReturn(activeUser());
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(tenantAtRoleQuery.get()).isEqualTo(2L);
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
     @Test

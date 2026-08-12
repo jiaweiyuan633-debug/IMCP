@@ -42,6 +42,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtUtil.parse(token);
                 if (tokenService.hasValidAccessToken(claims.getId())) {
                     Long userId = Long.valueOf(claims.getSubject());
+                    // R1-1.7：access token 携带 tenantId，查询角色/权限/用户前先就位租户上下文。
+                    // 否则 TenantFilter 设定的默认 tenant_id=1 会让非租户 1 用户的所有认证查询落空（401）。
+                    Object tenantClaim = claims.get("tenantId");
+                    if (tenantClaim instanceof Number tenantNumber) {
+                        TenantContext.setTenantId(tenantNumber.longValue());
+                    }
                     List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
                     List<String> perms = tokenService.getCachedPermissions(userId);
                     if (perms == null) {
@@ -52,6 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (user == null || user.getStatus() == null || user.getStatus() != 1) {
                         SecurityContextHolder.clearContext();
                     } else {
+                        // DB 为用户租户权威来源：用户被迁移租户后以库表为准
                         if (user.getTenantId() != null) {
                             TenantContext.setTenantId(user.getTenantId());
                         }

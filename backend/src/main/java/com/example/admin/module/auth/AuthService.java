@@ -81,8 +81,16 @@ public class AuthService {
             throw new BusinessException(ResultCode.CAPTCHA_ERROR);
         }
         String username = request.getUsername().trim();
-        SysUserDO user = userMapper.selectOne(
-                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, username));
+        // R1-1.7：登录查询必须跨租户——此时租户上下文尚未就位，租户拦截器注入默认 tenant_id=1
+        // 会把非租户 1 用户挡在门外。selectByUsername 豁免租户拦截器，按用户名（+ 可选租户）定位。
+        List<SysUserDO> candidates = userMapper.selectByUsername(username, request.getTenantId());
+        if (candidates.size() > 1) {
+            // 跨租户同名且未指定租户，无法唯一定位登录账号
+            saveLoginLog(httpRequest, username, false, "存在同名账号，需指定租户");
+            recordLoginFailure(username);
+            throw new BusinessException(ResultCode.USERNAME_AMBIGUOUS);
+        }
+        SysUserDO user = candidates.isEmpty() ? null : candidates.get(0);
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             saveLoginLog(httpRequest, username, false, "用户名或密码错误");
@@ -117,8 +125,10 @@ public class AuthService {
         String accessJti = jwtUtil.generateJti();
         String refreshJti = jwtUtil.generateJti();
 
-        String accessToken = jwtUtil.createAccessToken(accessJti, user.getId(), user.getUsername(), roles, perms);
-        String refreshToken = jwtUtil.createRefreshToken(refreshJti, user.getId(), user.getUsername());
+        String accessToken = jwtUtil.createAccessToken(accessJti, user.getId(), user.getUsername(),
+                user.getTenantId(), roles, perms);
+        String refreshToken = jwtUtil.createRefreshToken(refreshJti, user.getId(), user.getUsername(),
+                user.getTenantId());
         tokenService.saveAccessToken(accessJti, refreshJti);
         tokenService.saveRefreshToken(refreshJti, String.valueOf(user.getId()));
         tokenService.saveOnlineUser(accessJti, OnlineUserVo.builder()
@@ -155,7 +165,14 @@ public class AuthService {
         }
 
         Long userId = Long.valueOf(claims.getSubject());
+        // R1-1.7：refresh token 携带 tenantId，查询用户前先就位租户上下文，
+        // 避免 selectById 被租户拦截器注入默认 tenant_id=1 查不到非租户 1 用户。
+        Long tokenTenantId = asLong(claims.get("tenantId"));
+        if (tokenTenantId != null) {
+            TenantContext.setTenantId(tokenTenantId);
+        }
         SysUserDO user = userMapper.selectById(userId);
+        // DB 为用户租户权威来源：用户被迁移租户后以库表为准，token 仅作查询前置。
         if (user != null && user.getTenantId() != null) {
             TenantContext.setTenantId(user.getTenantId());
         }
@@ -170,8 +187,10 @@ public class AuthService {
         String accessJti = jwtUtil.generateJti();
         String newRefreshJti = jwtUtil.generateJti();
 
-        String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(), roles, perms);
-        String refreshToken = jwtUtil.createRefreshToken(newRefreshJti, userId, user.getUsername());
+        String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(),
+                user.getTenantId(), roles, perms);
+        String refreshToken = jwtUtil.createRefreshToken(newRefreshJti, userId, user.getUsername(),
+                user.getTenantId());
         tokenService.saveAccessToken(accessJti, newRefreshJti);
         tokenService.saveRefreshToken(newRefreshJti, String.valueOf(userId));
 
@@ -365,5 +384,10 @@ public class AuthService {
 
     private boolean captchaEnabled() {
         return loginConfig().isCaptchaEnabled();
+    }
+
+    /** JWT claim 中的 JSON 数字可能被解析为 Integer 或 Long，统一转 Long；null 返回 null。 */
+    private static Long asLong(Object value) {
+        return value instanceof Number number ? number.longValue() : null;
     }
 }

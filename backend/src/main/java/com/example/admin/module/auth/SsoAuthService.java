@@ -52,9 +52,11 @@ public class SsoAuthService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "redirect_uri 不在应用白名单内");
         }
         String code = jwtUtil.generateJti();
-        // 授权码绑定用户与客户端，一次性消费
+        // 授权码绑定用户、租户与客户端，一次性消费
+        // （R1-1.7 增加租户段：兑换时先就位租户上下文再查用户，避免非租户 1 用户查不到）
         redisTemplate.opsForValue().set(
-                SSO_CODE_PREFIX + code, SecurityUtils.getUserId() + ":" + clientId, CODE_TTL);
+                SSO_CODE_PREFIX + code,
+                SecurityUtils.getUserId() + ":" + TenantContext.getTenantId() + ":" + clientId, CODE_TTL);
         return SsoAuthorizeVo.builder()
                 .code(code)
                 .redirectUri(client.getRedirectUri())
@@ -73,10 +75,13 @@ public class SsoAuthService {
         }
         redisTemplate.delete(SSO_CODE_PREFIX + request.getCode());
         String[] parts = value.split(":");
-        if (parts.length != 2 || !parts[1].equals(request.getClientId())) {
+        if (parts.length != 3 || !parts[2].equals(request.getClientId())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码与客户端不匹配");
         }
         Long userId = Long.valueOf(parts[0]);
+        // R1-1.7：授权码携带租户，兑换时先就位租户上下文再查用户，
+        // 避免租户拦截器注入默认 tenant_id=1 查不到非租户 1 用户。
+        TenantContext.setTenantId(Long.valueOf(parts[1]));
         SysUserDO user = userMapper.selectById(userId);
         if (user == null || user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
@@ -85,7 +90,8 @@ public class SsoAuthService {
         List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
         List<String> perms = menuMapper.selectPermsByUserId(userId);
         String accessJti = jwtUtil.generateJti();
-        String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(), roles, perms);
+        String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(),
+                user.getTenantId(), roles, perms);
         // SSO 令牌不签发 refresh token，用空串占位避免 Redis 值判空异常
         tokenService.saveAccessToken(accessJti, "");
         return SsoTokenVo.builder()

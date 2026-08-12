@@ -62,6 +62,8 @@ export default {
     submit: 'Sign in',
     usernamePlaceholder: 'Enter username',
     passwordPlaceholder: 'Enter password',
+    tenant: 'Tenant ID (optional)',
+    tenantPlaceholder: 'Required only for duplicate usernames',
     captcha: 'Captcha',
     captchaPlaceholder: 'Enter captcha',
     failed: 'Login failed',

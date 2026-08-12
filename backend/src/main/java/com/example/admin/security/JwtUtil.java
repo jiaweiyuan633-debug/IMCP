@@ -25,13 +25,20 @@ public class JwtUtil {
         return UUID.randomUUID().toString().replace("-", "");
     }
 
-    public String createAccessToken(String jti, Long userId, String username, List<String> roles, List<String> perms) {
+    /**
+     * 签发访问令牌。R1-1.7：token 携带 tenantId，认证链（JwtAuthenticationFilter / refresh）
+     * 在首个数据库查询前先据其就位租户上下文，避免租户拦截器注入默认 tenant_id=1 使
+     * 非租户 1 用户的角色/权限/用户查询全部落空。
+     */
+    public String createAccessToken(String jti, Long userId, String username, Long tenantId,
+                                    List<String> roles, List<String> perms) {
         Instant now = Instant.now();
         Date nowDate = Date.from(now);
         Date expiration = Date.from(now.plusMillis(properties.getAccessTokenExpireMinutes() * 60_000L));
         return Jwts.builder()
                 .id(jti)
                 .subject(String.valueOf(userId))
+                .claim("tenantId", tenantId)
                 .claim("username", username)
                 .claim("roles", roles)
                 .claim("perms", perms)
@@ -41,13 +48,14 @@ public class JwtUtil {
                 .compact();
     }
 
-    public String createRefreshToken(String jti, Long userId, String username) {
+    public String createRefreshToken(String jti, Long userId, String username, Long tenantId) {
         Instant now = Instant.now();
         Date nowDate = Date.from(now);
         Date expiration = Date.from(now.plusMillis(properties.getRefreshTokenExpireDays() * 24 * 60 * 60_000L));
         return Jwts.builder()
                 .id(jti)
                 .subject(String.valueOf(userId))
+                .claim("tenantId", tenantId)
                 .claim("username", username)
                 .issuedAt(nowDate)
                 .expiration(expiration)

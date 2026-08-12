@@ -62,6 +62,8 @@ export default {
     submit: '登录',
     usernamePlaceholder: '请输入账号',
     passwordPlaceholder: '请输入密码',
+    tenant: '租户ID（可选）',
+    tenantPlaceholder: '同名账号时填写，用于定位租户',
     captcha: '验证码',
     captchaPlaceholder: '请输入验证码',
     failed: '登录失败',

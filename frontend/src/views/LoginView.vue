@@ -17,6 +17,15 @@
         >
           <a-input-password v-model:value="form.password" :placeholder="t('login.passwordPlaceholder')" />
         </a-form-item>
+        <a-form-item :label="t('login.tenant')" name="tenantId">
+          <a-input-number
+            v-model:value="form.tenantId"
+            :placeholder="t('login.tenantPlaceholder')"
+            :min="1"
+            :precision="0"
+            style="width: 100%"
+          />
+        </a-form-item>
         <a-form-item v-if="captchaEnabled" :label="t('login.captcha')" name="captchaCode">
           <a-space>
             <a-input v-model:value="form.captchaCode" :placeholder="t('login.captchaPlaceholder')" style="width: 160px" />
@@ -65,6 +74,7 @@ const loading = ref(false)
 const form = reactive<LoginForm>({
   username: 'admin',
   password: '',
+  tenantId: undefined,
 })
 const captchaEnabled = ref(false)
 const captchaImage = ref('')
