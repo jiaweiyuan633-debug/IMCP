@@ -25,6 +25,7 @@ from redis.asyncio import Redis
 
 from app.core.callback_security import CallbackUrlGuard
 from app.core.config import Settings
+from app.core.observability import request_id_var
 from app.schemas.task import TaskCreateRequest, TaskStatusResponse
 from app.tasks.errors import NonRetryableError
 
@@ -125,6 +126,9 @@ class TaskManager:
         ready_key = self.settings.queue_ready_key
         delayed_key = self.settings.queue_delayed_key
         while not self._closing:
+            # 工作协程由首个提交任务的请求上下文派生（create_task 复制上下文），
+            # 逐轮清空 request_id，避免无关任务日志错误携带建队请求的 ID
+            request_id_var.set("")
             await self._promote_due(delayed_key, ready_key)
             popped = await self.redis.zpopmin(ready_key)
             if not popped:
@@ -153,6 +157,8 @@ class TaskManager:
         data = await self._get(task_no)
         if data is None or data.get("status") == "RUNNING":
             return
+        # 执行期间日志携带提交该任务的请求 ID，跨服务排障可串联调用方
+        request_id_var.set(data.get("request_id") or "")
         data["status"] = "RUNNING"
         data["updated_at"] = _now()
         await self._save(task_no, data)
@@ -161,7 +167,7 @@ class TaskManager:
         try:
             service = self._get_service(data["biz_type"])
             result = await asyncio.wait_for(service.run(data["params"]), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             data["error"] = f"task timeout after {timeout:g}s"
             data["retry_count"] = data.get("retry_count", 0) + 1
             await self._fail(task_no, data)

@@ -6,11 +6,17 @@ from redis.asyncio import Redis
 
 from app.api.routes import router as api_router
 from app.core.config import settings
+from app.core.observability import RequestLogMiddleware, setup_logging
 from app.llm import build_registry
 from app.scheduler import Scheduler
 from app.services import ServiceContext, build_services
 from app.tasks.manager import TaskManager
 from app.vectors import RedisVectorStore
+
+# 统一日志格式与 request_id 贯穿：须在应用构造前完成。
+# uvicorn 在 Config 构造期（app 导入前）先行应用默认日志配置，此处必然在其后
+# 执行，可覆盖根日志器并关闭重复的 uvicorn.access 日志。
+setup_logging()
 
 
 @asynccontextmanager
@@ -60,6 +66,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 访问日志 + request_id 贯穿（最外层，先于 CORS 处理，覆盖全部请求）
+app.add_middleware(RequestLogMiddleware)
+
 app.include_router(api_router)
 
 
@@ -70,7 +79,7 @@ async def health(response: Response) -> dict[str, str]:
     if redis is not None:
         try:
             await redis.ping()
-        except Exception:
+        except Exception:  # noqa: BLE001 - Redis 探活失败统一按不健康处理
             response.status_code = 503
             return {"status": "error", "service": settings.app_name, "detail": "redis unreachable"}
     return {"status": "ok", "service": settings.app_name}
