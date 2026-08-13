@@ -1,6 +1,5 @@
 import asyncio
 import json
-from unittest.mock import AsyncMock
 
 import fakeredis.aioredis
 import pytest
@@ -105,6 +104,25 @@ async def test_retryable_error_exhausts_retries_then_dead_letter() -> None:
 
     dead = await redis.lrange(settings.queue_dead_key, 0, -1)
     assert any("r" in json.loads(item)["task_no"] for item in dead)
+
+
+@pytest.mark.asyncio
+async def test_dead_letter_queue_capped_and_keeps_newest() -> None:
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    service = _FakeService(exc=NonRetryableError("参数非法"))
+    settings = Settings(worker_count=1, queue_dead_max_len=2)
+    manager = TaskManager(redis, settings, services={"job": service})
+
+    # 三个失败任务顺序入库（zset 同分按字典序：d1 -> d2 -> d3），
+    # 每次写入 rpush + ltrim 裁剪至上限 2，d1 应被挤出、保留最新的 d2/d3
+    for task_no in ("d1", "d2", "d3"):
+        await manager.create_task(TaskCreateRequest(task_no=task_no, biz_type="job", params={}))
+    await _wait(manager, ["d1", "d2", "d3"])
+
+    dead = await redis.lrange(settings.queue_dead_key, 0, -1)
+    assert len(dead) == 2  # 死信队列长度被裁剪到上限
+    remaining = {json.loads(item)["task_no"] for item in dead}
+    assert remaining == {"d2", "d3"}  # 仅保留最近两条，最旧 d1 被裁剪
 
 
 @pytest.mark.asyncio

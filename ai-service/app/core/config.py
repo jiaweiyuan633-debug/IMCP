@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     queue_ready_key: str = "ai:queue:ready"
     queue_delayed_key: str = "ai:queue:delayed"
     queue_dead_key: str = "ai:queue:dead"
+    # 死信队列长度上限：死信为纯写入、无消费者的 Redis list，若不裁剪则随失败
+    # 总数无界增长、Redis 内存只升不降。失败落库时对队列做 rpush + ltrim 原子
+    # 裁剪，仅保留最近 queue_dead_max_len 条（0 表示不裁剪，保留历史行为）。
+    queue_dead_max_len: int = 1000
     task_ttl_seconds: int = 60 * 60 * 24
     # 崩溃自愈租约宽限（秒）：执行受 wait_for 超时约束，租约 = 任务超时 + 该宽限。
     # 存活执行必在租约到期前离开 RUNNING，故启动扫描可安全回收过期租约任务（见

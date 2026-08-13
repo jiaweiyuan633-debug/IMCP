@@ -3,7 +3,8 @@
 队列结构（Redis）：
 - ``ai:queue:ready``     zset，score = -priority（优先级越大越先执行；同优先级按任务号字典序）
 - ``ai:queue:delayed``   zset，score = 就绪时间戳（重试退避到期后由工作线程提升到 ready）
-- ``ai:queue:dead``      list，超出重试或不可重试的失败任务（JSON 记录）
+- ``ai:queue:dead``      list，超出重试或不可重试的失败任务（JSON 记录，写入时
+                         rpush + ltrim 原子裁剪至 queue_dead_max_len 上限，防无界增长）
 
 执行模型：固定数量工作线程（settings.worker_count）持续消费 ready 队列；
 单任务执行受 ``asyncio.wait_for`` 超时保护；可重试异常按指数式/固定退避重新入队，
@@ -232,13 +233,28 @@ class TaskManager:
     async def _fail(self, task_no: str, data: dict[str, Any]) -> None:
         data["status"] = "FAILED"
         data["updated_at"] = _now()
-        await self.redis.rpush(
-            self.settings.queue_dead_key,
-            json.dumps({"task_no": task_no, "error": data.get("error")}, ensure_ascii=False),
-        )
+        await self._record_dead_letter(task_no, data)
         await self._save(task_no, data)
         await self._expire(task_no)
         await self._callback(task_no, data)
+
+    async def _record_dead_letter(self, task_no: str, data: dict[str, Any]) -> None:
+        """写死信并裁剪队列长度上限（见 queue_dead_max_len）。
+
+        死信列表纯写入、无消费者，若只 rpush 不裁剪则随失败总数无界增长。
+        rpush + ltrim 用事务（MULTI/EXEC）包住：两条命令原子生效，并发失败时
+        列表不会出现中间态超长。仅保留最近 queue_dead_max_len 条，0 表示不裁剪。
+        """
+        payload = json.dumps(
+            {"task_no": task_no, "error": data.get("error")},
+            ensure_ascii=False,
+        )
+        max_len = self.settings.queue_dead_max_len
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await pipe.rpush(self.settings.queue_dead_key, payload)
+            if max_len > 0:
+                await pipe.ltrim(self.settings.queue_dead_key, -max_len, -1)
+            await pipe.execute()
 
     async def _requeue_after_error(self, task_no: str, error: Exception) -> None:
         """执行期异常兜底：任务仍非终态时恢复为 QUEUED 重新入队。
