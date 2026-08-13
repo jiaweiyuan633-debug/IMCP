@@ -184,6 +184,8 @@ app:
       timeout-seconds: ${MILVUS_EMBEDDING_TIMEOUT_SECONDS:10}
   # 公告 SSE 长连接心跳间隔（毫秒）：定期发送注释帧保活（穿透反代空闲读超时）并回收僵死连接
   notice-sse-heartbeat-ms: ${NOTICE_SSE_HEARTBEAT_MS:30000}
+  # 公告 SSE 每用户并发连接上限：超限回收最旧连接（防单账号脚本无限开流耗尽异步线程/内存）
+  notice-sse-max-connections-per-user: ${NOTICE_SSE_MAX_CONNECTIONS_PER_USER:5}
   screen:
     # 数据大屏 SSE 实时推送间隔（毫秒）：连接保持期间按此节奏广播聚合快照
     push-interval-ms: ${SCREEN_PUSH_INTERVAL_MS:30000}

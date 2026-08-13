@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,14 +19,27 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class NoticeSseService {
 
     private static final long NO_TIMEOUT = 0L;
+    private static final int DEFAULT_CONNECTION_LIMIT = 5;
 
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private int connectionLimit = DEFAULT_CONNECTION_LIMIT;
 
     public NoticeSseService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+    }
+
+    /**
+     * R4-1.2：每用户并发连接上限，超限回收最旧连接。默认 5，可用
+     * app.notice-sse-max-connections-per-user 覆盖；配置 {@code <=0} 表示不限制。
+     * 连接为 NO_TIMEOUT 长连接且无心跳外置上限，单账号可循环开流无限堆积
+     * （每连接占用一个异步 Servlet 请求 + SseEmitter），构成资源耗尽面。
+     */
+    @Value("${app.notice-sse-max-connections-per-user:5}")
+    public void setConnectionLimit(int connectionLimit) {
+        this.connectionLimit = connectionLimit;
     }
 
     public SseEmitter connect(Long userId) {
@@ -34,7 +48,25 @@ public class NoticeSseService {
         emitter.onCompletion(() -> remove(userId, emitter));
         emitter.onTimeout(() -> remove(userId, emitter));
         emitter.onError(error -> remove(userId, emitter));
+        enforceConnectionLimit(userId);
         return emitter;
+    }
+
+    /** 回收该用户最旧连接直至不超过上限；被回收连接 complete() 释放容器异步线程。 */
+    private void enforceConnectionLimit(Long userId) {
+        if (connectionLimit <= 0) {
+            return;
+        }
+        List<SseEmitter> list = emitters.get(userId);
+        while (list != null && list.size() > connectionLimit) {
+            SseEmitter oldest = list.get(0);
+            remove(userId, oldest);
+            try {
+                oldest.complete();
+            } catch (IllegalStateException ignored) {
+                // 连接已被并发关闭；移除逻辑幂等，无需处理
+            }
+        }
     }
 
     /**

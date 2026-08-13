@@ -69,4 +69,31 @@ class NoticeSseServiceTest {
         service.broadcast(1L, emitter -> frames.incrementAndGet());
         assertThat(frames.get()).isEqualTo(1);
     }
+
+    @Test
+    void connectEvictsOldestConnectionWhenPerUserLimitExceeded() {
+        NoticeSseService service = new NoticeSseService(mock(StringRedisTemplate.class), new ObjectMapper());
+        service.setConnectionLimit(2);
+        service.connect(1L);
+        service.connect(1L);
+        service.connect(1L);
+
+        // 超限 → 回收最旧连接（列表头），仅保留最近 2 条
+        AtomicInteger frames = new AtomicInteger();
+        service.broadcast(1L, emitter -> frames.incrementAndGet());
+        assertThat(frames.get()).isEqualTo(2);
+    }
+
+    @Test
+    void connectionLimitZeroMeansUnlimited() {
+        NoticeSseService service = new NoticeSseService(mock(StringRedisTemplate.class), new ObjectMapper());
+        service.setConnectionLimit(0);
+        service.connect(1L);
+        service.connect(1L);
+        service.connect(1L);
+
+        AtomicInteger frames = new AtomicInteger();
+        service.broadcast(1L, emitter -> frames.incrementAndGet());
+        assertThat(frames.get()).isEqualTo(3);
+    }
 }
