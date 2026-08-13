@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.TableFieldInfo;
 import com.baomidou.mybatisplus.core.metadata.TableInfo;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.admin.common.BusinessMetrics;
+import com.example.admin.config.MybatisPlusConfig;
 import com.example.admin.common.FieldDiffUtils;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.FieldAudit;
@@ -109,9 +110,26 @@ public class FieldAuditAspect {
             return null;
         }
         // JdbcTemplate 绑定当前事务连接：事务内业务未提交的更新在 after 快照中可见，
-        // 保证 diff 基于真实变更而非过期状态
-        String sql = "SELECT * FROM " + tableInfo.getTableName()
-                + " WHERE " + tableInfo.getKeyColumn() + " = ?";
+        // 保证 diff 基于真实变更而非过期状态。
+        // R4-1.11：租户表白名单表必须显式带租户条件——JdbcTemplate 直查绕开
+        // MyBatis-Plus 租户拦截器，否则租户 A 拿租户 B 记录 ID 调 update
+        // （业务更新被拦截器挡掉、0 行生效），before/after 快照会把租户 B 行全字段
+        // JSON 写入租户 A 自己的 sys_field_audit_log，构成跨租户外带通道。
+        // 白名单与租户拦截器同源（MybatisPlusConfig.TENANT_TABLES），避免两处判定分叉。
+        boolean tenantScoped = MybatisPlusConfig.TENANT_TABLES
+                .contains(tableInfo.getTableName().toLowerCase());
+        String sql;
+        Object[] args;
+        if (tenantScoped) {
+            sql = "SELECT * FROM " + tableInfo.getTableName()
+                    + " WHERE " + tableInfo.getKeyColumn() + " = ? AND "
+                    + MybatisPlusConfig.TENANT_ID_COLUMN + " = ?";
+            args = new Object[]{id, TenantContext.getTenantId()};
+        } else {
+            sql = "SELECT * FROM " + tableInfo.getTableName()
+                    + " WHERE " + tableInfo.getKeyColumn() + " = ?";
+            args = new Object[]{id};
+        }
         return jdbcTemplate.query(sql, rs -> {
             if (!rs.next()) {
                 return null;
@@ -130,7 +148,7 @@ public class FieldAuditAspect {
             } catch (ReflectiveOperationException exception) {
                 return null;
             }
-        }, id);
+        }, args);
     }
 
     /** JDBC 时间戳转 LocalDateTime，其余类型由 BeanWrapper 自动转换 */

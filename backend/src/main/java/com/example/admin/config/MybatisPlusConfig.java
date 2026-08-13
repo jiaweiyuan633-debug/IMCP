@@ -86,6 +86,9 @@ public class MybatisPlusConfig {
             "sys_message_template",
             "sys_field_audit_log");
 
+    /** 租户列名：租户拦截器注入条件与字段审计直查过滤共用同源，避免硬编码两处分叉。 */
+    public static final String TENANT_ID_COLUMN = "tenant_id";
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
@@ -102,7 +105,7 @@ public class MybatisPlusConfig {
 
             @Override
             public String getTenantIdColumn() {
-                return "tenant_id";
+                return TENANT_ID_COLUMN;
             }
 
             @Override
