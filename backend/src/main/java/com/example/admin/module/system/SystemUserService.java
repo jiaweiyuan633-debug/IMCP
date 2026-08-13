@@ -193,8 +193,10 @@ public class SystemUserService {
     @Transactional
     public void assignRoles(Long userId, List<Long> roleIds) {
         userRoleMapper.deleteByUserId(userId);
-        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效该用户，避免全局 KEYS 全扫与缓存雪崩
-        tokenService.evictUserPermissions(userId);
+        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效该用户，避免全局 KEYS 全扫与缓存雪崩。
+        // R4-1.12：提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧角色）会重新缓存
+        // 旧权限，撤销的权限最长残留 30 分钟。改为事务提交后失效。
+        tokenService.evictUserPermissionsAfterCommit(userId);
         if (roleIds == null || roleIds.isEmpty()) {
             return;
         }

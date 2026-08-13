@@ -108,7 +108,7 @@ class SystemUserServiceTest {
         verify(userRoleMapper).deleteByUserId(7L);
         verify(userRoleMapper).insert(eq(7L), eq(2L));
         verify(userRoleMapper).insert(eq(7L), eq(3L));
-        verify(tokenService).evictUserPermissions(7L);
+        verify(tokenService).evictUserPermissionsAfterCommit(7L);
     }
 
     @Test
@@ -117,6 +117,6 @@ class SystemUserServiceTest {
         userService.assignRoles(7L, List.of());
 
         verify(userRoleMapper).deleteByUserId(7L);
-        verify(tokenService).evictUserPermissions(7L);
+        verify(tokenService).evictUserPermissionsAfterCommit(7L);
     }
 }

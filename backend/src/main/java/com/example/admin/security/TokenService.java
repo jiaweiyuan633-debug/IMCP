@@ -8,6 +8,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -182,6 +184,42 @@ public class TokenService {
         }
         List<String> keys = userIds.stream().map(id -> PERMS_KEY + id).toList();
         redisTemplate.delete(keys);
+    }
+
+    /**
+     * 事务提交后失效单个用户权限缓存（R4-1.12）。
+     *
+     * <p>在事务提交前删除 Redis 键存在竞态：并发请求在 evict 之后、commit 之前读库
+     * （仍是旧角色）会把旧权限重新缓存（TTL 30 分钟），撤销的权限最长残留 30 分钟。
+     * 改为注册事务同步，提交成功后再删除；无事务上下文（非事务调用点）退化为立即失效。
+     */
+    public void evictUserPermissionsAfterCommit(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        evictAfterCommit(() -> redisTemplate.delete(PERMS_KEY + userId));
+    }
+
+    /** 批量版：事务提交后失效指定用户的权限缓存（R4-1.12，语义同上）。 */
+    public void evictPermissionsByUserIdsAfterCommit(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        List<String> keys = userIds.stream().map(id -> PERMS_KEY + id).toList();
+        evictAfterCommit(() -> redisTemplate.delete(keys));
+    }
+
+    private void evictAfterCommit(Runnable eviction) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    eviction.run();
+                }
+            });
+        } else {
+            eviction.run();
+        }
     }
 }
 

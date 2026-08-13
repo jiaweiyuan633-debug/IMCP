@@ -47,7 +47,7 @@ class SystemRoleServiceTest {
 
         verify(roleMenuMapper).deleteByRoleId(5L);
         verify(roleMenuMapper).insertBatch(5L, List.of(10L, 11L));
-        verify(tokenService).evictPermissionsByUserIds(List.of(1L, 2L));
+        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of(1L, 2L));
     }
 
     @Test
@@ -58,7 +58,7 @@ class SystemRoleServiceTest {
         roleService.assignMenus(5L, List.of());
 
         verify(roleMenuMapper).deleteByRoleId(5L);
-        verify(tokenService).evictPermissionsByUserIds(List.of(9L));
+        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of(9L));
     }
 
     @Test
@@ -68,7 +68,7 @@ class SystemRoleServiceTest {
         roleService.assignMenus(5L, List.of(1L));
 
         verify(roleMenuMapper).insertBatch(eq(5L), eq(List.of(1L)));
-        verify(tokenService).evictPermissionsByUserIds(List.of());
+        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of());
     }
 
     @Test

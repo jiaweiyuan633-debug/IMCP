@@ -127,8 +127,10 @@ public class SystemRoleService {
         if (menuIds != null && !menuIds.isEmpty()) {
             roleMenuMapper.insertBatch(roleId, menuIds);
         }
-        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效绑定该角色的用户，避免 KEYS 全扫与缓存雪崩
-        tokenService.evictPermissionsByUserIds(userIds);
+        // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效绑定该角色的用户，避免 KEYS 全扫与缓存雪崩。
+        // R4-1.12：提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧权限）会重新缓存，
+        // 撤销的权限最长残留 30 分钟。改为事务提交后失效。
+        tokenService.evictPermissionsByUserIdsAfterCommit(userIds);
     }
 
     public void assignDepts(Long roleId, List<Long> deptIds) {
