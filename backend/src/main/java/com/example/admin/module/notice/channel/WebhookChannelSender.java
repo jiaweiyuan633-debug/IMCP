@@ -1,10 +1,10 @@
 package com.example.admin.module.notice.channel;
 
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.notice.ChannelType;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
@@ -30,11 +30,20 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WebhookChannelSender implements MessageChannelSender {
 
     private final ObjectMapper objectMapper;
-    private final RestClient restClient = RestClient.builder().build();
+    private final RestClient restClient;
+
+    public WebhookChannelSender(ObjectMapper objectMapper) {
+        this(objectMapper, RestClient.builder().build());
+    }
+
+    /** 测试/自定义注入入口：可换用 mock 的 RestClient 验证请求构造。 */
+    WebhookChannelSender(ObjectMapper objectMapper, RestClient restClient) {
+        this.objectMapper = objectMapper;
+        this.restClient = restClient;
+    }
 
     @Override
     public ChannelType supports() {
@@ -48,6 +57,11 @@ public class WebhookChannelSender implements MessageChannelSender {
             String url = node.path("url").asText();
             if (!StringUtils.hasText(url)) {
                 return "Webhook URL 未配置";
+            }
+            // R4-1.13：与告警 Webhook 同源 SSRF 防护，发送前按"静态+DNS 解析"复核，拒绝内网目标。
+            String error = SsrfUrlValidator.validateOutboundHttpUrlWithDns(url);
+            if (error != null) {
+                return "Webhook URL 不合法: " + error;
             }
             HttpMethod method = parseMethod(node.path("method").asText("POST"));
             Map<String, String> headers = new HashMap<>();

@@ -1,5 +1,6 @@
 package com.example.admin.module.monitor.manager;
 
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.common.outbox.OutboxHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,6 +48,14 @@ public class AlertWebhookOutboxHandler implements OutboxHandler {
             String webhookUrl = node.path("webhookUrl").asText();
             if (webhookUrl.isBlank()) {
                 return true; // 无 Webhook 地址视为投递成功，避免无限重试
+            }
+            // R4-1.13：投递时复核 SSRF。发件箱可能残留修复前入库的地址，且主机名解析结果可能变化，
+            // 保存时静态校验无法覆盖"主机名指向内网 IP"；永久非法地址按投递成功丢弃，避免重试/退避打空转。
+            String error = SsrfUrlValidator.validateOutboundHttpUrlWithDns(webhookUrl);
+            if (error != null) {
+                log.error("告警 Webhook 地址被 SSRF 校验拒绝，丢弃该投递（rule={}）：{}",
+                        node.path("ruleName").asText(), error);
+                return true;
             }
             Map<String, Object> body = new HashMap<>(8);
             body.put("ruleName", node.path("ruleName").asText());

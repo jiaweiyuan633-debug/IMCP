@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.monitor.dto.AlertRuleSaveRequest;
 import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import com.example.admin.module.monitor.mapper.SysAlertRuleMapper;
@@ -35,6 +36,7 @@ public class AlertRuleService {
     }
 
     public Long create(AlertRuleSaveRequest request) {
+        checkWebhookUrl(request.getWebhookUrl());
         SysAlertRuleDO rule = toEntity(request);
         rule.setCreatedBy(SecurityUtils.tryGetUserId());
         ruleMapper.insert(rule);
@@ -45,6 +47,7 @@ public class AlertRuleService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "规则 ID 不能为空");
         }
+        checkWebhookUrl(request.getWebhookUrl());
         SysAlertRuleDO rule = toEntity(request);
         rule.setUpdatedBy(SecurityUtils.tryGetUserId());
         ruleMapper.updateById(rule);
@@ -69,6 +72,17 @@ public class AlertRuleService {
         rule.setWebhookUrl(request.getWebhookUrl());
         rule.setRemark(request.getRemark());
         return rule;
+    }
+
+    /**
+     * 保存时静态校验 Webhook 地址（协议/主机/IP 字面量，不发起 DNS，避免保存依赖解析）。
+     * R4-1.13：告警触发时服务端会主动请求该地址，若不限制可被用作 SSRF 跳板打内网。
+     */
+    private void checkWebhookUrl(String webhookUrl) {
+        String error = SsrfUrlValidator.validateOutboundHttpUrl(webhookUrl);
+        if (error != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Webhook 地址不合法：" + error);
+        }
     }
 
 }
