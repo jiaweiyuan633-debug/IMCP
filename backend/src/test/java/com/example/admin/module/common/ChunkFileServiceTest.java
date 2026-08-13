@@ -23,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
@@ -30,6 +31,7 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -212,6 +214,90 @@ class ChunkFileServiceTest {
         // 拒绝发生在合并与入库之前，不触碰存储层
         verify(fileStorageManager, never())
                 .storeBytes(any(byte[].class), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void uploadChunkRefreshesTaskTtlOnProgress() throws Exception {
+        stubTask(task(2, 5, 10));
+        when(setOps.isMember(anyString(), anyString())).thenReturn(false);
+
+        service.uploadChunk(UPLOAD_ID, 0, new MockMultipartFile("c", new byte[5]));
+
+        // R4-1.16：写入新分片后顺延任务与已收分片集合的 TTL，慢速上传不被 init 起算的 2h 过期中断
+        verify(redisTemplate).expire("file:chunk:" + UPLOAD_ID, Duration.ofHours(2));
+        verify(redisTemplate).expire("file:chunk:" + UPLOAD_ID + ":parts", Duration.ofHours(2));
+    }
+
+    @Test
+    void completeCleansUpOnShaMismatch() throws Exception {
+        // sha256 与合并内容不符 -> 任务已确定失败，临时分片目录被清理，不留孤儿目录
+        ChunkFileService.ChunkTask badTask = new ChunkFileService.ChunkTask(UPLOAD_ID, 1L, "a.txt",
+                "text/plain", "doc", 2, 5, 10, DigestUtil.sha256Hex("something-else"), "txt");
+        stubTask(badTask);
+        when(setOps.size("file:chunk:" + UPLOAD_ID + ":parts")).thenReturn(2L);
+        Path chunkDir = tempDir.resolve(UPLOAD_ID);
+        Files.createDirectories(chunkDir);
+        Files.write(chunkDir.resolve("0"), "hello".getBytes(StandardCharsets.UTF_8));
+        Files.write(chunkDir.resolve("1"), "world".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> service.complete(UPLOAD_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("文件内容校验失败");
+
+        verify(redisTemplate).delete(List.of("file:chunk:" + UPLOAD_ID, "file:chunk:" + UPLOAD_ID + ":parts"));
+        assertThat(Files.exists(chunkDir)).isFalse();
+        verify(fileStorageManager, never())
+                .storeBytes(any(byte[].class), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void completeCleansUpOnStoreRejection() throws Exception {
+        stubTask(task(2, 5, 10));
+        when(setOps.size("file:chunk:" + UPLOAD_ID + ":parts")).thenReturn(2L);
+        Path chunkDir = tempDir.resolve(UPLOAD_ID);
+        Files.createDirectories(chunkDir);
+        Files.write(chunkDir.resolve("0"), "hello".getBytes(StandardCharsets.UTF_8));
+        Files.write(chunkDir.resolve("1"), "world".getBytes(StandardCharsets.UTF_8));
+        when(fileStorageManager.storeBytes(any(byte[].class), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new BusinessException(1026, "Eicar FOUND"));
+
+        assertThatThrownBy(() -> service.complete(UPLOAD_ID))
+                .isInstanceOf(BusinessException.class);
+
+        // 业务拒绝（如扫描拦截）后任务确定失败：临时分片与任务元数据一并清理
+        verify(redisTemplate).delete(List.of("file:chunk:" + UPLOAD_ID, "file:chunk:" + UPLOAD_ID + ":parts"));
+        assertThat(Files.exists(chunkDir)).isFalse();
+    }
+
+    @Test
+    void completeDoesNotCleanupWhenPartsIncomplete() throws Exception {
+        stubTask(task(2, 5, 10));
+        when(setOps.size("file:chunk:" + UPLOAD_ID + ":parts")).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.complete(UPLOAD_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("分片未上传完整");
+
+        // 可续传场景：不清任务、不删分片，用户可继续上传剩余分片
+        verify(redisTemplate, never()).delete(anyList());
+    }
+
+    @Test
+    void sweepExpiredDirsRemovesOnlyOldOrphans() throws Exception {
+        Path fresh = tempDir.resolve("fresh-upload");
+        Path stale = tempDir.resolve("stale-upload");
+        Files.createDirectories(fresh);
+        Files.createDirectories(stale);
+        Files.write(stale.resolve("0"), "hello".getBytes(StandardCharsets.UTF_8));
+        // 旧目录 mtime 拨回 3 小时前（孤儿阈值 2h30m），模拟放弃的上传
+        Files.setLastModifiedTime(stale,
+                FileTime.fromMillis(System.currentTimeMillis() - 3 * 60 * 60 * 1000L));
+
+        int removed = service.sweepExpiredDirs();
+
+        assertThat(removed).isEqualTo(1);
+        assertThat(Files.exists(stale)).isFalse();
+        assertThat(Files.exists(fresh)).isTrue();
     }
 
     private String startsWith(String prefix) {

@@ -46,6 +46,11 @@ public class ChunkFileService {
 
     private static final String REDIS_KEY_PREFIX = "file:chunk:";
     private static final Duration TASK_TTL = Duration.ofHours(2);
+    /**
+     * 孤儿分片目录判定阈值（R4-1.16）：距最后一次分片写入超过该时长即视为任务已放弃。
+     * 与 Redis 任务 TTL 对齐并留 30 分钟宽限，覆盖文件系统 mtime 精度与时钟偏差。
+     */
+    private static final Duration ORPHAN_DIR_MAX_AGE = TASK_TTL.plusMinutes(30);
 
     private final SysFileMapper fileMapper;
     private final StringRedisTemplate redisTemplate;
@@ -123,6 +128,9 @@ public class ChunkFileService {
         }
         redisTemplate.opsForSet().add(partsKey(uploadId), String.valueOf(index));
         redisTemplate.expire(partsKey(uploadId), TASK_TTL);
+        // R4-1.16：上传活动顺延任务有效期——慢速上传不会被 init 起算的固定 2h 过期中断；
+        // 也保证「最近一次分片写入」成为活动上传的可靠信号，供孤儿目录清扫安全判龄。
+        redisTemplate.expire(key(uploadId), TASK_TTL);
     }
 
     public UploadResponse complete(String uploadId) {
@@ -141,16 +149,28 @@ public class ChunkFileService {
         }
         byte[] content = mergeChunks(task, uploadId);
         if (content.length != task.totalSize()) {
+            // R4-1.16：合并结果与声明不一致，任务已确定失败——清理临时分片，避免失败上传滞留磁盘
+            cleanup(uploadId);
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "合并文件大小与声明不一致");
         }
         if (StringUtils.hasText(task.sha256())
                 && !DigestUtil.sha256Hex(content).equalsIgnoreCase(task.sha256())) {
+            // R4-1.16：内容校验失败，任务已确定失败——清理临时分片
+            cleanup(uploadId);
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容校验失败");
         }
-        UploadResponse response = fileStorageManager.storeBytes(
-                content, task.fileName(), task.contentType(), task.category(), task.extension());
-        cleanup(uploadId);
-        return response;
+        try {
+            UploadResponse response = fileStorageManager.storeBytes(
+                    content, task.fileName(), task.contentType(), task.category(), task.extension());
+            cleanup(uploadId);
+            return response;
+        } catch (RuntimeException exception) {
+            // R4-1.16：业务拒绝（类型/扫描/配额/入库失败）后任务已确定失败——清理临时分片，
+            // 避免失败上传的分片在磁盘上滞留成孤儿目录；「分片未上传完整/分片缺失」属可续传
+            // 场景，在合并与入库之前抛出，不会走到这里，保留分片供用户续传。
+            cleanup(uploadId);
+            throw exception;
+        }
     }
 
     private byte[] mergeChunks(ChunkTask task, String uploadId) {
@@ -202,6 +222,36 @@ public class ChunkFileService {
     private void cleanup(String uploadId) {
         FileUtil.del(chunkDir(uploadId));
         redisTemplate.delete(List.of(key(uploadId), partsKey(uploadId)));
+    }
+
+    /**
+     * 清理超龄孤儿分片目录（R4-1.16）：临时分片只在 complete 成功或确定失败时清理，中断/放弃
+     * 的任务会留下孤儿目录（Redis 任务 TTL 只管元数据、不管磁盘），认证用户反复 init 后放弃
+     * 即可逐步填满磁盘。本方法删除最后一次写入距今超过 {@link #ORPHAN_DIR_MAX_AGE} 的目录；
+     * 活动上传会随新分片落盘刷新目录 mtime（且顺延 Redis 任务 TTL），不会被误清。
+     * 由 {@link ChunkDirSweeper} 周期调用（多副本经锁互斥）。
+     *
+     * @return 删除的孤儿目录数
+     */
+    public int sweepExpiredDirs() {
+        File base = baseChunkDir();
+        if (!base.isDirectory()) {
+            return 0;
+        }
+        File[] dirs = base.listFiles(dir -> dir.isDirectory());
+        if (dirs == null) {
+            return 0;
+        }
+        long cutoff = System.currentTimeMillis() - ORPHAN_DIR_MAX_AGE.toMillis();
+        int removed = 0;
+        for (File dir : dirs) {
+            if (dir.lastModified() < cutoff) {
+                FileUtil.del(dir);
+                removed++;
+                log.info("清理超龄孤儿分片目录, uploadId={}", dir.getName());
+            }
+        }
+        return removed;
     }
 
     private String key(String uploadId) {

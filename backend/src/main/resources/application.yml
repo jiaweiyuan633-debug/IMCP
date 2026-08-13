@@ -153,6 +153,9 @@ app:
   upload:
     max-size-mb: ${UPLOAD_MAX_SIZE_MB:20}
     allowed-extensions: ${UPLOAD_ALLOWED_EXTENSIONS:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}
+  chunk-dir-sweep:
+    # 分片临时目录清理间隔：中断/放弃上传遗留的孤儿分片目录按此周期回收（多副本经锁互斥）
+    interval-ms: ${CHUNK_DIR_SWEEP_INTERVAL_MS:1800000}
   report:
     # 报表执行单次查询行数硬上限：执行引擎追加/收紧 LIMIT，防止拉爆结果集
     max-rows: ${REPORT_MAX_ROWS:5000}
