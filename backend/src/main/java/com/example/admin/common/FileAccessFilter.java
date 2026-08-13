@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -34,6 +35,11 @@ public class FileAccessFilter extends OncePerRequestFilter {
         String token = request.getParameter("token");
         // 已登录请求强制校验令牌绑定用户（防跨用户复用）；匿名预览请求凭签名与有效期访问
         if (fileAccessService.verify(uri, token, SecurityUtils.tryGetUserId())) {
+            // R3-1.2：静态资源路径（/uploads/**）不带缓存头，前端列表/预览重复全量下载。
+            // 文件内容不可变（UUID 对象键），浏览器缓存 max-age 与令牌有效期对齐，
+            // 缓存命中时令牌必然仍有效；/files/{id} 由 FileContentController 设置同值 private 头覆盖。
+            response.setHeader(HttpHeaders.CACHE_CONTROL,
+                    "private, max-age=" + fileAccessService.getTokenTtlSeconds());
             filterChain.doFilter(request, response);
             return;
         }

@@ -1,5 +1,6 @@
 package com.example.admin.module.common;
 
+import com.example.admin.common.FileAccessService;
 import com.example.admin.module.system.entity.SysFileDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
@@ -27,6 +28,7 @@ import java.util.Optional;
 public class FileContentController {
 
     private final FileStorageManager fileStorageManager;
+    private final FileAccessService fileAccessService;
 
     @GetMapping("/files/{id}")
     public ResponseEntity<InputStreamResource> content(@PathVariable Long id,
@@ -82,7 +84,7 @@ public class FileContentController {
                 .header(HttpHeaders.CONTENT_RANGE, "bytes " + range.start() + "-" + range.end() + "/" + total)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .contentLength(range.length())
-                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
+                .cacheControl(privateCacheControl())
                 .body(new InputStreamResource(new LimitedInputStream(inputStream, range.length())));
     }
 
@@ -100,11 +102,21 @@ public class FileContentController {
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic());
+                .cacheControl(privateCacheControl());
         if (file.getSha256() != null && !file.getSha256().isBlank()) {
             builder.eTag("\"" + file.getSha256() + "\"");
         }
         return builder.body(new InputStreamResource(inputStream));
+    }
+
+    /**
+     * R3-1.2：文件受访问令牌保护（URL 携带绑定用户的 token），是私有资源，
+     * 只允许浏览器（含缓存复用）缓存，禁止共享代理/CDN 缓存——public 会让
+     * 公共缓存保留含 token 的 URL，扩大令牌泄露面。max-age 与令牌有效期对齐，
+     * 缓存命中时令牌必然仍有效。
+     */
+    private CacheControl privateCacheControl() {
+        return CacheControl.maxAge(Duration.ofSeconds(fileAccessService.getTokenTtlSeconds())).cachePrivate();
     }
 
     private MediaType resolveMediaType(SysFileDO file) {

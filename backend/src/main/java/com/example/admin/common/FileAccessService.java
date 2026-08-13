@@ -26,6 +26,14 @@ public class FileAccessService {
 
     private final String secret;
 
+    /**
+     * 令牌有效期（秒）：文件响应缓存 max-age 与其对齐，保证浏览器缓存命中时令牌必然仍有效，
+     * 不会出现「已缓存过期令牌导致 403」。
+     */
+    public long getTokenTtlSeconds() {
+        return TOKEN_TTL_SECONDS;
+    }
+
     public FileAccessService(@Value("${jwt.secret:}") String secret) {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("文件访问签名密钥未配置（读取 jwt.secret），请检查 JWT_SECRET 配置");
