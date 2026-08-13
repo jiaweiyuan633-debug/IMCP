@@ -20,6 +20,12 @@
         <template v-if="column.key === 'status'">
           <StatusTag :value="record.status" />
         </template>
+        <template v-else-if="column.key === 'errorType'">
+          <a-tag v-if="record.errorType" :color="errorTypeColor[record.errorType] || 'default'">
+            {{ errorTypeLabel(record.errorType) }}
+          </a-tag>
+          <span v-else>-</span>
+        </template>
         <template v-else-if="column.key === 'retryCount'">
           {{ record.retryCount }} / {{ record.maxRetry }}
         </template>
@@ -56,6 +62,10 @@
           <StatusTag v-if="detail" :value="detail.status" />
         </a-descriptions-item>
         <a-descriptions-item :label="t('page.aiRetry')">{{ detail ? `${detail.retryCount} / ${detail.maxRetry}` : '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.aiErrorType')">
+          <a-tag v-if="detail?.errorType" :color="errorTypeColor[detail.errorType] || 'default'">{{ errorTypeLabel(detail.errorType) }}</a-tag>
+          <span v-else>-</span>
+        </a-descriptions-item>
         <a-descriptions-item :label="t('page.aiCreatedAt')">{{ detail?.createdAt }}</a-descriptions-item>
         <a-descriptions-item :label="t('page.aiError')" :span="2">{{ detail?.errorMsg || '-' }}</a-descriptions-item>
       </a-descriptions>
@@ -96,9 +106,32 @@ const bizTypeOptions = [
   { label: 'Keyword Extract', value: 'keyword_extract' },
 ]
 
+// R4-1.23：失败分类（R4-1.20 回调落库 error_type）——瞬时超时值得重试，确定性错误重试无意义
+const errorTypeOptions = [
+  { label: t('page.aiErrorTypeTimeout'), value: 'timeout' },
+  { label: t('page.aiErrorTypeNonRetryable'), value: 'non_retryable' },
+  { label: t('page.aiErrorTypeRetriesExhausted'), value: 'retries_exhausted' },
+]
+
+const errorTypeColor: Record<string, string> = {
+  timeout: 'orange',
+  non_retryable: 'red',
+  retries_exhausted: 'purple',
+}
+
+function errorTypeLabel(value: string): string {
+  const map: Record<string, string> = {
+    timeout: t('page.aiErrorTypeTimeout'),
+    non_retryable: t('page.aiErrorTypeNonRetryable'),
+    retries_exhausted: t('page.aiErrorTypeRetriesExhausted'),
+  }
+  return map[value] || value
+}
+
 const searchFields: SearchField[] = [
   { label: t('page.aiBizType'), prop: 'bizType', type: 'select', options: bizTypeOptions },
   { label: t('page.aiStatus'), prop: 'status', type: 'select', options: statusOptions },
+  { label: t('page.aiErrorType'), prop: 'errorType', type: 'select', options: errorTypeOptions },
 ]
 
 const columns = [
@@ -106,6 +139,7 @@ const columns = [
   { title: t('page.aiTaskNo'), dataIndex: 'taskNo', key: 'taskNo' },
   { title: t('page.aiBizType'), dataIndex: 'bizType', key: 'bizType' },
   { title: t('page.aiStatus'), key: 'status', width: 100 },
+  { title: t('page.aiErrorType'), key: 'errorType', width: 120 },
   { title: t('page.aiRetry'), key: 'retryCount', width: 90 },
   { title: t('page.aiCreatedAt'), dataIndex: 'createdAt', key: 'createdAt' },
   { title: t('page.aiUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt' },
@@ -121,6 +155,7 @@ const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, o
     buildParams: (query) => ({
       status: (query.status as string) || undefined,
       bizType: (query.bizType as string) || undefined,
+      errorType: (query.errorType as string) || undefined,
     }),
   })
 const createForm = reactive({

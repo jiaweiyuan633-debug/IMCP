@@ -3,10 +3,14 @@ package com.example.admin.module.ai;
 import cn.hutool.core.util.HexUtil;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
+import com.example.admin.module.ai.dto.AiTaskQuery;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import com.example.admin.module.ai.entity.AiTaskDO;
 import com.example.admin.module.ai.entity.AiTaskResultDO;
@@ -219,6 +223,45 @@ class AiTaskServiceTest {
         Map<String, Object> params = wrapperCaptor.getValue().getParamNameValuePairs();
         assertTrue(params.containsValue(AiTaskStatus.FAILED.name()), "params=" + params);
         assertTrue(params.containsValue("timeout"), "error_type 未随条件 UPDATE 落库, params=" + params);
+    }
+
+    // ---------- R4-1.23：列表按失败分类（error_type）过滤 ----------
+
+    /**
+     * R4-1.20 落库的 error_type 分类需在任务列表可查，否则前端只能看到 status=FAILED
+     * 而无法区分瞬时超时（值得重试）与确定性错误（重试无意义）。断言过滤条件注入 wrapper。
+     */
+    @Test
+    void pageFiltersByErrorType() {
+        when(taskMapper.selectPage(any(), any())).thenReturn(new Page<AiTaskDO>(1, 10));
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+
+        AiTaskQuery query = new AiTaskQuery();
+        query.setErrorType("timeout");
+        aiTaskService.page(query);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<AiTaskDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(taskMapper).selectPage(any(), captor.capture());
+        LambdaQueryWrapper<AiTaskDO> wrapper = (LambdaQueryWrapper<AiTaskDO>) captor.getValue();
+        // getSqlSegment() 触发 SQL 段构建后参数表才物化；断言 error_type 条件与绑定值。
+        assertThat(wrapper.getSqlSegment()).contains("error_type");
+        assertThat(wrapper.getParamNameValuePairs()).containsValue("timeout");
+    }
+
+    @Test
+    void pageWithoutErrorTypeSkipsFilter() {
+        when(taskMapper.selectPage(any(), any())).thenReturn(new Page<AiTaskDO>(1, 10));
+        when(taskMapper.selectCount(any())).thenReturn(0L);
+
+        aiTaskService.page(new AiTaskQuery());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<AiTaskDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(taskMapper).selectPage(any(), captor.capture());
+        LambdaQueryWrapper<AiTaskDO> wrapper = (LambdaQueryWrapper<AiTaskDO>) captor.getValue();
+        // 未选择分类时不追加条件，避免 eq(hasText=false) 生成无意义参数
+        assertThat(wrapper.getSqlSegment()).doesNotContain("error_type");
     }
 
     // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------

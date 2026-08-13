@@ -155,6 +155,7 @@ public class AiTaskService {
         LambdaQueryWrapper<AiTaskDO> wrapper = new LambdaQueryWrapper<AiTaskDO>()
                 .eq(StringUtils.hasText(query.getStatus()), AiTaskDO::getStatus, query.getStatus())
                 .eq(StringUtils.hasText(query.getBizType()), AiTaskDO::getBizType, query.getBizType())
+                .eq(StringUtils.hasText(query.getErrorType()), AiTaskDO::getErrorType, query.getErrorType())
                 .orderByDesc(AiTaskDO::getId);
         IPage<AiTaskDO> result = taskMapper.selectPage(page, wrapper);
         page.setTotal(taskMapper.selectCount(wrapper));
