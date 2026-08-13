@@ -55,7 +55,9 @@ public class AiController {
         if (userId == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
-        return taskStreamService.stream(id);
+        // R4-1.9：票据即身份，透传 userId —— 连接时在请求线程完成访问校验与租户捕获
+        // （AiTaskStreamService.stream → AiTaskService.openStream），轮询线程据此恢复上下文。
+        return taskStreamService.stream(id, userId);
     }
 
     @GetMapping("/config")

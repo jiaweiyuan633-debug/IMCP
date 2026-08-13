@@ -24,6 +24,9 @@ import com.example.admin.module.ai.vo.AiTaskResultVo;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.module.system.SystemMessageService;
+import com.example.admin.module.system.entity.SysUserDO;
+import com.example.admin.module.system.mapper.SysRoleMapper;
+import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.DataScope;
 import com.example.admin.security.SecurityUtils;
@@ -76,6 +79,8 @@ public class AiTaskService {
     private final DataScopeHelper dataScopeHelper;
     private final StringRedisTemplate redisTemplate;
     private final SystemMessageService messageService;
+    private final SysUserMapper userMapper;
+    private final SysRoleMapper roleMapper;
 
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
@@ -163,15 +168,66 @@ public class AiTaskService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         checkDataScope(task);
+        return toVoWithResult(task);
+    }
+
+    /**
+     * R4-1.9：SSE 轮询专用读取（跳过 SecurityContext 数据范围校验）。
+     * 连接建立时已在请求线程经 {@link #openStream} 完成访问校验并捕获租户；
+     * 轮询线程无 SecurityContext/TenantContext，若复用 detail() 的 SecurityUtils 校验
+     * 必然抛 UNAUTHORIZED 使流立即失败。调用方（AiTaskStreamService）须先就位
+     * TenantContext（emit 内 setTenantId）再调用，否则 selectById 会被租户拦截器挡回。
+     */
+    public AiTaskVo detailForStream(Long taskId) {
+        AiTaskDO task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return toVoWithResult(task);
+    }
+
+    private AiTaskVo toVoWithResult(AiTaskDO task) {
         AiTaskVo vo = toVo(task);
         AiTaskResultDO aiTaskResult = resultMapper.selectOne(new LambdaQueryWrapper<AiTaskResultDO>()
-                .eq(AiTaskResultDO::getTaskId, id)
+                .eq(AiTaskResultDO::getTaskId, task.getId())
                 .orderByDesc(AiTaskResultDO::getId)
                 .last("LIMIT 1"));
         if (aiTaskResult != null) {
             vo.setResult(toResultVo(aiTaskResult));
         }
         return vo;
+    }
+
+    /** AI 任务 SSE 流连接上下文：轮询线程据此恢复租户并读取任务。 */
+    public record TaskStreamContext(Long taskId, Long tenantId) {
+    }
+
+    /**
+     * R4-1.9：SSE 流连接前的访问校验（请求线程执行）。
+     * <p>流端点为 permitAll + 一次性票据鉴权，EventSource 无法携带 Authorization 头，
+     * 请求线程既无 SecurityContext 也无租户头（TenantFilter 不再信任请求头，默认租户 1）。
+     * 故先按票据 userId 跨租户定位用户（以库表租户为权威来源，与 JwtAuthenticationFilter
+     * 一致），再按其租户上下文查任务并做归属校验：管理员可看全部，非管理员仅可看自己
+     * 创建的任务（createdBy 匹配）。校验通过后返回带租户的上下文，供轮询线程恢复上下文。
+     *
+     * @throws BusinessException 用户不存在/停用（UNAUTHORIZED）、任务不存在（DATA_NOT_FOUND）、
+     *                          无访问权（FORBIDDEN）
+     */
+    public TaskStreamContext openStream(Long taskId, Long userId) {
+        SysUserDO user = userMapper.selectByIdIgnoreTenant(userId);
+        if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        TenantContext.setTenantId(user.getTenantId());
+        AiTaskDO task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        boolean admin = roleMapper.selectRoleCodesByUserId(userId).contains("admin");
+        if (!admin && (task.getCreatedBy() == null || !task.getCreatedBy().equals(userId))) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        return new TaskStreamContext(taskId, task.getTenantId());
     }
 
     public void cancel(Long id) {

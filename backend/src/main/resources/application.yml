@@ -186,6 +186,9 @@ app:
   notice-sse-heartbeat-ms: ${NOTICE_SSE_HEARTBEAT_MS:30000}
   # 公告 SSE 每用户并发连接上限：超限回收最旧连接（防单账号脚本无限开流耗尽异步线程/内存）
   notice-sse-max-connections-per-user: ${NOTICE_SSE_MAX_CONNECTIONS_PER_USER:5}
+  # AI 任务 SSE 每用户并发连接上限：超限回收最旧连接（R4-1.9，同公告 SSE 防护模式——
+  # 每条连接除异步 Servlet 请求外还占用共享调度池上一个 2s 轮询任务，资源放大更甚）
+  ai-task-sse-max-connections-per-user: ${AI_TASK_SSE_MAX_CONNECTIONS_PER_USER:5}
   screen:
     # 数据大屏 SSE 实时推送间隔（毫秒）：连接保持期间按此节奏广播聚合快照
     push-interval-ms: ${SCREEN_PUSH_INTERVAL_MS:30000}

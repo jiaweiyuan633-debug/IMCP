@@ -32,5 +32,15 @@ public interface SysUserMapper extends BaseMapper<SysUserDO> {
     @Select("SELECT * FROM sys_user WHERE username = #{username} AND deleted = 0 "
             + "AND (#{tenantId} IS NULL OR tenant_id = #{tenantId}) ORDER BY id")
     List<SysUserDO> selectByUsername(@Param("username") String username, @Param("tenantId") Long tenantId);
+
+    /**
+     * 按主键跨租户查询用户（R4-1.9 AI 任务 SSE 票据流程）：绕过 TenantLine 拦截器。
+     * <p>SSE 流端点为 permitAll + 一次性票据鉴权，请求线程租户恒为 1（TenantFilter 不再信任
+     * 请求头）；票据仅绑定 userId，须以用户库表租户为权威来源先定位用户（与
+     * JwtAuthenticationFilter 认证后覆盖租户的逻辑一致），再按其租户上下文查询任务。
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM sys_user WHERE id = #{userId} AND deleted = 0")
+    SysUserDO selectByIdIgnoreTenant(@Param("userId") Long userId);
 }
 

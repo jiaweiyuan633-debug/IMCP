@@ -14,7 +14,12 @@ import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
 import com.example.admin.module.ai.manager.AiTaskManager;
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.DataScopeHelper;
+import com.example.admin.module.system.entity.SysUserDO;
+import com.example.admin.module.system.mapper.SysRoleMapper;
+import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.security.SecurityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -31,10 +36,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,6 +75,12 @@ class AiTaskServiceTest {
 
     @Mock
     private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private SysUserMapper userMapper;
+
+    @Mock
+    private SysRoleMapper roleMapper;
 
     @InjectMocks
     private AiTaskService aiTaskService;
@@ -161,6 +175,93 @@ class AiTaskServiceTest {
         verify(resultMapper).insert(resultCaptor.capture());
         assertEquals(2L, resultCaptor.getValue().getTaskId());
         assertEquals(3L, resultCaptor.getValue().getTenantId());
+    }
+
+    // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------
+
+    private static SysUserDO activeUser(Long id, Long tenantId) {
+        SysUserDO user = new SysUserDO();
+        user.setId(id);
+        user.setTenantId(tenantId);
+        user.setStatus(1);
+        return user;
+    }
+
+    private static AiTaskDO taskOf(Long id, Long tenantId, Long createdBy) {
+        AiTaskDO task = new AiTaskDO();
+        task.setId(id);
+        task.setTenantId(tenantId);
+        task.setCreatedBy(createdBy);
+        return task;
+    }
+
+    @Test
+    void openStreamAllowsOwnerOfTaskAndResolvesUserTenant() {
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(activeUser(2L, 8L));
+        when(taskMapper.selectById(10L)).thenReturn(taskOf(10L, 8L, 2L));
+        when(roleMapper.selectRoleCodesByUserId(2L)).thenReturn(List.of("user"));
+
+        AiTaskService.TaskStreamContext context = aiTaskService.openStream(10L, 2L);
+
+        assertThat(context.taskId()).isEqualTo(10L);
+        assertThat(context.tenantId()).isEqualTo(8L);
+    }
+
+    @Test
+    void openStreamAllowsAdminToViewOthersTask() {
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(activeUser(2L, 8L));
+        when(taskMapper.selectById(10L)).thenReturn(taskOf(10L, 8L, 99L));
+        when(roleMapper.selectRoleCodesByUserId(2L)).thenReturn(List.of("admin"));
+
+        AiTaskService.TaskStreamContext context = aiTaskService.openStream(10L, 2L);
+
+        assertThat(context.tenantId()).isEqualTo(8L);
+    }
+
+    @Test
+    void openStreamRejectsNonOwnerNonAdmin() {
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(activeUser(2L, 8L));
+        when(taskMapper.selectById(10L)).thenReturn(taskOf(10L, 8L, 99L));
+        when(roleMapper.selectRoleCodesByUserId(2L)).thenReturn(List.of("user"));
+
+        assertThatThrownBy(() -> aiTaskService.openStream(10L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(ResultCode.FORBIDDEN.getCode());
+    }
+
+    @Test
+    void openStreamRejectsInactiveUser() {
+        SysUserDO user = activeUser(2L, 8L);
+        user.setStatus(0);
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(user);
+
+        assertThatThrownBy(() -> aiTaskService.openStream(10L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(ResultCode.UNAUTHORIZED.getCode());
+    }
+
+    @Test
+    void openStreamRejectsMissingUser() {
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(null);
+
+        assertThatThrownBy(() -> aiTaskService.openStream(10L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(ResultCode.UNAUTHORIZED.getCode());
+    }
+
+    @Test
+    void openStreamNotFoundWhenTaskOutsideUsersTenant() {
+        when(userMapper.selectByIdIgnoreTenant(2L)).thenReturn(activeUser(2L, 8L));
+        // 用户租户 8，但任务属于租户 9 → 租户拦截器过滤后 selectById 返回 null
+        when(taskMapper.selectById(10L)).thenReturn(null);
+
+        assertThatThrownBy(() -> aiTaskService.openStream(10L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(ResultCode.DATA_NOT_FOUND.getCode());
     }
 
     private AiServiceConfigDO enabledConfig() {
