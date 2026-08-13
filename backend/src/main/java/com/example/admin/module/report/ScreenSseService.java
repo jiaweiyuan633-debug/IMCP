@@ -3,6 +3,7 @@ package com.example.admin.module.report;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.report.vo.ReportScreenVo;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,14 +25,28 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class ScreenSseService {
 
     private static final long NO_TIMEOUT = 0L;
+    private static final int DEFAULT_CONNECTION_LIMIT = 5;
 
     private final ReportService reportService;
     private final JdbcTemplate jdbcTemplate;
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+    private int connectionLimit = DEFAULT_CONNECTION_LIMIT;
 
     public ScreenSseService(ReportService reportService, JdbcTemplate jdbcTemplate) {
         this.reportService = reportService;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /**
+     * R4-1.3：每租户并发连接上限，超限回收最旧连接。默认 5，可用
+     * app.screen.max-connections-per-tenant 覆盖；配置 {@code <=0} 表示不限制。
+     * 连接为 NO_TIMEOUT 长连接且回收仅依赖 30s 定时广播的发送失败，单账号可循环
+     * 取票开流无限堆积（每连接占用一个异步 Servlet 请求 + SseEmitter，且放大每轮
+     * 大屏快照聚合与推送开销），构成资源耗尽面。
+     */
+    @Value("${app.screen.max-connections-per-tenant:5}")
+    public void setConnectionLimit(int connectionLimit) {
+        this.connectionLimit = connectionLimit;
     }
 
     /** 票据已校验：按用户归属租户挂接连接（stream 请求无 JWT，租户需按 userId 解析）。 */
@@ -42,7 +57,31 @@ public class ScreenSseService {
         emitter.onCompletion(() -> remove(tenantId, emitter));
         emitter.onTimeout(() -> remove(tenantId, emitter));
         emitter.onError(error -> remove(tenantId, emitter));
+        enforceConnectionLimit(tenantId);
         return emitter;
+    }
+
+    /** 回收该租户最旧连接直至不超过上限；被回收连接 complete() 释放容器异步线程。 */
+    private void enforceConnectionLimit(Long tenantId) {
+        if (connectionLimit <= 0) {
+            return;
+        }
+        List<SseEmitter> list = emitters.get(tenantId);
+        while (list != null && list.size() > connectionLimit) {
+            SseEmitter oldest = list.get(0);
+            remove(tenantId, oldest);
+            try {
+                oldest.complete();
+            } catch (IllegalStateException ignored) {
+                // 连接已被并发关闭；移除逻辑幂等，无需处理
+            }
+        }
+    }
+
+    /** 测试接缝：该租户当前在线连接数（只读观测，不泄漏连接引用）。包内可见。 */
+    int connectionCount(Long tenantId) {
+        List<SseEmitter> list = emitters.get(tenantId);
+        return list == null ? 0 : list.size();
     }
 
     @Scheduled(fixedDelayString = "${app.screen.push-interval-ms:30000}")
