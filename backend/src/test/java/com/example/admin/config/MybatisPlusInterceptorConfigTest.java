@@ -141,6 +141,29 @@ class MybatisPlusInterceptorConfigTest {
     }
 
     @Test
+    void mcpServerSqlCarriesTenantCondition() throws Throwable {
+        // R4-1.17：sys_mcp_server 补进租户名单——他租户 MCP 服务（含 authToken）不能被
+        // 跨租户列出/加载/修改/删除，外部工具调用不得越权携带他租户连接凭据
+        TenantContext.setTenantId(5L);
+        BoundSql boundSql = new BoundSql(configuration,
+                "SELECT id, name, url, auth_token FROM sys_mcp_server WHERE enabled = ?",
+                List.of(new ParameterMapping.Builder(configuration, "enabled", Integer.class).build()),
+                new Object[]{1});
+
+        driveChain(boundSql);
+
+        assertThat(boundSql.getSql())
+                .contains("tenant_id = 5")
+                .doesNotContain("sys_user.id IN");
+    }
+
+    @Test
+    void tenantTablesIncludeSysMcpServer() {
+        // R4-1.17：白名单含 sys_mcp_server，防名单回退（漏加即回归跨租户越权）
+        assertThat(MybatisPlusConfig.TENANT_TABLES).contains("sys_mcp_server");
+    }
+
+    @Test
     void conditionInjectorsRunBeforePagination() {
         assertThat(interceptor.getInterceptors())
                 .extracting(i -> i.getClass().getSimpleName())

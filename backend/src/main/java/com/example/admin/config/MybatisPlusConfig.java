@@ -84,7 +84,10 @@ public class MybatisPlusConfig {
             "ai_knowledge_doc",
             "ai_prompt_template",
             "sys_message_template",
-            "sys_field_audit_log");
+            "sys_field_audit_log",
+            // R4-1.17：外部 MCP Server 配置（V41 新增表漏进租户名单——此前跨租户可列出/读写/删除
+            // 他租户服务并携带其 authToken 连接调用外部工具，create 还会落到默认租户 1 造成数据污染）
+            "sys_mcp_server");
 
     /** 租户列名：租户拦截器注入条件与字段审计直查过滤共用同源，避免硬编码两处分叉。 */
     public static final String TENANT_ID_COLUMN = "tenant_id";
