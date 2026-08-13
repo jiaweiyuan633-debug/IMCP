@@ -188,8 +188,11 @@ public class OauthLoginService {
         if (bindData == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "绑定凭证无效或已过期");
         }
-        SysUserDO user = userMapper.selectOne(new LambdaQueryWrapper<SysUserDO>()
-                .eq(SysUserDO::getUsername, request.getUsername()));
+        // R4-1.19：匿名绑定端点无租户上下文，selectOne 会被租户拦截器注入默认 tenant_id=1，
+        // 租户 2 的平台账号按用户名永远查不到、绑定必失败。改走 R1-1.7 的跨租户辅助方法，
+        // 并以绑定凭证携带的配置租户精确限定（与 findBinding/bindToUser 同一租户来源）。
+        List<SysUserDO> users = userMapper.selectByUsername(request.getUsername(), bindData.getTenantId());
+        SysUserDO user = users.isEmpty() ? null : users.get(0);
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(ResultCode.BAD_CREDENTIALS);
         }
