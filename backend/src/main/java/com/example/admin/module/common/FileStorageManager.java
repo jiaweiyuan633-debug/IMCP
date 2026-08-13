@@ -29,8 +29,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FileStorageManager {
 
-    private static final long BYTES_PER_MB = 1024L * 1024L;
-
     private final FileStorage fileStorage;
     private final SysFileMapper fileMapper;
     private final StorageQuotaService storageQuotaService;
@@ -70,7 +68,7 @@ public class FileStorageManager {
      * 扫描不通过时顺带删除违规对象，避免中毒文件滞留存储。
      */
     public UploadResponse registerObject(String objectKey, String originalName, String contentType, String category) {
-        byte[] content = readBackQuietly(objectKey);
+        byte[] content = readBackBounded(objectKey);
         String extension = extensionOf(originalName);
         String resolvedCategory = resolveCategory(category, extension, contentType);
         Validation validation = validate(content, originalName, extension);
@@ -113,7 +111,7 @@ public class FileStorageManager {
 
     /** 大小/扩展名/内容魔数/病毒校验，通过后返回摘要与扫描结果。 */
     private Validation validate(byte[] content, String originalName, String extension) {
-        long maxSize = uploadProperties.getMaxSizeMb() * BYTES_PER_MB;
+        long maxSize = uploadProperties.getMaxSizeBytes();
         if (content.length > maxSize) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
                     "文件大小不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
@@ -205,14 +203,26 @@ public class FileStorageManager {
         }
     }
 
-    /** 读回对象内容；读失败按业务异常抛出。 */
-    private byte[] readBackQuietly(String objectKey) {
+    /**
+     * 有界读回预签名直传对象：最多读入 maxSize+1 字节即截断，超限直接判为过大并清理对象。
+     * 整读（readAllBytes）会把绕过 multipart 20MB 上限、直传对象存储的超大文件一次性装入堆，
+     * 构成 OOM 面；有界读使内存占用恒不大于 maxSize+1，且超限对象不再滞留存储（R4-1.15）。
+     */
+    private byte[] readBackBounded(String objectKey) {
+        long maxSize = uploadProperties.getMaxSizeBytes();
+        byte[] content;
         try (InputStream inputStream = fileStorage.open(objectKey)) {
-            return inputStream.readAllBytes();
+            content = inputStream.readNBytes((int) (maxSize + 1));
         } catch (Exception exception) {
             log.error("读取预签名直传对象失败, objectKey={}", objectKey, exception);
             throw new BusinessException(ResultCode.INTERNAL_ERROR.getCode(), "直传对象读取失败");
         }
+        if (content.length > maxSize) {
+            deleteQuietly(objectKey);
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "文件大小不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
+        }
+        return content;
     }
 
     private void deleteQuietly(String objectKey) {

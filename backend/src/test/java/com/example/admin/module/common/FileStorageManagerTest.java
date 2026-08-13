@@ -156,6 +156,22 @@ class FileStorageManagerTest {
     }
 
     @Test
+    void registerObjectRejectsOversizeObjectWithBoundedRead() throws Exception {
+        // 收紧上限到 1MB，超限内容仅 1MB+1 字节，测试内存开销可控
+        properties.setMaxSizeMb(1);
+        byte[] oversize = new byte[1024 * 1024 + 1];
+        when(storage.open("1/x.png")).thenReturn(new ByteArrayInputStream(oversize));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> manager.registerObject("1/x.png", "x.png", "image/png", "image"));
+
+        assertEquals(1001, exception.getCode());
+        // 超限对象不滞留存储；不得落入入库/扫描管线
+        verify(storage).delete("1/x.png");
+        verify(fileMapper, never()).insert(any(SysFileDO.class));
+    }
+
+    @Test
     void registerObjectDeletesInfectedObject() throws Exception {
         when(storage.open("1/x.png")).thenReturn(new ByteArrayInputStream(PNG_CONTENT));
         when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.blocked("Eicar FOUND"));

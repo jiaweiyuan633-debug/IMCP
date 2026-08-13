@@ -11,4 +11,9 @@ public class FileUploadProperties {
 
     private long maxSizeMb = 20;
     private String allowedExtensions = "jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip";
+
+    /** 换算后的字节上限：普通/分片/预签名各上传管线统一以此为准做大小校验（R4-1.15）。 */
+    public long getMaxSizeBytes() {
+        return maxSizeMb * 1024L * 1024L;
+    }
 }

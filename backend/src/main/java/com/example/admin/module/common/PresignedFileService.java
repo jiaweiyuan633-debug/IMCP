@@ -40,16 +40,25 @@ public class PresignedFileService {
     private final FileStorageManager fileStorageManager;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final FileUploadProperties uploadProperties;
 
     public PresignedFileService(FileStorage fileStorage, FileStorageManager fileStorageManager,
-                                StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+                                StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
+                                FileUploadProperties uploadProperties) {
         this.fileStorage = fileStorage;
         this.fileStorageManager = fileStorageManager;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.uploadProperties = uploadProperties;
     }
 
     public PresignUploadResponse createUpload(PresignUploadRequest request) {
+        // R4-1.15：签发前按声明的 size 拒绝超限文件——超限即不发 URL，与 confirm 有界读回共同构成
+        // 纵深防御（PUT 预签名 URL 会绕过 multipart 20MB 上限直传对象存储，超大对象整读会 OOM）。
+        if (request.getSize() > uploadProperties.getMaxSizeBytes()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "文件大小不能超过 " + uploadProperties.getMaxSizeMb() + "MB");
+        }
         String extension = extensionOf(request.getFileName());
         String objectKey = objectKey(request.getFileName(), extension);
         String url;

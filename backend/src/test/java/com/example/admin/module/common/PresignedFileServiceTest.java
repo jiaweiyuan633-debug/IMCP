@@ -33,6 +33,7 @@ class PresignedFileServiceTest {
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
     private ObjectMapper objectMapper;
+    private FileUploadProperties properties;
     private PresignedFileService service;
 
     @BeforeEach
@@ -42,7 +43,8 @@ class PresignedFileServiceTest {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
         objectMapper = new ObjectMapper();
-        service = new PresignedFileService(storage, fileStorageManager, redisTemplate, objectMapper);
+        properties = new FileUploadProperties();
+        service = new PresignedFileService(storage, fileStorageManager, redisTemplate, objectMapper, properties);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         TenantContext.setTenantId(1L);
     }
@@ -84,6 +86,19 @@ class PresignedFileServiceTest {
         assertThat(response.getObjectKey()).startsWith("1/");
         verify(valueOps).set(org.mockito.ArgumentMatchers.startsWith("file:presign:"), anyString(),
                 eq(Duration.ofMinutes(30)));
+    }
+
+    @Test
+    void createUploadRejectsOversizeClaimWithoutIssuingUrl() throws Exception {
+        PresignUploadRequest request = uploadRequest();
+        // 超过默认 20MB 上限的声明必须在签发前被拒绝，连 URL 都不生成
+        request.setSize(20L * 1024 * 1024 + 1);
+
+        assertThatThrownBy(() -> service.createUpload(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("文件大小不能超过 20MB");
+        verify(storage, never()).presignedUpload(anyString(), any(), any(long.class));
+        verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
     }
 
     @Test
