@@ -88,6 +88,19 @@ export function cancelAiTask(id: number): Promise<void> {
   return request.delete(`/ai/tasks/${id}`)
 }
 
+export interface AiTaskRetryResult {
+  total: number
+  succeeded: number
+  skipped: number
+  failed: number
+  failedIds: number[]
+}
+
+/** R4-1.25：批量重试终态失败任务（后端单次上限 100），返回成功/跳过/失败分类计数。 */
+export function retryAiTasks(ids: number[]): Promise<AiTaskRetryResult> {
+  return request.post('/ai/tasks/retry', { ids })
+}
+
 export function getAiSseTicket(): Promise<string> {
   return request.get('/ai/ticket')
 }

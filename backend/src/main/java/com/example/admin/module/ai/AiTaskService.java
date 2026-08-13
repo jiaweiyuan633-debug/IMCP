@@ -21,6 +21,7 @@ import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
 import com.example.admin.module.ai.manager.AiTaskManager;
 import com.example.admin.module.ai.vo.AiTaskResultVo;
+import com.example.admin.module.ai.vo.AiTaskRetryResult;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.module.system.SystemMessageService;
@@ -47,6 +48,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -293,6 +295,67 @@ public class AiTaskService {
         task.setStatus(AiTaskStatus.CANCELLED.name());
         task.setUpdatedAt(LocalDateTime.now());
         taskMapper.updateById(task);
+    }
+
+    /**
+     * R4-1.25：批量重试终态失败任务（死信恢复入口）。
+     * <p>逐条处理：仅 FAILED 终态且服务仍可用（enabled=1）的任务会被重试——先调用 AI 侧
+     * retry 重新入队，再条件更新把本库状态从 FAILED 置回 QUEUED 并清空 error/errorType。
+     * 条件更新以 status=FAILED 为前置，避免与并发重试/已抢先到达的成功回调互踩：影响 0 行
+     * 说明任务已被并发处理，计为跳过。数据范围与 detail/cancel 一致（checkDataScope）。
+     * 单条 AI 调用失败（服务禁用/不可用/AI 侧任务已过期）仅影响该条，不中断整批。
+     *
+     * @return 批处理统计（成功/跳过/失败 + 失败 ID 列表）
+     */
+    public AiTaskRetryResult retry(List<Long> ids) {
+        int succeeded = 0;
+        int skipped = 0;
+        List<Long> failedIds = new ArrayList<>();
+        for (Long id : ids) {
+            AiTaskDO task = taskMapper.selectById(id);
+            if (task == null) {
+                skipped++;
+                continue;
+            }
+            checkDataScope(task);
+            if (!AiTaskStatus.FAILED.name().equals(task.getStatus())) {
+                skipped++;
+                continue;
+            }
+            AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
+                    .eq(AiServiceConfigDO::getCode, task.getServiceCode()));
+            if (config == null || config.getEnabled() == null || config.getEnabled() != 1) {
+                log.warn("AI task {} retry skipped: config unavailable", task.getTaskNo());
+                failedIds.add(id);
+                continue;
+            }
+            try {
+                aiTaskManager.retry(config, task.getTaskNo());
+            } catch (BusinessException exception) {
+                log.warn("AI task {} retry failed: {}", task.getTaskNo(), exception.getMessage());
+                failedIds.add(id);
+                continue;
+            }
+            int updated = taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                    .eq(AiTaskDO::getId, id)
+                    .eq(AiTaskDO::getStatus, AiTaskStatus.FAILED.name())
+                    .set(AiTaskDO::getStatus, AiTaskStatus.QUEUED.name())
+                    .set(AiTaskDO::getErrorMsg, null)
+                    .set(AiTaskDO::getErrorType, null)
+                    .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
+            if (updated == 1) {
+                succeeded++;
+            } else {
+                skipped++;
+            }
+        }
+        return AiTaskRetryResult.builder()
+                .total(ids.size())
+                .succeeded(succeeded)
+                .skipped(skipped)
+                .failed(failedIds.size())
+                .failedIds(failedIds)
+                .build();
     }
 
     @Transactional

@@ -11,7 +11,9 @@ import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiConfigSaveRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
 import com.example.admin.module.ai.dto.AiTaskQuery;
+import com.example.admin.module.ai.dto.AiTaskRetryRequest;
 import com.example.admin.module.ai.vo.AiConfigVo;
+import com.example.admin.module.ai.vo.AiTaskRetryResult;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -100,6 +102,13 @@ public class AiController {
     public Result<Void> cancelTask(@PathVariable Long id) {
         taskService.cancel(id);
         return Result.success();
+    }
+
+    @PostMapping("/tasks/retry")
+    @PreAuthorize("hasAuthority('ai:task:retry')")
+    @OperLog(module = "AI 管理", action = "重试 AI 任务")
+    public Result<AiTaskRetryResult> retryTasks(@Valid @RequestBody AiTaskRetryRequest request) {
+        return Result.success(taskService.retry(request.getIds()));
     }
 
     @PostMapping("/callback/task")

@@ -15,6 +15,7 @@ import com.example.admin.module.ai.dto.AiTaskQuery;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import com.example.admin.module.ai.entity.AiTaskDO;
 import com.example.admin.module.ai.entity.AiTaskResultDO;
+import com.example.admin.module.ai.vo.AiTaskRetryResult;
 import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
@@ -52,9 +53,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -326,6 +330,125 @@ class AiTaskServiceTest {
         AiTaskVo vo = result.getRecords().get(0);
         assertThat(vo.getServiceName()).isEqualTo("missing-code");
         assertThat(vo.getCreatedByName()).isNull();
+    }
+
+    // ---------- R4-1.25：死信任务批量重试（终态失败 → AI 重新入队） ----------
+
+    /**
+     * R4-1.25：FAILED 终态任务重试须调用 AI 侧 retry 重新入队，并把本库状态条件更新回
+     * QUEUED、清空 error/errorType。断言 aiTaskManager.retry 收到配置与任务号，
+     * 且条件更新（前置 status=FAILED）的 set 参数含 QUEUED，避免与并发回调互踩。
+     */
+    @Test
+    void retryResubmitsFailedTaskAndResetsStatus() {
+        AiTaskDO task = new AiTaskDO();
+        task.setId(1L);
+        task.setTaskNo("AI1");
+        task.setServiceCode("default");
+        task.setStatus(AiTaskStatus.FAILED.name());
+        task.setErrorMsg("boom");
+        task.setErrorType("timeout");
+        when(taskMapper.selectById(1L)).thenReturn(task);
+        // 重试属管理操作：显式模拟管理员数据范围上下文放行（mock 的 List 返回默认为空集合而非 null）
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(configMapper.selectOne(any())).thenReturn(enabledConfig());
+        when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(1);
+
+        AiTaskRetryResult result = aiTaskService.retry(List.of(1L));
+
+        assertThat(result.getTotal()).isEqualTo(1);
+        assertThat(result.getSucceeded()).isEqualTo(1);
+        assertThat(result.getFailed()).isZero();
+        verify(aiTaskManager).retry(any(), eq("AI1"));
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<AbstractWrapper> wrapperCaptor = ArgumentCaptor.forClass(AbstractWrapper.class);
+        verify(taskMapper).update(isNull(), wrapperCaptor.capture());
+        Map<String, Object> params = wrapperCaptor.getValue().getParamNameValuePairs();
+        assertThat(params).containsValue(AiTaskStatus.QUEUED.name());
+    }
+
+    /**
+     * R4-1.25：非 FAILED 终态（如 SUCCEEDED）与已不存在的任务不应触发重试——
+     * 重试语义仅针对死信失败，成功/取消/运行中任务重试无意义且会破坏状态机。
+     */
+    @Test
+    void retrySkipsNonFailedAndMissingTasks() {
+        AiTaskDO succeeded = new AiTaskDO();
+        succeeded.setId(2L);
+        succeeded.setTaskNo("AI2");
+        succeeded.setStatus(AiTaskStatus.SUCCEEDED.name());
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(taskMapper.selectById(2L)).thenReturn(succeeded);
+        when(taskMapper.selectById(3L)).thenReturn(null);
+
+        AiTaskRetryResult result = aiTaskService.retry(List.of(2L, 3L));
+
+        assertThat(result.getTotal()).isEqualTo(2);
+        assertThat(result.getSucceeded()).isZero();
+        assertThat(result.getSkipped()).isEqualTo(2);
+        assertThat(result.getFailed()).isZero();
+        verify(aiTaskManager, never()).retry(any(), any());
+    }
+
+    /**
+     * R4-1.25：服务禁用（enabled=0）或 AI 调用异常（服务不可用/AI 侧任务已过期）的任务
+     * 记为单条失败并收集失败 ID 供前端提示，不中断整批其余任务的重试。
+     */
+    @Test
+    void retryCountsFailedWhenConfigUnavailableOrAiCallThrows() {
+        AiTaskDO disabledTask = new AiTaskDO();
+        disabledTask.setId(4L);
+        disabledTask.setTaskNo("AI4");
+        disabledTask.setServiceCode("disabled-code");
+        disabledTask.setStatus(AiTaskStatus.FAILED.name());
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(taskMapper.selectById(4L)).thenReturn(disabledTask);
+
+        AiTaskDO throwTask = new AiTaskDO();
+        throwTask.setId(5L);
+        throwTask.setTaskNo("AI5");
+        throwTask.setServiceCode("default");
+        throwTask.setStatus(AiTaskStatus.FAILED.name());
+        when(taskMapper.selectById(5L)).thenReturn(throwTask);
+
+        AiServiceConfigDO disabled = new AiServiceConfigDO();
+        disabled.setCode("disabled-code");
+        disabled.setEnabled(0);
+        when(configMapper.selectOne(any())).thenReturn(disabled, enabledConfig());
+        doThrow(new BusinessException(ResultCode.AI_SERVICE_UNAVAILABLE))
+                .when(aiTaskManager).retry(any(), any());
+
+        AiTaskRetryResult result = aiTaskService.retry(List.of(4L, 5L));
+
+        assertThat(result.getTotal()).isEqualTo(2);
+        assertThat(result.getSucceeded()).isZero();
+        assertThat(result.getSkipped()).isZero();
+        assertThat(result.getFailed()).isEqualTo(2);
+        assertThat(result.getFailedIds()).containsExactly(4L, 5L);
+    }
+
+    /**
+     * R4-1.25：AI 已受理但条件更新影响 0 行（任务被并发重试/回调抢先处理）时计为跳过，
+     * 不得重复入队或覆盖并发回调已写入的终态。
+     */
+    @Test
+    void retryConditionalUpdateMissCountsAsSkipped() {
+        AiTaskDO task = new AiTaskDO();
+        task.setId(6L);
+        task.setTaskNo("AI6");
+        task.setServiceCode("default");
+        task.setStatus(AiTaskStatus.FAILED.name());
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(taskMapper.selectById(6L)).thenReturn(task);
+        when(configMapper.selectOne(any())).thenReturn(enabledConfig());
+        when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(0);
+
+        AiTaskRetryResult result = aiTaskService.retry(List.of(6L));
+
+        assertThat(result.getSucceeded()).isZero();
+        assertThat(result.getSkipped()).isEqualTo(1);
+        assertThat(result.getFailed()).isZero();
     }
 
     // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------

@@ -54,5 +54,29 @@ public class AiPythonClient {
             throw new BusinessException(ResultCode.AI_SERVICE_UNAVAILABLE);
         }
     }
+
+    /**
+     * R4-1.25：手动重试终态失败任务，调用 AI 侧 POST /api/v1/tasks/{taskNo}/retry。
+     * AI 侧语义：任务置回 QUEUED、清空 error/reason 重新入队（保留已耗重试次数——
+     * 重试给任务再一次执行机会而非重置完整重试预算）。404（AI 侧任务已过期/缺失）
+     * 等调用错误统一映射为业务异常，由调用方按单条失败处理，不中断整批。
+     */
+    public void retryTask(AiServiceConfigDO config, String taskNo) {
+        HttpHeaders headers = new HttpHeaders();
+        if (StringUtils.hasText(config.getApiKey())) {
+            headers.setBearerAuth(config.getApiKey());
+        }
+        if (RequestIdHolder.get() != null) {
+            headers.set("X-Request-Id", RequestIdHolder.get());
+        }
+        try {
+            restTemplate.postForEntity(
+                    config.getBaseUrl() + "/api/v1/tasks/" + taskNo + "/retry",
+                    new HttpEntity<>(headers),
+                    Map.class);
+        } catch (RestClientException exception) {
+            throw new BusinessException(ResultCode.AI_SERVICE_UNAVAILABLE);
+        }
+    }
 }
 

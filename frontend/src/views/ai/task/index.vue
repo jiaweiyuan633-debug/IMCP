@@ -3,6 +3,11 @@
     <ProSearchForm :fields="searchFields" :loading="loading" @search="onSearch" @reset="onReset" />
     <div class="toolbar">
       <a-button v-permission="'ai:task:create'" type="primary" @click="openCreate">{{ t('page.aiCreate') }}</a-button>
+      <a-button
+        v-permission="'ai:task:retry'"
+        :disabled="selectedRowKeys.length === 0"
+        @click="onRetrySelected"
+      >{{ t('page.aiRetrySelected') }}</a-button>
     </div>
     <ProTable
       v-model:page-num="pageNum"
@@ -12,6 +17,7 @@
       :loading="loading"
       :total="total"
       :error="error"
+      :row-selection="rowSelection"
       row-key="id"
       @change="loadData"
       @retry="loadData"
@@ -38,6 +44,8 @@
         <template v-else-if="column.key === 'actions'">
           <a-space>
             <a @click="openDetail(record)">{{ t('page.aiDetail') }}</a>
+            <!-- R4-1.25：仅 FAILED 终态提供重试（死信恢复）；其他状态重试无意义 -->
+            <a v-if="record.status === 'FAILED'" v-permission="'ai:task:retry'" @click="onRetry([record.id])">{{ t('page.aiRetry') }}</a>
             <a v-permission="'ai:task:cancel'" @click="onCancel(record)">{{ t('page.aiCancel') }}</a>
           </a-space>
         </template>
@@ -89,7 +97,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import ModalForm from '@/components/ModalForm.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { cancelAiTask, createAiTask, getAiSseTicket, getAiTaskDetail, getAiTaskPage } from '@/api/ai'
+import { cancelAiTask, createAiTask, getAiSseTicket, getAiTaskDetail, getAiTaskPage, retryAiTasks } from '@/api/ai'
 import type { AiTaskVo } from '@/api/ai'
 import type { SearchField } from '@/types'
 import { useTableQuery } from '@/composables/useTableQuery'
@@ -158,6 +166,14 @@ const creating = ref(false)
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const detail = ref<AiTaskVo | null>(null)
+// R4-1.25：批量重试选中行（行选择状态与表格双向关联）
+const selectedRowKeys = ref<number[]>([])
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: Array<string | number>) => {
+    selectedRowKeys.value = keys.map((key) => Number(key))
+  },
+}))
 const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
   useTableQuery<AiTaskVo>(getAiTaskPage, {
     buildParams: (query) => ({
@@ -307,6 +323,26 @@ function onCancel(record: AiTaskVo) {
       message.success(t('page.aiCancelled'))
       loadData()
     },
+  })
+}
+
+// R4-1.25：死信任务重试——单条直接执行，批量经确认弹窗；结果按分类汇总提示
+async function onRetry(ids: number[]) {
+  const res = await retryAiTasks(ids)
+  message.success(t('page.aiRetryDone', { succeeded: res.succeeded, skipped: res.skipped, failed: res.failed }))
+  selectedRowKeys.value = []
+  loadData()
+}
+
+function onRetrySelected() {
+  const ids = selectedRowKeys.value
+  if (!ids.length) {
+    return
+  }
+  Modal.confirm({
+    title: t('page.aiRetrySelected'),
+    content: t('page.aiRetryConfirm', { count: ids.length }),
+    onOk: () => onRetry(ids),
   })
 }
 

@@ -4,6 +4,7 @@
     :data-source="dataSource"
     :loading="loading"
     :row-key="rowKey"
+    :row-selection="rowSelection"
     :pagination="pagination"
     @change="onChange"
   >
@@ -31,6 +32,8 @@ const props = defineProps<{
   pageNum: number
   pageSize: number
   rowKey?: string
+  /** 可选行选择配置（antd Table rowSelection），未传则表无选择列（向后兼容）。 */
+  rowSelection?: Record<string, unknown>
   error?: Error | null
 }>()
 
