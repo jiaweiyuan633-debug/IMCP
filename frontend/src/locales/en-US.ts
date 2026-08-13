@@ -474,6 +474,7 @@ export default {
     aiErrorTypeNonRetryable: 'Non-retryable',
     aiErrorTypeRetriesExhausted: 'Retries exhausted',
     aiServiceCode: 'Service Code',
+    aiServiceName: 'Service',
     aiCreatedBy: 'Creator',
     aiCreatedAt: 'Created At',
     aiActions: 'Actions',

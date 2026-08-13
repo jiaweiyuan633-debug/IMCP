@@ -50,7 +50,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -160,7 +162,55 @@ public class AiTaskService {
         IPage<AiTaskDO> result = taskMapper.selectPage(page, wrapper);
         page.setTotal(taskMapper.selectCount(wrapper));
         List<AiTaskVo> records = result.getRecords().stream().map(this::toVo).toList();
+        fillListDisplayNames(records);
         return PageResult.of(result, records);
+    }
+
+    /**
+     * R4-1.24：列表展示名批量解析（避免按行 N+1 查询）。
+     * <p>把已随 VO 暴露的 serviceCode / createdBy 解析为可读展示名：
+     * 服务名来自 ai_service_config.name（租户内批量查询），创建人姓名来自 sys_user
+     * （租户内 selectBatchIds，优先 nickname、回退 username）。均按 code/id 去重后
+     * 单次查询；未命中（如服务被删、用户被逻辑删除）时服务名回退编码、姓名保持空，
+     * 由前端兜底显示，不改变列表过滤语义。
+     */
+    private void fillListDisplayNames(List<AiTaskVo> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        Set<String> serviceCodes = records.stream()
+                .map(AiTaskVo::getServiceCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (!serviceCodes.isEmpty()) {
+            Map<String, String> nameByCode = configMapper.selectList(
+                            new LambdaQueryWrapper<AiServiceConfigDO>()
+                                    .select(AiServiceConfigDO::getCode, AiServiceConfigDO::getName)
+                                    .in(AiServiceConfigDO::getCode, serviceCodes))
+                    .stream()
+                    .filter(config -> StringUtils.hasText(config.getName()))
+                    .collect(Collectors.toMap(AiServiceConfigDO::getCode, AiServiceConfigDO::getName, (a, b) -> a));
+            records.forEach(vo -> {
+                if (StringUtils.hasText(vo.getServiceCode())) {
+                    vo.setServiceName(nameByCode.getOrDefault(vo.getServiceCode(), vo.getServiceCode()));
+                }
+            });
+        }
+        Set<Long> createdBys = records.stream()
+                .map(AiTaskVo::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (!createdBys.isEmpty()) {
+            Map<Long, String> nameById = userMapper.selectBatchIds(createdBys).stream()
+                    .collect(Collectors.toMap(SysUserDO::getId,
+                            user -> StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername(),
+                            (a, b) -> a));
+            records.forEach(vo -> {
+                if (vo.getCreatedBy() != null) {
+                    vo.setCreatedByName(nameById.get(vo.getCreatedBy()));
+                }
+            });
+        }
     }
 
     public AiTaskVo detail(Long id) {

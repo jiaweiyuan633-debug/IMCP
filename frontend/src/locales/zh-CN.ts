@@ -474,6 +474,7 @@ export default {
     aiErrorTypeNonRetryable: '不可重试',
     aiErrorTypeRetriesExhausted: '重试耗尽',
     aiServiceCode: '服务编码',
+    aiServiceName: '服务',
     aiCreatedBy: '创建人',
     aiCreatedAt: '创建时间',
     aiActions: '操作',

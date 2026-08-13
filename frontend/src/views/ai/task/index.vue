@@ -26,6 +26,12 @@
           </a-tag>
           <span v-else>-</span>
         </template>
+        <template v-else-if="column.key === 'serviceName'">
+          {{ record.serviceName || record.serviceCode || '-' }}
+        </template>
+        <template v-else-if="column.key === 'createdByName'">
+          {{ record.createdByName || '-' }}
+        </template>
         <template v-else-if="column.key === 'retryCount'">
           {{ record.retryCount }} / {{ record.maxRetry }}
         </template>
@@ -138,6 +144,8 @@ const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
   { title: t('page.aiTaskNo'), dataIndex: 'taskNo', key: 'taskNo' },
   { title: t('page.aiBizType'), dataIndex: 'bizType', key: 'bizType' },
+  { title: t('page.aiServiceName'), key: 'serviceName', width: 140 },
+  { title: t('page.aiCreatedBy'), key: 'createdByName', width: 100 },
   { title: t('page.aiStatus'), key: 'status', width: 100 },
   { title: t('page.aiErrorType'), key: 'errorType', width: 120 },
   { title: t('page.aiRetry'), key: 'retryCount', width: 90 },

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.admin.common.PageResult;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
@@ -14,6 +15,7 @@ import com.example.admin.module.ai.dto.AiTaskQuery;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import com.example.admin.module.ai.entity.AiTaskDO;
 import com.example.admin.module.ai.entity.AiTaskResultDO;
+import com.example.admin.module.ai.vo.AiTaskVo;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
 import com.example.admin.module.ai.mapper.AiTaskMapper;
 import com.example.admin.module.ai.mapper.AiTaskResultMapper;
@@ -262,6 +264,68 @@ class AiTaskServiceTest {
         LambdaQueryWrapper<AiTaskDO> wrapper = (LambdaQueryWrapper<AiTaskDO>) captor.getValue();
         // 未选择分类时不追加条件，避免 eq(hasText=false) 生成无意义参数
         assertThat(wrapper.getSqlSegment()).doesNotContain("error_type");
+    }
+
+    // ---------- R4-1.24：列表展示名批量解析（serviceName / createdByName） ----------
+
+    /**
+     * R4-1.24：列表须把已暴露的 serviceCode / createdBy 解析为可读展示名，否则前端只能看到
+     * 无意义的服务编码与用户 ID。断言：服务名取自 ai_service_config.name，创建人姓名取自
+     * sys_user.nickname，且两者均为单次批量查询（无 N+1）。
+     */
+    @Test
+    void pageResolvesServiceAndCreatorDisplayNames() {
+        Page<AiTaskDO> pageData = new Page<>(1, 10);
+        AiTaskDO task = new AiTaskDO();
+        task.setId(1L);
+        task.setServiceCode("default");
+        task.setCreatedBy(9L);
+        pageData.setRecords(List.of(task));
+        when(taskMapper.selectPage(any(), any())).thenReturn(pageData);
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+
+        AiServiceConfigDO config = new AiServiceConfigDO();
+        config.setCode("default");
+        config.setName("文本摘要");
+        when(configMapper.selectList(any())).thenReturn(List.of(config));
+
+        SysUserDO user = new SysUserDO();
+        user.setId(9L);
+        user.setNickname("张三");
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(user));
+
+        PageResult<AiTaskVo> result = aiTaskService.page(new AiTaskQuery());
+
+        AiTaskVo vo = result.getRecords().get(0);
+        assertThat(vo.getServiceName()).isEqualTo("文本摘要");
+        assertThat(vo.getCreatedByName()).isEqualTo("张三");
+        // 批量解析确为单次查询：服务名/创建人各一次，不随行数放大
+        verify(configMapper).selectList(any());
+        verify(userMapper).selectBatchIds(any());
+    }
+
+    /**
+     * R4-1.24：服务被删或创建人被逻辑删除等未命中场景必须优雅降级——服务名回退编码，
+     * 姓名保持空（前端以 '-' 兜底），不得抛异常或污染其他行。
+     */
+    @Test
+    void pageFallsBackToRawIdsWhenLookupMisses() {
+        Page<AiTaskDO> pageData = new Page<>(1, 10);
+        AiTaskDO task = new AiTaskDO();
+        task.setId(2L);
+        task.setServiceCode("missing-code");
+        task.setCreatedBy(99L);
+        pageData.setRecords(List.of(task));
+        when(taskMapper.selectPage(any(), any())).thenReturn(pageData);
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+        when(configMapper.selectList(any())).thenReturn(List.of());
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of());
+
+        PageResult<AiTaskVo> result = aiTaskService.page(new AiTaskQuery());
+
+        AiTaskVo vo = result.getRecords().get(0);
+        assertThat(vo.getServiceName()).isEqualTo("missing-code");
+        assertThat(vo.getCreatedByName()).isNull();
     }
 
     // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------
