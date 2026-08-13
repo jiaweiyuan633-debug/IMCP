@@ -2,7 +2,6 @@ package com.example.admin.module.system;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.example.admin.module.system.entity.SysNoticeDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
@@ -20,10 +19,12 @@ public class NoticeSseRedisListener implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            SysNoticeDO notice = objectMapper.readValue(
+            // R4-1.10：Redis 频道消息携带权威目标租户信封（发布线程租户），
+            // 各实例据此过滤本地连接，公告内容不再跨租户实时泄露
+            NoticeSseService.NoticeBroadcast broadcast = objectMapper.readValue(
                     new String(message.getBody(), StandardCharsets.UTF_8),
-                    SysNoticeDO.class);
-            noticeSseService.publishLocal(notice);
+                    NoticeSseService.NoticeBroadcast.class);
+            noticeSseService.publishLocal(broadcast.tenantId(), broadcast.payload());
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             // ignore malformed broadcast
         }

@@ -1,12 +1,10 @@
 package com.example.admin.module.monitor;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.ScheduledTaskLock;
 import com.example.admin.module.monitor.entity.SysAlertRuleDO;
 import com.example.admin.module.monitor.manager.AlertWebhookManager;
 import com.example.admin.module.monitor.mapper.SysAlertRuleMapper;
 import com.example.admin.module.monitor.vo.ServerMonitorVo;
-import com.example.admin.module.system.NoticeSseService;
 import com.example.admin.module.system.SystemNoticeService;
 import com.example.admin.module.system.entity.SysNoticeDO;
 import com.example.admin.common.TenantContext;
@@ -34,7 +32,6 @@ public class AlertMonitorService {
     private final SysAlertRuleMapper ruleMapper;
     private final ServerMonitorService serverMonitorService;
     private final SystemNoticeService noticeService;
-    private final NoticeSseService noticeSseService;
     private final StringRedisTemplate redisTemplate;
     private final AlertWebhookManager alertWebhookManager;
     private final ScheduledTaskLock scheduledTaskLock;
@@ -94,7 +91,7 @@ public class AlertMonitorService {
                 severity, rule.getMetric(), value, rule.getThreshold()));
         notice.setStatus(NOTICE_STATUS);
         noticeService.create(notice);
-        noticeSseService.publishAll(notice);
+        // create 内部已按发布线程租户（= rule.getTenantId()）广播公告，此处不再重复推送
         alertWebhookManager.send(rule, severity, value);
         log.warn("Alert triggered: {} severity={} current={} threshold={}", rule.getRuleName(), severity, value, rule.getThreshold());
     }
