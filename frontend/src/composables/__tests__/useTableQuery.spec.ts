@@ -86,4 +86,51 @@ describe('useTableQuery', () => {
     await flushPromises()
     expect(fetcher).not.toHaveBeenCalled()
   })
+
+  it('迟到的旧请求不覆盖更新的结果（竞态守卫）', async () => {
+    // 模拟快速翻页：请求1（第1页）挂起，请求2（第2页）后发起但先返回，
+    // 请求1 若在请求2 之后返回会覆盖用户看到的第2页数据
+    let resolveFirst!: (v: PageResult<Demo>) => void
+    let resolveSecond!: (v: PageResult<Demo>) => void
+    const first = new Promise<PageResult<Demo>>((resolve) => { resolveFirst = resolve })
+    const second = new Promise<PageResult<Demo>>((resolve) => { resolveSecond = resolve })
+    const fetcher = vi.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second)
+    const wrapper = mountHarness(fetcher, { immediate: false })
+
+    wrapper.vm.loadData()
+    wrapper.vm.loadData()
+    // 新请求先返回
+    resolveSecond(page([{ id: 2, name: 'b' }], 2, 2, 10))
+    await flushPromises()
+    expect(wrapper.vm.records).toEqual([{ id: 2, name: 'b' }])
+    expect(wrapper.vm.total).toBe(2)
+    expect(wrapper.vm.loading).toBe(false)
+    // 旧请求后返回，不得覆盖新结果
+    resolveFirst(page([{ id: 1, name: 'a' }], 1, 1, 10))
+    await flushPromises()
+    expect(wrapper.vm.records).toEqual([{ id: 2, name: 'b' }])
+    expect(wrapper.vm.total).toBe(2)
+  })
+
+  it('过期请求的失败不污染最新请求状态', async () => {
+    let resolveFirst!: (v: PageResult<Demo>) => void
+    const first = new Promise<PageResult<Demo>>((resolve) => { resolveFirst = resolve })
+    const fetcher = vi.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(Promise.resolve(page([{ id: 3, name: 'c' }], 3, 1, 10)))
+    const wrapper = mountHarness(fetcher, { immediate: false })
+
+    wrapper.vm.loadData()
+    wrapper.vm.loadData()
+    await flushPromises()
+    expect(wrapper.vm.records).toEqual([{ id: 3, name: 'c' }])
+    expect(wrapper.vm.error).toBeNull()
+    // 旧请求此刻才失败，不能把已成功的最新状态改成错误
+    resolveFirst(page([], 0, 1, 10))
+    await flushPromises()
+    expect(wrapper.vm.records).toEqual([{ id: 3, name: 'c' }])
+    expect(wrapper.vm.error).toBeNull()
+  })
 })

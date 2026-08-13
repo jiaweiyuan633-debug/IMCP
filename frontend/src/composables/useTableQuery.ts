@@ -40,7 +40,13 @@ export function useTableQuery<T, P extends Record<string, unknown> = Record<stri
 
   const buildParams = options.buildParams ?? ((query: Record<string, unknown>) => ({ ...query }) as Partial<P>)
 
+  // 请求序号守卫：快速翻页/搜索时可能同时存在多个在途请求，
+  // 仅最新请求允许写回状态；迟到的旧响应直接丢弃，否则慢请求后返回会
+  // 覆盖用户当前看到的更新数据（records/total 错乱、loading 提前结束）。
+  let requestSeq = 0
+
   async function loadData() {
+    const seq = ++requestSeq
     loading.value = true
     error.value = null
     try {
@@ -50,14 +56,23 @@ export function useTableQuery<T, P extends Record<string, unknown> = Record<stri
         pageSize: pageSize.value,
       } as P & { pageNum: number; pageSize: number }
       const data = await fetcher(params)
+      if (seq !== requestSeq) {
+        return
+      }
       records.value = data.records
       total.value = data.total
     } catch (err) {
+      if (seq !== requestSeq) {
+        return
+      }
       error.value = err instanceof Error ? err : new Error(String(err))
       records.value = []
       total.value = 0
     } finally {
-      loading.value = false
+      // 过期请求不得关闭 loading：新的在途请求仍需 loading 状态
+      if (seq === requestSeq) {
+        loading.value = false
+      }
     }
   }
 
