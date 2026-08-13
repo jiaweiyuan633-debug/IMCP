@@ -194,6 +194,10 @@ app:
     push-interval-ms: ${SCREEN_PUSH_INTERVAL_MS:30000}
     # 数据大屏 SSE 每租户并发连接上限：超限回收最旧连接（防单账号循环取票开流耗尽异步线程/内存）
     max-connections-per-tenant: ${SCREEN_MAX_CONNECTIONS_PER_TENANT:5}
+  websocket:
+    # 站内消息 WebSocket 每用户并发连接上限：超限回收最旧连接（R4-1.14，同 SSE 防护模式——
+    # 长连接无心跳回收，单账号可循环取票开流堆积 TCP 连接并放大每轮推送开销）
+    max-connections-per-user: ${WEBSOCKET_MAX_CONNECTIONS_PER_USER:5}
 
 importexport:
   job:
