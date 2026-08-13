@@ -5,10 +5,10 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -55,17 +55,40 @@ public class NoticeSseService {
     }
 
     public void publish(Long userId, Object payload) {
+        broadcast(userId, emitter -> emitter.send(SseEmitter.event().name("notice").data(payload)));
+    }
+
+    /**
+     * R4-1.1：长连接心跳。公告为事件驱动——无新公告时连接长时间空闲，反向代理
+     * （Nginx proxy_read_timeout 默认 60s）会切断空闲 SSE 连接导致推送静默失效；
+     * 且客户端异常断开/网络分区时容器回调可能不触发，僵死连接随运行时间在内存中堆积。
+     * 心跳注释帧定期保活，发送失败即回收该连接。间隔可配置，默认 30s。
+     */
+    @Scheduled(fixedDelayString = "${app.notice-sse-heartbeat-ms:30000}")
+    public void heartbeat() {
+        emitters.forEach((userId, list) ->
+                broadcast(userId, emitter -> emitter.send(SseEmitter.event().comment("hb"))));
+    }
+
+    /** 向某用户全部连接发送一帧，发送失败即回收该连接（连接已断）。包内可见：单元测试直接驱动。 */
+    void broadcast(Long userId, SseSender sender) {
         List<SseEmitter> list = emitters.get(userId);
         if (list == null || list.isEmpty()) {
             return;
         }
         for (SseEmitter emitter : list) {
             try {
-                emitter.send(SseEmitter.event().name("notice").data(payload));
-            } catch (IOException | IllegalStateException exception) {
+                sender.send(emitter);
+            } catch (Exception exception) {
                 remove(userId, emitter);
             }
         }
+    }
+
+    /** 发送函数测试接缝：由 {@link #broadcast} 捕获异常并回收失败连接。 */
+    @FunctionalInterface
+    interface SseSender {
+        void send(SseEmitter emitter) throws Exception;
     }
 
     private void remove(Long userId, SseEmitter emitter) {

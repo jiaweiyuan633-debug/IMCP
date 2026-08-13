@@ -182,6 +182,8 @@ app:
       api-key: ${MILVUS_EMBEDDING_API_KEY:}
       model: ${MILVUS_EMBEDDING_MODEL:text-embedding-3-small}
       timeout-seconds: ${MILVUS_EMBEDDING_TIMEOUT_SECONDS:10}
+  # 公告 SSE 长连接心跳间隔（毫秒）：定期发送注释帧保活（穿透反代空闲读超时）并回收僵死连接
+  notice-sse-heartbeat-ms: ${NOTICE_SSE_HEARTBEAT_MS:30000}
   screen:
     # 数据大屏 SSE 实时推送间隔（毫秒）：连接保持期间按此节奏广播聚合快照
     push-interval-ms: ${SCREEN_PUSH_INTERVAL_MS:30000}
