@@ -26,4 +26,6 @@ class TaskStatusResponse(BaseModel):
     timeout: float | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    # R4-1.20：失败原因分类（timeout / non_retryable / retries_exhausted），未失败为 None
+    reason: str | None = None
 

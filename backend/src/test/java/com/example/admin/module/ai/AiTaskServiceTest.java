@@ -177,6 +177,50 @@ class AiTaskServiceTest {
         assertEquals(3L, resultCaptor.getValue().getTenantId());
     }
 
+    /**
+     * R4-1.20：AI 侧失败分类（reason=timeout）必须随回调契约透传并落库 ai_task.error_type。
+     * 若回退到修复前契约（回调不携带 reason），条件 UPDATE 的 set 参数中找不到 error_type 值，
+     * 后端系统记录无从区分瞬时超时与确定性错误，此断言即失败。
+     */
+    @Test
+    void callbackCarriesFailureReasonToErrorType() throws Exception {
+        AiTaskDO task = new AiTaskDO();
+        task.setId(3L);
+        task.setTenantId(3L);
+        task.setServiceCode("default");
+        task.setStatus(AiTaskStatus.RUNNING.name());
+        when(taskMapper.selectByTaskNoIgnoreTenant("T2")).thenReturn(task);
+        AiServiceConfigDO config = new AiServiceConfigDO();
+        config.setApiKey("secret");
+        when(configMapper.selectOne(any())).thenReturn(config);
+        when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(1);
+
+        AiCallbackRequest request = new AiCallbackRequest();
+        request.setTaskNo("T2");
+        request.setStatus(AiTaskStatus.FAILED.name());
+        request.setErrorType("timeout");
+        request.setError("task timeout after 60s");
+        request.setRetryCount(3);
+
+        // 构造与 AI 侧 tasks/manager.py 一致的 HMAC 签名（message = timestamp + "\n" + rawBody）
+        byte[] body = new ObjectMapper().writeValueAsBytes(request);
+        String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.update((timestamp + "\n").getBytes(StandardCharsets.UTF_8));
+        String signature = HexUtil.encodeHexStr(mac.doFinal(body));
+
+        aiTaskService.handleCallback(request, body, timestamp, signature);
+
+        // 条件 UPDATE 的 set 参数必须同时含终态值与非空 error_type 值
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<AbstractWrapper> wrapperCaptor = ArgumentCaptor.forClass(AbstractWrapper.class);
+        verify(taskMapper).update(isNull(), wrapperCaptor.capture());
+        Map<String, Object> params = wrapperCaptor.getValue().getParamNameValuePairs();
+        assertTrue(params.containsValue(AiTaskStatus.FAILED.name()), "params=" + params);
+        assertTrue(params.containsValue("timeout"), "error_type 未随条件 UPDATE 落库, params=" + params);
+    }
+
     // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------
 
     private static SysUserDO activeUser(Long id, Long tenantId) {

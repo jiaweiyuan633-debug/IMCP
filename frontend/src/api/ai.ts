@@ -33,6 +33,7 @@ export interface AiTaskVo {
   status: string
   paramsJson?: string
   errorMsg?: string
+  errorType?: string
   retryCount: number
   maxRetry: number
   timeoutSeconds: number

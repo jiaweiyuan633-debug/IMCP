@@ -109,6 +109,8 @@ class TaskManager:
             raise HTTPException(status_code=404, detail="task not found")
         data["status"] = "QUEUED"
         data["error"] = None
+        # R4-1.20：手动重试重置失败分类，防止上一次失败的分类透传到后续回调
+        data["reason"] = None
         data["updated_at"] = _now()
         await self._save(task_no, data)
         await self._enqueue_ready(task_no, int(data.get("priority", 5)))
@@ -239,6 +241,8 @@ class TaskManager:
         data["status"] = "SUCCEEDED"
         data["result"] = result
         data["error"] = None
+        # R4-1.20：重试后成功的任务清除历史失败分类，避免陈旧 reason 透传到成功回调
+        data["reason"] = None
         data["updated_at"] = _now()
         ai_task_succeeded_total.inc()
         await self._save(task_no, data)
@@ -252,6 +256,9 @@ class TaskManager:
 
     async def _fail(self, task_no: str, data: dict[str, Any], reason: str = "unknown") -> None:
         data["status"] = "FAILED"
+        # R4-1.20：失败分类（timeout / non_retryable / retries_exhausted）随任务记录持久化，
+        # 供回调契约透传与 GET /tasks 读取。此前分类仅进死信与指标标签，后端系统记录无从得知
+        data["reason"] = reason
         data["updated_at"] = _now()
         # reason 见 app.core.metrics 模块 docstring：timeout / non_retryable / retries_exhausted
         ai_task_failed_total.labels(reason=reason).inc()
@@ -392,6 +399,9 @@ class TaskManager:
             "result": data.get("result"),
             "error": data.get("error"),
             "retry_count": data.get("retry_count", 0),
+            # R4-1.20：失败分类（timeout / non_retryable / retries_exhausted）随回调透传，
+            # 后端落 ai_task.error_type；成功路径已清空，成功回调为 null
+            "reason": data.get("reason"),
         }
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         timestamp = str(int(time.time()))

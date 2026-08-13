@@ -71,7 +71,9 @@ backend (Spring Boot)                 ai-service (FastAPI)
 - **轻量 ML**：纯 Python TF-IDF + KNN 分类 + KMeans 聚类，零重依赖，Docker 镜像保持精简。
 - **任务队列深化**：Redis zset 优先级队列（`-priority` 排序）、延迟队列做重试退避、
   有界工作池 + `asyncio.wait_for` 超时保护、`NonRetryableError` 不重试、
-  同名任务去重（409）、超限失败进死信队列。
+  同名任务去重（409）、超限失败进死信队列。失败按原因分类
+  （`timeout` / `non_retryable` / `retries_exhausted`）随回调载荷 `reason` 透传，
+  后端落 `ai_task.error_type`，便于区分瞬时超时（值得重试）与确定性错误（重试无意义）。
 - **PII 脱敏**：身份证/手机/邮箱/银行卡/IP 等规则检测 + 递归结构脱敏（敏感键整值打码）。
 
 ## 配置

@@ -17,6 +17,7 @@ public class AiTaskVo {
     private String status;
     private String paramsJson;
     private String errorMsg;
+    private String errorType;
     private Integer retryCount;
     private Integer maxRetry;
     private Integer timeoutSeconds;

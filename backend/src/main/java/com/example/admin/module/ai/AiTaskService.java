@@ -275,6 +275,7 @@ public class AiTaskService {
                         AiTaskStatus.RUNNING.name())
                 .set(AiTaskDO::getStatus, status)
                 .set(AiTaskDO::getErrorMsg, request.getError())
+                .set(AiTaskDO::getErrorType, request.getErrorType())
                 .set(AiTaskDO::getRetryCount,
                         request.getRetryCount() == null ? task.getRetryCount() : request.getRetryCount())
                 .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
@@ -283,6 +284,7 @@ public class AiTaskService {
         }
         task.setStatus(status);
         task.setErrorMsg(request.getError());
+        task.setErrorType(request.getErrorType());
         if (request.getRetryCount() != null) {
             task.setRetryCount(request.getRetryCount());
         }
@@ -324,6 +326,7 @@ public class AiTaskService {
                 .status(task.getStatus())
                 .paramsJson(task.getParamsJson())
                 .errorMsg(task.getErrorMsg())
+                .errorType(task.getErrorType())
                 .retryCount(task.getRetryCount())
                 .maxRetry(task.getMaxRetry())
                 .timeoutSeconds(task.getTimeoutSeconds())
