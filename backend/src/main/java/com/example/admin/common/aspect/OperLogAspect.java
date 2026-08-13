@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -25,6 +26,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 @Aspect
@@ -42,6 +44,7 @@ public class OperLogAspect {
     private final SysAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
     private final BusinessMetrics businessMetrics;
+    private final TaskExecutor operLogExecutor;
 
     @Around("@annotation(operLog)")
     public Object around(ProceedingJoinPoint joinPoint, OperLog operLog) throws Throwable {
@@ -55,46 +58,74 @@ public class OperLogAspect {
             error = throwable;
             throw throwable;
         } finally {
-            saveLog(joinPoint, operLog, start, result, error);
+            asyncSaveLog(joinPoint, operLog, start, result, error);
         }
     }
 
-    private void saveLog(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
+    /**
+     * R3-1.3：日志异步落库，主请求路径不再承担 2 次日志 INSERT。
+     * 上下文（租户/用户/请求信息）依赖 ThreadLocal，必须在调用线程提取完毕后
+     * 才提交异步任务；异步线程只做纯落库与指标计数。
+     * 队列拥堵时回退调用线程同步写（CallerRunsPolicy），日志不丢失。
+     */
+    /** 包内可见：单元测试直接驱动异步提交流程。 */
+    void asyncSaveLog(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
+        LogEntities entities;
         try {
-            SysOperLogDO operLogEntity = new SysOperLogDO();
-            operLogEntity.setTenantId(TenantContext.getTenantId());
-            operLogEntity.setUserId(SecurityUtils.tryGetUserId());
-            operLogEntity.setModule(operLog.module());
-            operLogEntity.setAction(operLog.action());
-            operLogEntity.setMethod(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
-            operLogEntity.setDurationMs(System.currentTimeMillis() - start);
-            operLogEntity.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
-            operLogEntity.setOperTime(LocalDateTime.now());
-            if (error != null) {
-                operLogEntity.setErrorMsg(truncate(error.getMessage(), MAX_ERROR_LENGTH));
-            }
+            entities = buildEntities(joinPoint, operLog, start, result, error);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to build oper log", exception);
+            return;
+        }
+        try {
+            operLogExecutor.execute(() -> writeQuietly(entities));
+        } catch (RejectedExecutionException exception) {
+            log.warn("Oper log executor busy, fallback to sync write", exception);
+            writeQuietly(entities);
+        }
+    }
 
-            ServletRequestAttributes attributes =
-                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attributes != null) {
-                HttpServletRequest request = attributes.getRequest();
-                operLogEntity.setRequestUrl(request.getRequestURI());
-                operLogEntity.setRequestMethod(request.getMethod());
-                operLogEntity.setIp(request.getRemoteAddr());
-            }
-            operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs())));
-            operLogEntity.setResult(toJson(result));
-            operLogMapper.insert(operLogEntity);
-            saveAuditLog(operLogEntity);
+    private void writeQuietly(LogEntities entities) {
+        try {
+            operLogMapper.insert(entities.operLog());
+            auditLogMapper.insert(entities.auditLog());
             businessMetrics.operLogWritten();
         } catch (RuntimeException exception) {
             log.warn("Failed to write oper log", exception);
         }
     }
 
-    private void saveAuditLog(SysOperLogDO operLogEntity) {
+    /** 调用线程内构建日志实体（读取全部 ThreadLocal 上下文），包内可见便于单元测试。 */
+    LogEntities buildEntities(ProceedingJoinPoint joinPoint, OperLog operLog, long start, Object result, Throwable error) {
+        SysOperLogDO operLogEntity = new SysOperLogDO();
+        operLogEntity.setTenantId(TenantContext.getTenantId());
+        operLogEntity.setUserId(SecurityUtils.tryGetUserId());
+        operLogEntity.setModule(operLog.module());
+        operLogEntity.setAction(operLog.action());
+        operLogEntity.setMethod(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
+        operLogEntity.setDurationMs(System.currentTimeMillis() - start);
+        operLogEntity.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
+        operLogEntity.setOperTime(LocalDateTime.now());
+        if (error != null) {
+            operLogEntity.setErrorMsg(truncate(error.getMessage(), MAX_ERROR_LENGTH));
+        }
+
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes != null) {
+            HttpServletRequest request = attributes.getRequest();
+            operLogEntity.setRequestUrl(request.getRequestURI());
+            operLogEntity.setRequestMethod(request.getMethod());
+            operLogEntity.setIp(request.getRemoteAddr());
+        }
+        operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs())));
+        operLogEntity.setResult(toJson(result));
+        return new LogEntities(operLogEntity, buildAuditLog(operLogEntity));
+    }
+
+    private SysAuditLogDO buildAuditLog(SysOperLogDO operLogEntity) {
         SysAuditLogDO auditLog = new SysAuditLogDO();
-        auditLog.setTenantId(TenantContext.getTenantId());
+        auditLog.setTenantId(operLogEntity.getTenantId());
         auditLog.setUserId(operLogEntity.getUserId());
         auditLog.setModule(operLogEntity.getModule());
         auditLog.setAction(operLogEntity.getAction());
@@ -102,7 +133,11 @@ public class OperLogAspect {
         auditLog.setResult(operLogEntity.getResult());
         auditLog.setStatus(operLogEntity.getStatus());
         auditLog.setCreatedAt(LocalDateTime.now());
-        auditLogMapper.insert(auditLog);
+        return auditLog;
+    }
+
+    /** 操作日志 + 审计日志，作为一次异步任务原子提交。 */
+    record LogEntities(SysOperLogDO operLog, SysAuditLogDO auditLog) {
     }
 
     private List<Object> filterArgs(Object[] args) {
