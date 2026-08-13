@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthConfigQuery;
 import com.example.admin.module.auth.dto.OauthConfigSaveRequest;
 import com.example.admin.module.auth.entity.SysOauthConfigDO;
@@ -29,6 +30,7 @@ public class OauthConfigService {
     private final SysOauthConfigMapper oauthConfigMapper;
 
     public PageResult<OauthConfigVo> page(OauthConfigQuery query) {
+        requirePlatformTenant();
         Page<SysOauthConfigDO> page = new Page<>(query.getPageNum(), query.getPageSize());
         LambdaQueryWrapper<SysOauthConfigDO> wrapper = new LambdaQueryWrapper<SysOauthConfigDO>()
                 .eq(StringUtils.hasText(query.getProvider()), SysOauthConfigDO::getProvider, query.getProvider())
@@ -41,13 +43,18 @@ public class OauthConfigService {
     }
 
     public Long create(OauthConfigSaveRequest request) {
+        requirePlatformTenant();
         validateProvider(request.getProvider());
         SysOauthConfigDO config = toEntity(request);
+        // 平台级配置归属恒为租户 1：登录链路按 provider 全局解析（OauthLoginService.requireEnabled），
+        // 回调按本配置 tenant_id 路由绑定身份；此前未显式设置，靠 DB 默认落 1，现显式固化。
+        config.setTenantId(1L);
         oauthConfigMapper.insert(config);
         return config.getId();
     }
 
     public void update(OauthConfigSaveRequest request) {
+        requirePlatformTenant();
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "配置 ID 不能为空");
         }
@@ -56,6 +63,7 @@ public class OauthConfigService {
     }
 
     public void updateStatus(Long id, Integer enabled) {
+        requirePlatformTenant();
         SysOauthConfigDO config = new SysOauthConfigDO();
         config.setId(id);
         config.setEnabled(enabled);
@@ -63,7 +71,21 @@ public class OauthConfigService {
     }
 
     public void delete(Long id) {
+        requirePlatformTenant();
         oauthConfigMapper.deleteById(id);
+    }
+
+    /** 平台租户守卫：sys_oauth_config 为平台级设置，仅租户 1（平台）管理员可管理。
+     *
+     * 为什么不能像 sys_mcp_server 那样直接进租户白名单：登录/授权解析在匿名上下文
+     * 按 provider 全局 selectOne（OauthLoginService.requireEnabled），一旦注入租户条件
+     * 恒落租户 1，非平台租户配置既查不到也无法按 provider 跨租户区分——隔离只能在服务层
+     * 做归属约束，而非 SQL 拦截器。
+     */
+    private void requirePlatformTenant() {
+        if (TenantContext.getTenantId() != 1L) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
     }
 
     private void validateProvider(String provider) {

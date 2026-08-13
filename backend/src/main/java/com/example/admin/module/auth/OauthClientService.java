@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthClientQuery;
 import com.example.admin.module.auth.dto.OauthClientSaveRequest;
 import com.example.admin.module.auth.entity.SysOauthClientDO;
@@ -31,6 +32,7 @@ public class OauthClientService {
     public PageResult<OauthClientVo> page(OauthClientQuery query) {
         Page<SysOauthClientDO> page = new Page<>(query.getPageNum(), query.getPageSize());
         LambdaQueryWrapper<SysOauthClientDO> wrapper = new LambdaQueryWrapper<SysOauthClientDO>()
+                .eq(SysOauthClientDO::getTenantId, TenantContext.getTenantId())
                 .like(StringUtils.hasText(query.getClientName()), SysOauthClientDO::getClientName, query.getClientName())
                 .eq(query.getEnabled() != null, SysOauthClientDO::getEnabled, query.getEnabled())
                 .orderByAsc(SysOauthClientDO::getSort)
@@ -41,7 +43,11 @@ public class OauthClientService {
     }
 
     public Long create(OauthClientSaveRequest request) {
+        // client_id 跨租户全局唯一：SSO 授权链路匿名按 client_id 解析（SsoAuthService.requireEnabledClient），
+        // 两租户重名会 selectOne 抛 TooManyResultsException——创建时即拦截，避免数据模型允许但运行时必然炸。
+        ensureClientIdUnique(request.getClientId(), null);
         SysOauthClientDO client = toEntity(request);
+        client.setTenantId(TenantContext.getTenantId());
         oauthClientMapper.insert(client);
         return client.getId();
     }
@@ -50,10 +56,13 @@ public class OauthClientService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "应用 ID 不能为空");
         }
+        requireOwned(request.getId());
+        ensureClientIdUnique(request.getClientId(), request.getId());
         oauthClientMapper.updateById(toEntity(request));
     }
 
     public void updateStatus(Long id, Integer enabled) {
+        requireOwned(id);
         SysOauthClientDO client = new SysOauthClientDO();
         client.setId(id);
         client.setEnabled(enabled);
@@ -61,7 +70,28 @@ public class OauthClientService {
     }
 
     public void delete(Long id) {
+        requireOwned(id);
         oauthClientMapper.deleteById(id);
+    }
+
+    /** 归属校验：按 id 的写操作前先确认行属于当前租户，跨租户视为不存在（不暴露存在性）。 */
+    private SysOauthClientDO requireOwned(Long id) {
+        SysOauthClientDO client = oauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientDO>()
+                .eq(SysOauthClientDO::getId, id)
+                .eq(SysOauthClientDO::getTenantId, TenantContext.getTenantId()));
+        if (client == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return client;
+    }
+
+    private void ensureClientIdUnique(String clientId, Long excludeId) {
+        Long count = oauthClientMapper.selectCount(new LambdaQueryWrapper<SysOauthClientDO>()
+                .eq(SysOauthClientDO::getClientId, clientId)
+                .ne(excludeId != null, SysOauthClientDO::getId, excludeId));
+        if (count != null && count > 0) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "client_id 已被其他应用占用");
+        }
     }
 
     private SysOauthClientDO toEntity(OauthClientSaveRequest request) {

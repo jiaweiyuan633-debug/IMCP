@@ -129,6 +129,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - 用户、角色、部门、岗位使用逻辑删除。
 - `created_by/updated_by` 由 `MyMetaObjectHandler` 自动填充，核心业务表带 `version` 乐观锁并由 `OptimisticLockerInnerInterceptor` 校验。
 - 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_message`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
+- OAuth 三表隔离模型（R4-1.22，刻意不进租户白名单）：`sys_oauth_config` 为**平台级配置**，登录/授权在匿名上下文按 provider 全局解析（`OauthLoginService.requireEnabled`），注入租户条件会恒落租户 1 使非平台租户配置查不到——因此仅租户 1（平台）管理员可管理，服务层 `requirePlatformTenant` 守卫；`sys_oauth_client` 为**租户私有**（SSO 应用），page 过滤当前租户、create 落当前租户、update/status/delete 校验归属，且 `client_id` 跨租户全局唯一（SSO 匿名链路按 client_id `selectOne`，重名抛 `TooManyResultsException`）；`sys_user_oauth` 所有访问均已显式按租户过滤，无需额外约束。
 - 用户名唯一性按租户隔离：`sys_user` 使用 `uk_sys_user_tenant_username(tenant_id, username)`，多租户下各租户可存在同名账号。
 - 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
 - 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，对 `sys_user/ai_task/sys_oper_log/sys_login_log` 自动注入权限条件。
