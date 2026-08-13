@@ -46,6 +46,8 @@ backend (Spring Boot)                 ai-service (FastAPI)
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/v1/tasks` | 提交任务（`priority` 0-9 越大越先执行，`timeout` 秒） |
+| GET | `/api/v1/tasks/dead` | 列出死信队列（新失败在前；`limit` 默认 100、上限 1000） |
+| DELETE | `/api/v1/tasks/dead` | 清空死信队列并返回清理条数 |
 | GET | `/api/v1/tasks/{task_no}` | 查询任务状态 |
 | POST | `/api/v1/tasks/{task_no}/retry` | 手动重试 |
 | POST | `/api/v1/chat` | 非流式对话（多供应商） |
@@ -74,6 +76,10 @@ backend (Spring Boot)                 ai-service (FastAPI)
   同名任务去重（409）、超限失败进死信队列。失败按原因分类
   （`timeout` / `non_retryable` / `retries_exhausted`）随回调载荷 `reason` 透传，
   后端落 `ai_task.error_type`，便于区分瞬时超时（值得重试）与确定性错误（重试无意义）。
+  死信记录富化 `failed_at` / `biz_type` / `retry_count`，经 `GET /tasks/dead`
+  查询（新失败在前）、`DELETE /tasks/dead` 清理，运维可按时间/类型排障；
+  字面量 `/tasks/dead` 必须先于参数路由 `/tasks/{task_id}` 注册（Starlette 按
+  注册顺序匹配），否则会被参数路由吞成查询任务 "dead"。
 - **PII 脱敏**：身份证/手机/邮箱/银行卡/IP 等规则检测 + 递归结构脱敏（敏感键整值打码）。
 
 ## 配置

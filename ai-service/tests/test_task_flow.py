@@ -51,6 +51,40 @@ async def test_task_failure_retries_then_failed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dead_letter_list_and_purge() -> None:
+    """R4-1.21：死信记录富化失败时间戳/任务类型/重试次数，可经 list/purge 管理。
+
+    修复前死信记录只有 task_no/error/reason——无失败时刻、无任务类型，运维无法
+    按时间排障；且队列只写无读/无清，历史失败只能被新失败挤出裁剪窗口。此断言
+    覆盖：真实失败写入富化死信（failed_at/biz_type/retry_count 齐备）、
+    list_dead_letters 新失败在前、purge_dead_letters 全量清空。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    manager = TaskManager(redis, Settings())
+    await manager.create_task(TaskCreateRequest(
+        task_no="task-dl",
+        biz_type="keyword_extract",
+        params={"content": "测试", "force_fail": True},
+    ))
+
+    current = await _wait_for_terminal(manager, "task-dl", attempts=200)
+    assert current is not None and current.status == "FAILED"
+
+    entries = await manager.list_dead_letters()
+    assert len(entries) >= 1
+    latest = entries[0]
+    assert latest.task_no == "task-dl"
+    assert latest.reason == "retries_exhausted"
+    assert latest.biz_type == "keyword_extract"
+    assert latest.retry_count == 3
+    assert latest.failed_at is not None
+
+    purged = await manager.purge_dead_letters()
+    assert purged >= 1
+    assert await manager.list_dead_letters() == []
+
+
+@pytest.mark.asyncio
 async def test_unknown_biz_type_rejected() -> None:
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     manager = TaskManager(redis, Settings())

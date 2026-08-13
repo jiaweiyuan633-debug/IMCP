@@ -136,6 +136,33 @@ def test_unauthorized_rejected() -> None:
     assert response.status_code == 401
 
 
+def test_dead_letter_api_endpoints_and_route_order() -> None:
+    """R4-1.21：/tasks/dead 字面量路由先于 /tasks/{task_id} 注册（否则被参数路由吞掉）。
+
+    若注册顺序错误，GET /api/v1/tasks/dead 会被 {task_id} 捕获为查询任务
+    "dead"（404 task not found），DELETE 则因无 DELETE /tasks/{task_id} 返回 405——
+    下方任一断言都会失败。空队列即足以暴露顺序问题：正确注册时 GET 返回
+    200 空数组、DELETE 返回 200 清理数 0。顺带验证 limit 查询参数被接受。
+    """
+    with _boot_client() as client:
+        listed = client.get("/api/v1/tasks/dead", headers=AUTH)
+        assert listed.status_code == 200
+        assert listed.json() == []
+
+        listed_limit = client.get("/api/v1/tasks/dead?limit=1", headers=AUTH)
+        assert listed_limit.status_code == 200
+
+        purged = client.delete("/api/v1/tasks/dead", headers=AUTH)
+        assert purged.status_code == 200
+        assert purged.json() == {"purged": 0}
+
+
+def test_dead_letter_api_requires_token() -> None:
+    with _boot_client() as client:
+        response = client.get("/api/v1/tasks/dead")
+    assert response.status_code == 401
+
+
 def test_bad_schedule_expression_rejected() -> None:
     with _boot_client() as client:
         response = client.post(

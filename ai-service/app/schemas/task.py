@@ -29,3 +29,18 @@ class TaskStatusResponse(BaseModel):
     # R4-1.20：失败原因分类（timeout / non_retryable / retries_exhausted），未失败为 None
     reason: str | None = None
 
+
+class DeadLetterEntry(BaseModel):
+    """死信队列单条记录（GET /api/v1/tasks/dead 返回）。
+
+    字段与 TaskManager._record_dead_letter 写入结构一致：R4-1.21 起记录富化
+    biz_type / retry_count / failed_at，供运维按时间排障；修复前的旧记录缺
+    这些字段，置默认值（None / 0）向后兼容。
+    """
+    task_no: str
+    biz_type: str | None = None
+    error: str | None = None
+    reason: str | None = None
+    retry_count: int = 0
+    failed_at: str | None = None
+

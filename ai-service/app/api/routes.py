@@ -2,7 +2,7 @@ import hmac
 import json
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -19,7 +19,7 @@ from app.schemas.ai import (
     VectorSearchResponse,
     VectorUpsertRequest,
 )
-from app.schemas.task import TaskCreateRequest, TaskStatusResponse
+from app.schemas.task import DeadLetterEntry, TaskCreateRequest, TaskStatusResponse
 
 router = APIRouter(prefix="/api/v1", tags=["core"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -58,6 +58,34 @@ async def ping() -> dict[str, str]:
 async def create_task(request: Request, payload: TaskCreateRequest) -> TaskStatusResponse:
     request_id = request.headers.get("X-Request-Id")
     return await request.app.state.task_manager.create_task(payload, request_id)
+
+
+@router.get(
+    "/tasks/dead",
+    response_model=list[DeadLetterEntry],
+    dependencies=[Depends(require_api_token)],
+)
+async def list_dead_tasks(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[DeadLetterEntry]:
+    """列出死信队列（新失败在前），limit 控制返回条数（默认 100，上限 1000）。
+
+    运维面端点：死信为只写 Redis list，无此接口前无法查询失败历史，只能等新
+    失败把旧记录挤出裁剪窗口。修复前旧记录缺 failed_at/biz_type 等富化字段，
+    由 DeadLetterEntry 默认值兼容透出。
+    """
+    return await request.app.state.task_manager.list_dead_letters(limit)
+
+
+@router.delete(
+    "/tasks/dead",
+    dependencies=[Depends(require_api_token)],
+)
+async def purge_dead_tasks(request: Request) -> dict[str, int]:
+    """清空死信队列并返回清理条数（运维清障后收尾）。"""
+    purged = await request.app.state.task_manager.purge_dead_letters()
+    return {"purged": purged}
 
 
 @router.get(

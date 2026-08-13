@@ -37,7 +37,7 @@ from app.core.metrics import (
     ai_worker_count,
 )
 from app.core.observability import request_id_var
-from app.schemas.task import TaskCreateRequest, TaskStatusResponse
+from app.schemas.task import DeadLetterEntry, TaskCreateRequest, TaskStatusResponse
 from app.tasks.errors import NonRetryableError
 
 MAX_RETRY = 3
@@ -273,10 +273,19 @@ class TaskManager:
         死信列表纯写入、无消费者，若只 rpush 不裁剪则随失败总数无界增长。
         rpush + ltrim 用事务（MULTI/EXEC）包住：两条命令原子生效，并发失败时
         列表不会出现中间态超长。仅保留最近 queue_dead_max_len 条，0 表示不裁剪。
-        记录带 reason（与 ai_task_failed_total 标签一致），供运维离线排查失败原因。
+        记录带 reason（与 ai_task_failed_total 标签一致）以及 R4-1.21 富化的
+        biz_type / retry_count / failed_at，供运维按时间/类型离线排查失败原因，
+        并经 GET /api/v1/tasks/dead 查询、DELETE /api/v1/tasks/dead 清理。
         """
         payload = json.dumps(
-            {"task_no": task_no, "error": data.get("error"), "reason": reason},
+            {
+                "task_no": task_no,
+                "biz_type": data.get("biz_type"),
+                "error": data.get("error"),
+                "reason": reason,
+                "retry_count": data.get("retry_count", 0),
+                "failed_at": _now(),
+            },
             ensure_ascii=False,
         )
         max_len = self.settings.queue_dead_max_len
@@ -285,6 +294,27 @@ class TaskManager:
             if max_len > 0:
                 await pipe.ltrim(self.settings.queue_dead_key, -max_len, -1)
             await pipe.execute()
+
+    async def list_dead_letters(self, limit: int = 100) -> list[DeadLetterEntry]:
+        """列出死信队列（新失败在前），供 GET /api/v1/tasks/dead 透出。
+
+        列表尾部（rpush 写入 + ltrim 裁剪保留的最近区段）即最新失败：先
+        lrange 取尾部 limit 条再反转。返回 DeadLetterEntry，字段与写入结构
+        一致（含 failed_at / biz_type / retry_count），兼容修复前旧记录。
+        """
+        if limit <= 0:
+            return []
+        raw = await self.redis.lrange(self.settings.queue_dead_key, -limit, -1)
+        entries = [json.loads(item) for item in raw]
+        entries.reverse()
+        return [DeadLetterEntry(**entry) for entry in entries]
+
+    async def purge_dead_letters(self) -> int:
+        """清空死信队列并返回清理条数，供 DELETE /api/v1/tasks/dead 运维收尾。"""
+        size = await self.redis.llen(self.settings.queue_dead_key)
+        if size > 0:
+            await self.redis.delete(self.settings.queue_dead_key)
+        return size
 
     async def _requeue_after_error(self, task_no: str, error: Exception) -> None:
         """执行期异常兜底：任务仍非终态时恢复为 QUEUED 重新入队。
