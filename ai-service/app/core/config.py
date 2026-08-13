@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     queue_delayed_key: str = "ai:queue:delayed"
     queue_dead_key: str = "ai:queue:dead"
     task_ttl_seconds: int = 60 * 60 * 24
+    # 崩溃自愈租约宽限（秒）：执行受 wait_for 超时约束，租约 = 任务超时 + 该宽限。
+    # 存活执行必在租约到期前离开 RUNNING，故启动扫描可安全回收过期租约任务（见
+    # TaskManager.recover_stale_tasks），多实例下也不会误回收其它实例正在执行的任务
+    stale_task_lease_grace_seconds: float = 60.0
 
     # ---------- OCR（可插拔：mock / tesseract） ----------
     ocr_provider: str = "mock"

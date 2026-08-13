@@ -39,6 +39,9 @@ async def lifespan(app: FastAPI):
     )
     services = build_services(context)
     task_manager = TaskManager(redis, settings, services=services)
+    # 崩溃自愈：启动时回收租约过期的 RUNNING 遗留任务重新入队（见
+    # TaskManager.recover_stale_tasks），避免进程被杀/滚动发布后任务永久卡死
+    await task_manager.recover_stale_tasks()
     app.state.task_manager = task_manager
 
     scheduler = Scheduler(redis, settings)

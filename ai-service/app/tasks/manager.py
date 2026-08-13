@@ -123,19 +123,43 @@ class TaskManager:
         self._workers.clear()
 
     async def _worker_loop(self) -> None:
+        """消费循环：瞬时错误指数退避后继续，不因单个异常杀死消费线程。
+
+        原实现中 `_execute`/`_promote_due`/`zpopmin` 任一处抛出（如 Redis 瞬时
+        故障）都会让 while 循环退出、worker 协程消亡且不再重建（_ensure_workers
+        仅在建单/手动重试时触发），整个消费端静默停机、队列永久停滞。
+        此处把整轮循环包在 try 里：错误只触发退避重试；执行期错误把可能遗留
+        RUNNING 的任务恢复为 QUEUED 重新入队；优雅停机/协程取消仍立即响应。
+        """
         ready_key = self.settings.queue_ready_key
         delayed_key = self.settings.queue_delayed_key
+        failure_backoff = 0.0
         while not self._closing:
             # 工作协程由首个提交任务的请求上下文派生（create_task 复制上下文），
             # 逐轮清空 request_id，避免无关任务日志错误携带建队请求的 ID
             request_id_var.set("")
-            await self._promote_due(delayed_key, ready_key)
-            popped = await self.redis.zpopmin(ready_key)
-            if not popped:
-                await asyncio.sleep(0.02)
-                continue
-            task_no = popped[0][0]
-            await self._execute(task_no)
+            task_no: str | None = None
+            try:
+                await self._promote_due(delayed_key, ready_key)
+                popped = await self.redis.zpopmin(ready_key)
+                if not popped:
+                    failure_backoff = 0.0
+                    await asyncio.sleep(0.02)
+                    continue
+                task_no = popped[0][0]
+                await self._execute(task_no)
+                failure_backoff = 0.0
+            except asyncio.CancelledError:
+                raise
+            except Exception as exception:  # noqa: BLE001 —— 瞬时错误不杀死消费线程
+                failure_backoff = min(failure_backoff * 2 + 0.5, 10.0)
+                if task_no is not None:
+                    await self._requeue_after_error(task_no, exception)
+                logger.warning(
+                    "AI worker transient error, backoff %.1fs: %s",
+                    failure_backoff, exception,
+                )
+                await asyncio.sleep(failure_backoff)
 
     async def _promote_due(self, delayed_key: str, ready_key: str) -> None:
         now = time.time()
@@ -159,11 +183,15 @@ class TaskManager:
             return
         # 执行期间日志携带提交该任务的请求 ID，跨服务排障可串联调用方
         request_id_var.set(data.get("request_id") or "")
+        timeout = float(data.get("timeout") or self.settings.default_timeout_seconds)
         data["status"] = "RUNNING"
+        data["started_at"] = _now()
+        # 崩溃自愈租约：执行受 asyncio.wait_for 超时约束，租约 = 超时 + 宽限期，
+        # 存活的执行必在租约到期前离开 RUNNING；崩溃遗留的任务由启动扫描按过期
+        # 租约回收重新入队（recover_stale_tasks），避免永久卡死 RUNNING
+        data["lease_until"] = time.time() + timeout + self.settings.stale_task_lease_grace_seconds
         data["updated_at"] = _now()
         await self._save(task_no, data)
-
-        timeout = float(data.get("timeout") or self.settings.default_timeout_seconds)
         try:
             service = self._get_service(data["biz_type"])
             result = await asyncio.wait_for(service.run(data["params"]), timeout=timeout)
@@ -211,6 +239,67 @@ class TaskManager:
         await self._save(task_no, data)
         await self._expire(task_no)
         await self._callback(task_no, data)
+
+    async def _requeue_after_error(self, task_no: str, error: Exception) -> None:
+        """执行期异常兜底：任务仍非终态时恢复为 QUEUED 重新入队。
+
+        `_execute` 内部已把 service.run 的异常分流到重试/死信，逃逸到这里的异常
+        来自执行中的 Redis 写入、回调等瞬时故障。此时任务可能已标记 RUNNING（
+        RUNNING 落库成功、后续步骤失败）或仍为 QUEUED（RUNNING 落库本身失败，
+        任务已被 zpopmin 弹出、不在任何队列）。两者均恢复为 QUEUED 重新入队，
+        交由后续轮次重试。恢复本身失败则静默，交给启动自愈兜底。
+        """
+        try:
+            data = await self._get(task_no)
+            if data is None or data.get("status") not in ("QUEUED", "RUNNING"):
+                return
+            data["status"] = "QUEUED"
+            data["error"] = f"requeued after worker transient error: {error}"
+            data["updated_at"] = _now()
+            await self._save(task_no, data)
+            await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+        except Exception as exception:  # noqa: BLE001 —— 恢复失败不再抛出，交启动自愈兜底
+            logger.warning(
+                "AI worker failed to requeue task %s after transient error: %s",
+                task_no, exception,
+            )
+
+    async def recover_stale_tasks(self) -> int:
+        """启动自愈：回收租约已过期的 RUNNING 任务为 QUEUED 重新入队。
+
+        工作线程崩溃 / 进程被杀（OOM、滚动发布、k8s 重启）会让任务永久停留在
+        RUNNING：_execute 遇 RUNNING 直接跳过、无任何恢复路径，任务直至 24h TTL
+        才消失，期间既不重试也不回调，等于任务永久丢失。
+
+        以租约判定归属：执行受 asyncio.wait_for 超时约束，存活的执行必在
+        lease_until（= 超时 + 宽限）前离开 RUNNING，故租约过期是确凿的崩溃遗留，
+        多实例下也不会误回收其它实例正在执行的任务。无 lease_until 字段的记录
+        （本特性上线前遗留）同样按遗留回收。返回回收数量。
+        """
+        now = time.time()
+        recovered = 0
+        cursor: int | str = 0
+        while True:
+            cursor, keys = await self.redis.scan(cursor, match=KEY_PREFIX + "*", count=200)
+            for key in keys:
+                task_no = key.removeprefix(KEY_PREFIX)
+                data = await self._get(task_no)
+                if data is None or data.get("status") != "RUNNING":
+                    continue
+                lease_until = data.get("lease_until")
+                if lease_until is not None and float(lease_until) > now:
+                    continue  # 租约未过期：可能仍被其它实例执行
+                data["status"] = "QUEUED"
+                data["error"] = "recovered after worker interruption"
+                data["updated_at"] = _now()
+                await self._save(task_no, data)
+                await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+                recovered += 1
+            if not cursor:
+                break
+        if recovered:
+            logger.warning("AI task recovery: requeued %s stale RUNNING task(s)", recovered)
+        return recovered
 
     # ---------- 服务解析 ----------
 
