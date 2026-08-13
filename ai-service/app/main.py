@@ -1,11 +1,14 @@
+import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from redis.asyncio import Redis
 
 from app.api.routes import router as api_router
 from app.core.config import settings
+from app.core.metrics import sample_queue_depth
 from app.core.observability import RequestLogMiddleware, setup_logging
 from app.llm import build_registry
 from app.scheduler import Scheduler
@@ -86,3 +89,16 @@ async def health(response: Response) -> dict[str, str]:
             response.status_code = 503
             return {"status": "error", "service": settings.app_name, "detail": "redis unreachable"}
     return {"status": "ok", "service": settings.app_name}
+
+
+@app.get("/metrics", tags=["core"])
+async def metrics(request: Request) -> Response:
+    # 供 Prometheus 抓取，不参与业务鉴权。根路径（与 /health 同级）而非 /api/v1 前缀：
+    # 指标是基础设施端点，标准 scrape 路径就是根 /metrics，挂在 API 前缀下极易配错。
+    # 抓取时先实时采样队列深度（LLEN/ZCARD 均 O(1)，见 app.core.metrics.sample_queue_depth），
+    # 再在独立线程序列化——generate_latest 是同步 CPU 工作，直接在 async 端点内跑
+    # 会阻塞事件循环，影响同进程所有请求。
+    redis = getattr(request.app.state, "redis", None)
+    if redis is not None:
+        await sample_queue_depth(redis)
+    return Response(content=await asyncio.to_thread(generate_latest), media_type=CONTENT_TYPE_LATEST)

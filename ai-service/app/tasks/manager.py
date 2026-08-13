@@ -9,6 +9,9 @@
 执行模型：固定数量工作线程（settings.worker_count）持续消费 ready 队列；
 单任务执行受 ``asyncio.wait_for`` 超时保护；可重试异常按指数式/固定退避重新入队，
 不可重试异常（NonRetryableError/超时）直接失败并写死信。
+
+可观测性：任务生命周期事件同步打点（见 app.core.metrics）——创建/成功/失败（按
+原因分标签）/进入重试计数，工作协程数与队列深度 gauge，供 Prometheus 抓取。
 """
 
 import asyncio
@@ -26,6 +29,13 @@ from redis.asyncio import Redis
 
 from app.core.callback_security import CallbackUrlGuard
 from app.core.config import Settings
+from app.core.metrics import (
+    ai_task_created_total,
+    ai_task_failed_total,
+    ai_task_retried_total,
+    ai_task_succeeded_total,
+    ai_worker_count,
+)
 from app.core.observability import request_id_var
 from app.schemas.task import TaskCreateRequest, TaskStatusResponse
 from app.tasks.errors import NonRetryableError
@@ -84,6 +94,7 @@ class TaskManager:
         await self._save(request.task_no, data)
         await self._enqueue_ready(request.task_no, request.priority)
         self._ensure_workers()
+        ai_task_created_total.inc()
         return TaskStatusResponse(**data)
 
     async def get_task(self, task_no: str) -> TaskStatusResponse | None:
@@ -112,7 +123,13 @@ class TaskManager:
         for _ in range(max(self.settings.worker_count, 1)):
             task = asyncio.create_task(self._worker_loop())
             self._workers.add(task)
-            task.add_done_callback(self._workers.discard)
+            task.add_done_callback(self._on_worker_done)
+        ai_worker_count.set(len(self._workers))
+
+    def _on_worker_done(self, task: asyncio.Task[None]) -> None:
+        self._workers.discard(task)
+        if not self._closing:
+            ai_worker_count.set(len(self._workers))
 
     async def close(self) -> None:
         """优雅停机：停止拉取并取消工作线程（运行中的任务被取消并记录为失败）。"""
@@ -122,6 +139,7 @@ class TaskManager:
         if self._workers:
             await asyncio.gather(*list(self._workers), return_exceptions=True)
         self._workers.clear()
+        ai_worker_count.set(0)
 
     async def _worker_loop(self) -> None:
         """消费循环：瞬时错误指数退避后继续，不因单个异常杀死消费线程。
@@ -199,12 +217,12 @@ class TaskManager:
         except TimeoutError:
             data["error"] = f"task timeout after {timeout:g}s"
             data["retry_count"] = data.get("retry_count", 0) + 1
-            await self._fail(task_no, data)
+            await self._fail(task_no, data, reason="timeout")
             return
         except NonRetryableError as exception:
             data["error"] = str(exception)
             data["retry_count"] = data.get("retry_count", 0) + 1
-            await self._fail(task_no, data)
+            await self._fail(task_no, data, reason="non_retryable")
             return
         except Exception as exception:  # noqa: BLE001 —— 其余异常按可重试处理
             data["error"] = str(exception)
@@ -215,38 +233,43 @@ class TaskManager:
                 await self._save(task_no, data)
                 await self._schedule_retry(task_no, data)
             else:
-                await self._fail(task_no, data)
+                await self._fail(task_no, data, reason="retries_exhausted")
             return
 
         data["status"] = "SUCCEEDED"
         data["result"] = result
         data["error"] = None
         data["updated_at"] = _now()
+        ai_task_succeeded_total.inc()
         await self._save(task_no, data)
         await self._expire(task_no)
         await self._callback(task_no, data)
 
     async def _schedule_retry(self, task_no: str, data: dict[str, Any]) -> None:
+        ai_task_retried_total.inc()
         backoff = float(self.settings.retry_backoff_seconds)
         await self.redis.zadd(self.settings.queue_delayed_key, {task_no: time.time() + backoff})
 
-    async def _fail(self, task_no: str, data: dict[str, Any]) -> None:
+    async def _fail(self, task_no: str, data: dict[str, Any], reason: str = "unknown") -> None:
         data["status"] = "FAILED"
         data["updated_at"] = _now()
-        await self._record_dead_letter(task_no, data)
+        # reason 见 app.core.metrics 模块 docstring：timeout / non_retryable / retries_exhausted
+        ai_task_failed_total.labels(reason=reason).inc()
+        await self._record_dead_letter(task_no, data, reason)
         await self._save(task_no, data)
         await self._expire(task_no)
         await self._callback(task_no, data)
 
-    async def _record_dead_letter(self, task_no: str, data: dict[str, Any]) -> None:
+    async def _record_dead_letter(self, task_no: str, data: dict[str, Any], reason: str) -> None:
         """写死信并裁剪队列长度上限（见 queue_dead_max_len）。
 
         死信列表纯写入、无消费者，若只 rpush 不裁剪则随失败总数无界增长。
         rpush + ltrim 用事务（MULTI/EXEC）包住：两条命令原子生效，并发失败时
         列表不会出现中间态超长。仅保留最近 queue_dead_max_len 条，0 表示不裁剪。
+        记录带 reason（与 ai_task_failed_total 标签一致），供运维离线排查失败原因。
         """
         payload = json.dumps(
-            {"task_no": task_no, "error": data.get("error")},
+            {"task_no": task_no, "error": data.get("error"), "reason": reason},
             ensure_ascii=False,
         )
         max_len = self.settings.queue_dead_max_len

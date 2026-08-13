@@ -1,11 +1,10 @@
 import hmac
 import json
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.core.config import settings
 from app.schemas.ai import (
@@ -27,7 +26,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def require_api_token(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
 ) -> None:
     """任务接口鉴权：后端提交/查询/重试任务时须出示共享密钥（Authorization: Bearer）。
 
@@ -211,7 +210,3 @@ async def delete_schedule(request: Request, schedule_id: str) -> dict[str, str]:
     return {"deleted": schedule_id}
 
 
-@router.get("/metrics")
-async def metrics() -> Response:
-    # 供 Prometheus 抓取，不参与业务鉴权
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
