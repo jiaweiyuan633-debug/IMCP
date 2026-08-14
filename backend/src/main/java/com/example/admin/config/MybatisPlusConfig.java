@@ -89,6 +89,23 @@ public class MybatisPlusConfig {
             // 他租户服务并携带其 authToken 连接调用外部工具，create 还会落到默认租户 1 造成数据污染）
             "sys_mcp_server");
 
+    /**
+     * R4-1.29：带 tenant_id 却【有意不在】白名单的四张表——均已由服务层显式隔离，禁止误加：
+     * <ul>
+     *   <li>sys_oauth_client：SSO 授权码链路按 client_id 全局唯一查询（匿名端点无租户上下文，
+     *       注入默认 tenant_id=1 会挡住租户 2 应用认证）；OauthClientService 已显式按租户
+     *       page/create/校验归属，并有 OauthClientServiceTest 覆盖。</li>
+     *   <li>sys_oauth_config：平台级配置（仅租户 1 管理员可管理），OauthConfigService 入口即
+     *       FORBIDDEN 守卫；OauthLoginService 匿名链路按 provider 查询，加白名单会破坏三方登录。</li>
+     *   <li>sys_user_oauth：仅在 OauthLoginService 内读写且全部显式携带 tenantId（匿名绑定端点
+     *       以绑定凭证租户为准）；加白名单后 INSERT 会被拦截器强制覆盖为默认租户 1，破坏租户 2 绑定。</li>
+     *   <li>screen_template：tenant_id IS NULL 表示内置全局模板（全租户可见），非空为租户自定义；
+     *       ScreenTemplateService 已用 (tenantId = ?) OR (tenant_id IS NULL) 显式过滤，加白名单会
+     *       过滤掉内置模板。</li>
+     * </ul>
+     * 其余全部带 tenant_id 的业务表均已纳入上方名单，无遗漏。
+     */
+
     /** 租户列名：租户拦截器注入条件与字段审计直查过滤共用同源，避免硬编码两处分叉。 */
     public static final String TENANT_ID_COLUMN = "tenant_id";
 

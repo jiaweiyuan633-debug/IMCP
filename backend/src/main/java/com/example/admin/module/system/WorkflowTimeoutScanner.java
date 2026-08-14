@@ -3,6 +3,7 @@ package com.example.admin.module.system;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.MessageBizType;
 import com.example.admin.common.ScheduledTaskLock;
+import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.entity.SysProcessNodeDO;
 import com.example.admin.module.system.entity.SysWorkflowDO;
 import com.example.admin.module.system.mapper.SysProcessNodeMapper;
@@ -48,28 +49,45 @@ public class WorkflowTimeoutScanner {
             return;
         }
         try {
-            List<SysWorkflowDO> pending = workflowMapper.selectList(new LambdaQueryWrapper<SysWorkflowDO>()
-                    .eq(SysWorkflowDO::getStatus, WorkflowStatus.PENDING.name())
-                    .eq(SysWorkflowDO::getTimeoutNotified, 0)
-                    .isNotNull(SysWorkflowDO::getCurrentNodeAssignedAt)
-                    .last("LIMIT 100"));
-            if (pending.isEmpty()) {
-                return;
-            }
-            LocalDateTime now = LocalDateTime.now();
-            for (SysWorkflowDO workflow : pending) {
-                int timeoutHours = resolveTimeoutHours(workflow);
-                if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(now)) {
-                    continue;
+            // R4-1.29：@Scheduled 线程无租户上下文，直接 selectList 会被租户拦截器注入默认
+            // tenant_id=1，仅能扫到租户 1 的超时流程、其余租户提醒永不触发（同款缺陷见
+            // AiTaskScanner#scanTimeoutTasks 修复）。改为跨租户取全量租户，逐个就位上下文后扫描，
+            // 使 selectList/resolveTimeoutHours/updateById 全部按对应租户精确限定。
+            List<Long> tenantIds = workflowMapper.selectTenantIds();
+            for (Long tenantId : tenantIds) {
+                TenantContext.setTenantId(tenantId);
+                try {
+                    scanPendingForTenant();
+                } finally {
+                    TenantContext.clear();
                 }
-                notifyTimeout(workflow, timeoutHours);
-                workflow.setTimeoutNotified(1);
-                workflowMapper.updateById(workflow);
-                log.info("工作流节点超时提醒已发送: workflowId={}, node={}, timeoutHours={}",
-                        workflow.getId(), workflow.getCurrentNodeName(), timeoutHours);
             }
         } finally {
             taskLock.unlock("workflow-timeout-scan");
+        }
+    }
+
+    /** 当前租户上下文就位下扫描本租户超时流程（租户拦截器按 TenantContext 自动限定查询与更新）。 */
+    private void scanPendingForTenant() {
+        List<SysWorkflowDO> pending = workflowMapper.selectList(new LambdaQueryWrapper<SysWorkflowDO>()
+                .eq(SysWorkflowDO::getStatus, WorkflowStatus.PENDING.name())
+                .eq(SysWorkflowDO::getTimeoutNotified, 0)
+                .isNotNull(SysWorkflowDO::getCurrentNodeAssignedAt)
+                .last("LIMIT 100"));
+        if (pending.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (SysWorkflowDO workflow : pending) {
+            int timeoutHours = resolveTimeoutHours(workflow);
+            if (workflow.getCurrentNodeAssignedAt().plusHours(timeoutHours).isAfter(now)) {
+                continue;
+            }
+            notifyTimeout(workflow, timeoutHours);
+            workflow.setTimeoutNotified(1);
+            workflowMapper.updateById(workflow);
+            log.info("工作流节点超时提醒已发送: workflowId={}, node={}, timeoutHours={}",
+                    workflow.getId(), workflow.getCurrentNodeName(), timeoutHours);
         }
     }
 

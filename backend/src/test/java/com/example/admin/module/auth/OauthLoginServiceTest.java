@@ -25,6 +25,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -89,6 +91,8 @@ class OauthLoginServiceTest {
         assertThat(row.getProvider()).isEqualTo("github");
         assertThat(row.getOpenId()).isEqualTo("gh-123");
         assertThat(result.getAccessToken()).isEqualTo("at-1");
+        // R4-1.29：绑定成功必须清除失败计数，解锁账号
+        verify(redisTemplate).delete("oauth:bind:fail:2:zhangsan");
     }
 
     @Test
@@ -113,6 +117,34 @@ class OauthLoginServiceTest {
                 () -> service.bind(bindRequest("tok-1", "zhangsan", "pwd-1"), mock(HttpServletRequest.class)));
 
         assertThat(ex.getCode()).isEqualTo(ResultCode.BAD_CREDENTIALS.getCode());
+        verify(userOauthMapper, never()).insert(any(SysUserOauthDO.class));
+    }
+
+    @Test
+    void bindRejectsWhenFailureCountLocked() {
+        // R4-1.29：同一 (租户,用户名) 失败计数达阈值后绑定被直接拒绝，且不触碰用户查询（防单账号爆破）
+        stubBindToken("tok-1");
+        when(valueOps.get("oauth:bind:fail:2:zhangsan")).thenReturn("5");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.bind(bindRequest("tok-1", "zhangsan", "pwd-1"), mock(HttpServletRequest.class)));
+
+        assertThat(ex.getCode()).isEqualTo(ResultCode.LOGIN_TOO_MANY.getCode());
+        verify(userMapper, never()).selectByUsername(anyString(), anyLong());
+        verify(userOauthMapper, never()).insert(any(SysUserOauthDO.class));
+    }
+
+    @Test
+    void bindRejectsWhenIpRateLimited() {
+        // R4-1.29：IP 级限流在消费绑定凭证之前触发（防撒网爆破），无需有效凭证即可拒绝
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRemoteAddr()).thenReturn("203.0.113.9");
+        when(valueOps.increment("oauth:bind:rate:203.0.113.9")).thenReturn(21L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.bind(bindRequest("tok-any", "zhangsan", "pwd-1"), request));
+
+        assertThat(ex.getCode()).isEqualTo(ResultCode.LOGIN_TOO_MANY.getCode());
         verify(userOauthMapper, never()).insert(any(SysUserOauthDO.class));
     }
 

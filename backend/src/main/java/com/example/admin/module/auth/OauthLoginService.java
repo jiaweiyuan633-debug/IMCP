@@ -60,6 +60,14 @@ public class OauthLoginService {
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
     private static final Duration BIND_TTL = Duration.ofMinutes(15);
     private static final Duration LOGIN_TICKET_TTL = Duration.ofSeconds(60);
+    // R4-1.29：匿名绑定端点以「用户名+密码」验证平台账号，与密码登录同等级防暴力破解。
+    // 失败锁定键带租户——(tenant_id, username) 才唯一（V33），跨租户同名不互锁、不误伤。
+    private static final String BIND_FAIL_KEY_PREFIX = "oauth:bind:fail:";
+    private static final String BIND_RATE_KEY_PREFIX = "oauth:bind:rate:";
+    private static final int MAX_BIND_FAILURES = 5;
+    private static final int BIND_RATE_LIMIT_PER_MINUTE = 20;
+    private static final long BIND_RATE_WINDOW_MINUTES = 1;
+    private static final long BIND_FAIL_LOCK_MINUTES = 10;
 
     private final SysOauthConfigMapper oauthConfigMapper;
     private final SysUserOauthMapper userOauthMapper;
@@ -186,22 +194,30 @@ public class OauthLoginService {
 
     /** 绑定第三方账号到平台账号并登录。 */
     public LoginResponse bind(OauthBindRequest request, HttpServletRequest httpRequest) {
+        // R4-1.29：匿名绑定端点以「用户名+密码」验证平台账号，防护须与密码登录同等级——
+        // IP 级限流防撒网爆破（取 socket 真实地址，与 ApiRateLimitInterceptor 同源原则）+ 用户名失败锁定。
+        if (isBindRateLimited(httpRequest.getRemoteAddr())) {
+            throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
+        }
         BindData bindData = consumeBindToken(request.getBindToken());
         if (bindData == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "绑定凭证无效或已过期");
         }
+        checkBindLockout(bindData.getTenantId(), request.getUsername());
         // R4-1.19：匿名绑定端点无租户上下文，selectOne 会被租户拦截器注入默认 tenant_id=1，
         // 租户 2 的平台账号按用户名永远查不到、绑定必失败。改走 R1-1.7 的跨租户辅助方法，
         // 并以绑定凭证携带的配置租户精确限定（与 findBinding/bindToUser 同一租户来源）。
         List<SysUserDO> users = userMapper.selectByUsername(request.getUsername(), bindData.getTenantId());
         SysUserDO user = users.isEmpty() ? null : users.get(0);
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            recordBindFailure(bindData.getTenantId(), request.getUsername());
             throw new BusinessException(ResultCode.BAD_CREDENTIALS);
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
         bindToUser(user.getId(), bindData.getProvider(), bindData.getTenantId(), bindData);
+        clearBindFailures(bindData.getTenantId(), request.getUsername());
         return authService.completeLogin(user, httpRequest);
     }
 
@@ -372,6 +388,40 @@ public class OauthLoginService {
         }
         redisTemplate.delete(BIND_KEY_PREFIX + bindToken);
         return fromJson(json, BindData.class);
+    }
+
+    // ---------- 绑定暴力破解防护（R4-1.29，与 AuthService 登录防护同等级） ----------
+
+    private boolean isBindRateLimited(String ip) {
+        String key = BIND_RATE_KEY_PREFIX + ip;
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofMinutes(BIND_RATE_WINDOW_MINUTES));
+        }
+        return count != null && count > BIND_RATE_LIMIT_PER_MINUTE;
+    }
+
+    private void checkBindLockout(Long tenantId, String username) {
+        String value = redisTemplate.opsForValue().get(bindFailKey(tenantId, username));
+        if (value != null && Integer.parseInt(value) >= MAX_BIND_FAILURES) {
+            throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
+        }
+    }
+
+    private void recordBindFailure(Long tenantId, String username) {
+        String key = bindFailKey(tenantId, username);
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofMinutes(BIND_FAIL_LOCK_MINUTES));
+        }
+    }
+
+    private void clearBindFailures(Long tenantId, String username) {
+        redisTemplate.delete(bindFailKey(tenantId, username));
+    }
+
+    private static String bindFailKey(Long tenantId, String username) {
+        return BIND_FAIL_KEY_PREFIX + tenantId + ":" + username;
     }
 
     // ---------- 工具 ----------
