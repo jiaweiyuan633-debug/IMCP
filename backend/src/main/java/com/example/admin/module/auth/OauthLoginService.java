@@ -3,6 +3,7 @@ package com.example.admin.module.auth;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthAuthorizeUrlRequest;
 import com.example.admin.module.auth.dto.OauthBindRequest;
@@ -68,6 +69,7 @@ public class OauthLoginService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final PasswordEncoder passwordEncoder;
+    private final SecretCipher secretCipher;
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
@@ -235,10 +237,12 @@ public class OauthLoginService {
 
     private OauthToken fetchAccessToken(OauthProvider provider, SysOauthConfigDO config, String code) {
         try {
+            // R4-1.28：appSecret 落库为 AES-GCM 密文，调用第三方前解密（存量明文经 SecretCipher 原样放行）
+            String appSecret = secretCipher.decrypt(config.getAppSecret());
             if (provider == OauthProvider.WECHAT) {
                 String url = provider.getTokenUrl()
                         + "?appid=" + config.getAppId()
-                        + "&secret=" + config.getAppSecret()
+                        + "&secret=" + appSecret
                         + "&code=" + code
                         + "&grant_type=authorization_code";
                 Map<String, Object> resp = restTemplate.getForObject(url, Map.class);
@@ -254,7 +258,7 @@ public class OauthLoginService {
             headers.setAccept(List.of(MediaType.APPLICATION_JSON));
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("client_id", config.getAppId());
-            body.add("client_secret", config.getAppSecret());
+            body.add("client_secret", appSecret);
             body.add("code", code);
             if (provider == OauthProvider.GITEE) {
                 body.add("grant_type", "authorization_code");

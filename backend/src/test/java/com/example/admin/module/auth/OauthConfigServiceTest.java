@@ -3,6 +3,7 @@ package com.example.admin.module.auth;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthConfigQuery;
 import com.example.admin.module.auth.dto.OauthConfigSaveRequest;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * R4-1.22：sys_oauth_config 平台级租户守卫。配置为平台级设置，仅租户 1 管理员可管理；
@@ -33,6 +35,8 @@ class OauthConfigServiceTest {
 
     @Mock
     private SysOauthConfigMapper oauthConfigMapper;
+    @Mock
+    private SecretCipher secretCipher;
 
     @InjectMocks
     private OauthConfigService oauthConfigService;
@@ -70,13 +74,16 @@ class OauthConfigServiceTest {
     }
 
     @Test
-    void createForcesPlatformTenantOwnership() {
+    void createForcesPlatformTenantOwnershipAndEncryptsSecret() {
         // create 未显式设置 tenant_id 时靠 DB 默认落 1；现显式固化，防止路由歧义。
         TenantContext.setTenantId(1L);
+        // R4-1.28：appSecret 落库前必须加密（明文永不入库）
+        when(secretCipher.encrypt("secret")).thenReturn("enc:cipher");
         oauthConfigService.create(request());
         ArgumentCaptor<SysOauthConfigDO> captor = ArgumentCaptor.forClass(SysOauthConfigDO.class);
         verify(oauthConfigMapper).insert(captor.capture());
         assertThat(captor.getValue().getTenantId()).isEqualTo(1L);
+        assertThat(captor.getValue().getAppSecret()).isEqualTo("enc:cipher");
     }
 
     @Test

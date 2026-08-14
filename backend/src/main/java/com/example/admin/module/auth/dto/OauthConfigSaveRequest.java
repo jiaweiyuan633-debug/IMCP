@@ -15,7 +15,7 @@ public class OauthConfigSaveRequest {
     @NotBlank(message = "客户端 ID 不能为空")
     private String appId;
 
-    @NotBlank(message = "客户端密钥不能为空")
+    /** 密钥仅创建时必填：编辑时不重输（空/掩码占位）表示沿用既有密文，由服务层 resolveSecret 识别。 */
     @Size(max = 255, message = "客户端密钥长度不能超过 255")
     private String appSecret;
 

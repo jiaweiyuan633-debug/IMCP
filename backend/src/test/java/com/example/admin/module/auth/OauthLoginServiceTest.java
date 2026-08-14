@@ -2,6 +2,7 @@ package com.example.admin.module.auth;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.auth.dto.OauthBindRequest;
 import com.example.admin.module.auth.entity.SysUserOauthDO;
 import com.example.admin.module.auth.mapper.SysOauthConfigMapper;
@@ -62,7 +63,7 @@ class OauthLoginServiceTest {
         restTemplate = mock(RestTemplate.class);
         passwordEncoder = mock(PasswordEncoder.class);
         service = new OauthLoginService(oauthConfigMapper, userOauthMapper, userMapper, authService,
-                redisTemplate, new ObjectMapper(), restTemplate, passwordEncoder);
+                redisTemplate, new ObjectMapper(), restTemplate, passwordEncoder, mock(SecretCipher.class));
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
     }
 

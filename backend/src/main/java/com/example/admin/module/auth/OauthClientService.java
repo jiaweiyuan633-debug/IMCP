@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthClientQuery;
 import com.example.admin.module.auth.dto.OauthClientSaveRequest;
@@ -27,7 +28,11 @@ public class OauthClientService {
 
     private static final int ENABLED = 1;
 
+    /** 返回给前端的密钥掩码占位：列表/编辑回显恒为该值，编辑不重输即视为保持不变（resolveSecret 识别）。 */
+    private static final String SECRET_MASK = "********";
+
     private final SysOauthClientMapper oauthClientMapper;
+    private final SecretCipher secretCipher;
 
     public PageResult<OauthClientVo> page(OauthClientQuery query) {
         Page<SysOauthClientDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -46,7 +51,11 @@ public class OauthClientService {
         // client_id 跨租户全局唯一：SSO 授权链路匿名按 client_id 解析（SsoAuthService.requireEnabledClient），
         // 两租户重名会 selectOne 抛 TooManyResultsException——创建时即拦截，避免数据模型允许但运行时必然炸。
         ensureClientIdUnique(request.getClientId(), null);
+        if (!StringUtils.hasText(request.getClientSecret())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "client_secret 不能为空");
+        }
         SysOauthClientDO client = toEntity(request);
+        client.setClientSecret(secretCipher.encrypt(request.getClientSecret()));
         client.setTenantId(TenantContext.getTenantId());
         oauthClientMapper.insert(client);
         return client.getId();
@@ -56,9 +65,20 @@ public class OauthClientService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "应用 ID 不能为空");
         }
-        requireOwned(request.getId());
+        SysOauthClientDO existing = requireOwned(request.getId());
         ensureClientIdUnique(request.getClientId(), request.getId());
-        oauthClientMapper.updateById(toEntity(request));
+        SysOauthClientDO client = toEntity(request);
+        // 编辑不重输密钥（空/掩码/已是密文）视为保持不变：沿用库中既有密文，避免明文覆盖或双次加密
+        client.setClientSecret(resolveSecret(existing.getClientSecret(), request.getClientSecret()));
+        oauthClientMapper.updateById(client);
+    }
+
+    /** 新密钥 → AES-GCM 加密；空/掩码占位/已是密文 → 沿用既有存储值（无前缀存量明文在此自动升级为密文）。 */
+    private String resolveSecret(String stored, String presented) {
+        if (!StringUtils.hasText(presented) || SECRET_MASK.equals(presented) || secretCipher.isEncrypted(presented)) {
+            return stored;
+        }
+        return secretCipher.encrypt(presented);
     }
 
     public void updateStatus(Long id, Integer enabled) {
@@ -99,7 +119,6 @@ public class OauthClientService {
         client.setId(request.getId());
         client.setClientName(request.getClientName());
         client.setClientId(request.getClientId());
-        client.setClientSecret(request.getClientSecret());
         client.setRedirectUri(request.getRedirectUri());
         client.setScope(request.getScope());
         client.setEnabled(request.getEnabled() == null ? ENABLED : request.getEnabled());
@@ -113,7 +132,8 @@ public class OauthClientService {
                 .id(client.getId())
                 .clientName(client.getClientName())
                 .clientId(client.getClientId())
-                .clientSecret(client.getClientSecret())
+                // 密钥永不明文回传：掩码占位供前端回显，编辑不重输即保持不变
+                .clientSecret(client.getClientSecret() == null ? null : SECRET_MASK)
                 .redirectUri(client.getRedirectUri())
                 .scope(client.getScope())
                 .enabled(client.getEnabled())

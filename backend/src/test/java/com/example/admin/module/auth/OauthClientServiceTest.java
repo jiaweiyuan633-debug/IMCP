@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthClientQuery;
 import com.example.admin.module.auth.dto.OauthClientSaveRequest;
@@ -39,6 +40,8 @@ class OauthClientServiceTest {
 
     @Mock
     private SysOauthClientMapper oauthClientMapper;
+    @Mock
+    private SecretCipher secretCipher;
 
     @InjectMocks
     private OauthClientService oauthClientService;
@@ -80,15 +83,18 @@ class OauthClientServiceTest {
     }
 
     @Test
-    void createAssignsCurrentTenant() {
+    void createAssignsCurrentTenantAndEncryptsSecret() {
         TenantContext.setTenantId(2L);
         when(oauthClientMapper.selectCount(any())).thenReturn(0L);
+        // R4-1.28：client_secret 落库前必须加密（明文永不入库）
+        when(secretCipher.encrypt("secret")).thenReturn("enc:cipher");
 
         oauthClientService.create(request());
 
         ArgumentCaptor<SysOauthClientDO> captor = ArgumentCaptor.forClass(SysOauthClientDO.class);
         verify(oauthClientMapper).insert(captor.capture());
         assertThat(captor.getValue().getTenantId()).isEqualTo(2L);
+        assertThat(captor.getValue().getClientSecret()).isEqualTo("enc:cipher");
     }
 
     @Test

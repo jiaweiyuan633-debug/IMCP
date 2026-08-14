@@ -3,6 +3,7 @@ package com.example.admin.module.auth;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.SsoTokenRequest;
 import com.example.admin.module.auth.entity.SysOauthClientDO;
@@ -45,6 +46,7 @@ public class SsoAuthService {
     private final JwtProperties jwtProperties;
     private final TokenService tokenService;
     private final StringRedisTemplate redisTemplate;
+    private final SecretCipher secretCipher;
 
     /** 当前登录用户授权某第三方应用，签发一次性授权码。 */
     public SsoAuthorizeVo authorize(String clientId, String redirectUri) {
@@ -70,7 +72,8 @@ public class SsoAuthService {
         SysOauthClientDO client = requireEnabledClient(request.getClientId());
         // R2-1.1：client_secret 必须恒定时间比较。String.equals 按字节短路，逐位差异产生
         // 可观测的耗时差（时序侧信道），允许远程枚举密钥；MessageDigest.isEqual 固定遍历全部字节。
-        if (!constantTimeEquals(client.getClientSecret(), request.getClientSecret())) {
+        // R4-1.28：落库值为 AES-GCM 密文，先解密再与提交值比较（存量明文经 SecretCipher 原样放行）。
+        if (!constantTimeEquals(secretCipher.decrypt(client.getClientSecret()), request.getClientSecret())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "client_secret 无效");
         }
         String value = redisTemplate.opsForValue().get(SSO_CODE_PREFIX + request.getCode());

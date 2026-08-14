@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.OauthConfigQuery;
 import com.example.admin.module.auth.dto.OauthConfigSaveRequest;
@@ -27,7 +28,11 @@ public class OauthConfigService {
 
     private static final int ENABLED = 1;
 
+    /** 返回给前端的密钥掩码占位：编辑不重输即视为保持不变（resolveSecret 识别）。 */
+    private static final String SECRET_MASK = "********";
+
     private final SysOauthConfigMapper oauthConfigMapper;
+    private final SecretCipher secretCipher;
 
     public PageResult<OauthConfigVo> page(OauthConfigQuery query) {
         requirePlatformTenant();
@@ -45,7 +50,11 @@ public class OauthConfigService {
     public Long create(OauthConfigSaveRequest request) {
         requirePlatformTenant();
         validateProvider(request.getProvider());
+        if (!StringUtils.hasText(request.getAppSecret())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "客户端密钥不能为空");
+        }
         SysOauthConfigDO config = toEntity(request);
+        config.setAppSecret(secretCipher.encrypt(request.getAppSecret()));
         // 平台级配置归属恒为租户 1：登录链路按 provider 全局解析（OauthLoginService.requireEnabled），
         // 回调按本配置 tenant_id 路由绑定身份；此前未显式设置，靠 DB 默认落 1，现显式固化。
         config.setTenantId(1L);
@@ -59,7 +68,22 @@ public class OauthConfigService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "配置 ID 不能为空");
         }
         validateProvider(request.getProvider());
-        oauthConfigMapper.updateById(toEntity(request));
+        SysOauthConfigDO existing = oauthConfigMapper.selectById(request.getId());
+        if (existing == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        SysOauthConfigDO config = toEntity(request);
+        // 编辑不重输密钥（空/掩码/已是密文）视为保持不变：沿用库中既有密文
+        config.setAppSecret(resolveSecret(existing.getAppSecret(), request.getAppSecret()));
+        oauthConfigMapper.updateById(config);
+    }
+
+    /** 新密钥 → AES-GCM 加密；空/掩码占位/已是密文 → 沿用既有存储值。 */
+    private String resolveSecret(String stored, String presented) {
+        if (!StringUtils.hasText(presented) || SECRET_MASK.equals(presented) || secretCipher.isEncrypted(presented)) {
+            return stored;
+        }
+        return secretCipher.encrypt(presented);
     }
 
     public void updateStatus(Long id, Integer enabled) {
@@ -97,7 +121,6 @@ public class OauthConfigService {
         config.setId(request.getId());
         config.setProvider(request.getProvider());
         config.setAppId(request.getAppId());
-        config.setAppSecret(request.getAppSecret());
         config.setRedirectUri(request.getRedirectUri());
         config.setScope(request.getScope());
         config.setEnabled(request.getEnabled() == null ? ENABLED : request.getEnabled());
@@ -112,7 +135,8 @@ public class OauthConfigService {
                 .provider(config.getProvider())
                 .providerLabel(providerLabel(config.getProvider()))
                 .appId(config.getAppId())
-                .appSecret(config.getAppSecret())
+                // 密钥永不明文回传：掩码占位供前端回显，编辑不重输即保持不变
+                .appSecret(config.getAppSecret() == null ? null : SECRET_MASK)
                 .redirectUri(config.getRedirectUri())
                 .scope(config.getScope())
                 .enabled(config.getEnabled())

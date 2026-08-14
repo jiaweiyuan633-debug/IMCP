@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.auth.dto.SsoTokenRequest;
 import com.example.admin.module.auth.entity.SysOauthClientDO;
@@ -59,9 +60,16 @@ class SsoAuthServiceTest {
     private TokenService tokenService;
     @Mock
     private StringRedisTemplate redisTemplate;
+    @Mock
+    private SecretCipher secretCipher;
 
     @InjectMocks
     private SsoAuthService ssoAuthService;
+
+    /** 存量明文按原样放行（SecretCipher 对无前缀值的兼容语义）。 */
+    private void stubPlaintextDecrypt() {
+        when(secretCipher.decrypt(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @BeforeAll
     static void registerMybatisPlusTableInfo() {
@@ -104,6 +112,7 @@ class SsoAuthServiceTest {
         SysOauthClientDO client = enabledClient("https://app.com/callback");
         client.setClientSecret("secret");
         when(oauthClientMapper.selectOne(any())).thenReturn(client);
+        stubPlaintextDecrypt();
 
         SsoTokenRequest request = new SsoTokenRequest();
         request.setClientId("app-1");
@@ -120,6 +129,7 @@ class SsoAuthServiceTest {
         SysOauthClientDO client = enabledClient("https://app.com/callback");
         client.setClientSecret("secret");
         when(oauthClientMapper.selectOne(any())).thenReturn(client);
+        stubPlaintextDecrypt();
         when(jwtUtil.generateJti()).thenReturn("access-1");
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOps = mock(ValueOperations.class);

@@ -15,7 +15,7 @@ public class OauthClientSaveRequest {
     @NotBlank(message = "client_id 不能为空")
     private String clientId;
 
-    @NotBlank(message = "client_secret 不能为空")
+    /** 密钥仅创建时必填：编辑时不重输（空/掩码占位）表示沿用既有密文，由服务层 resolveSecret 识别。 */
     private String clientSecret;
 
     private String redirectUri;

@@ -12,6 +12,8 @@ import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -23,17 +25,33 @@ import java.time.format.DateTimeFormatter;
 @ConditionalOnProperty(name = "app.storage.type", havingValue = "minio")
 public class MinioFileStorage implements FileStorage {
 
-    @Value("${app.storage.minio.endpoint:http://localhost:9000}")
-    private String endpoint;
+    /** MinIO 官方镜像默认凭据；生产使用即等于对桶开放全权访问，构造时 fail-fast 拒绝。 */
+    private static final String DEFAULT_ACCESS_KEY = "minioadmin";
+    private static final String DEFAULT_SECRET_KEY = "minioadmin";
 
-    @Value("${app.storage.minio.access-key:minioadmin}")
-    private String accessKey;
+    private final String endpoint;
+    private final String accessKey;
+    private final String secretKey;
+    private final String bucket;
 
-    @Value("${app.storage.minio.secret-key:minioadmin}")
-    private String secretKey;
-
-    @Value("${app.storage.minio.bucket:admin}")
-    private String bucket;
+    public MinioFileStorage(
+            @Value("${app.storage.minio.endpoint:http://localhost:9000}") String endpoint,
+            @Value("${app.storage.minio.access-key:minioadmin}") String accessKey,
+            @Value("${app.storage.minio.secret-key:minioadmin}") String secretKey,
+            @Value("${app.storage.minio.bucket:admin}") String bucket,
+            Environment environment) {
+        this.endpoint = endpoint;
+        this.accessKey = accessKey;
+        this.secretKey = secretKey;
+        this.bucket = bucket;
+        // 与 TotpService/JwtProperties 同款 fail-fast 策略：仅 dev 允许默认凭据（本地 MinIO 快速演示），
+        // 生产（显式启用 minio 存储而未注入独立密钥）启动即失败，杜绝默认口令桶对外泄露
+        boolean isDev = environment != null && environment.acceptsProfiles(Profiles.of("dev"));
+        if (!isDev && (DEFAULT_ACCESS_KEY.equals(accessKey) || DEFAULT_SECRET_KEY.equals(secretKey))) {
+            throw new IllegalStateException("生产环境禁止使用 MinIO 默认凭据 minioadmin/minioadmin，"
+                    + "请通过 MINIO_ACCESS_KEY / MINIO_SECRET_KEY 注入独立密钥");
+        }
+    }
 
     @Override
     public String type() {
