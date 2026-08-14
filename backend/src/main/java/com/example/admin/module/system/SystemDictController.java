@@ -30,6 +30,27 @@ public class SystemDictController {
 
     private final SystemDictService dictService;
 
+    @GetMapping("/shared")
+    @PreAuthorize("hasAuthority('system:dict:shared:list')")
+    public Result<PageResult<DictTypeVo>> sharedTypePage(DictTypeQuery query) {
+        return Result.success(dictService.sharedTypePage(query));
+    }
+
+    @PostMapping("/shared")
+    @PreAuthorize("hasAuthority('system:dict:shared:add')")
+    @OperLog(module = "共享字典", action = "新增共享字典")
+    public Result<Long> sharedTypeCreate(@Valid @RequestBody DictTypeSaveRequest request) {
+        return Result.success(dictService.sharedTypeCreate(request));
+    }
+
+    @PutMapping("/shared")
+    @PreAuthorize("hasAuthority('system:dict:shared:edit')")
+    @OperLog(module = "共享字典", action = "编辑共享字典")
+    public Result<Void> sharedTypeUpdate(@Valid @RequestBody DictTypeSaveRequest request) {
+        dictService.sharedTypeUpdate(request);
+        return Result.success();
+    }
+
     @GetMapping("/type")
     @PreAuthorize("hasAuthority('system:dict:list')")
     public Result<PageResult<DictTypeVo>> typePage(DictTypeQuery query) {

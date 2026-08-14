@@ -23,6 +23,15 @@ public interface SysDictTypeMapper extends BaseMapper<SysDictTypeDO> {
             """)
     List<SysDictTypeDO> selectSharedTypes();
 
+    /** 全部共享字典类型（is_shared=1，含停用，供共享字典管理页分页/编辑）：绕过租户拦截器。 */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT * FROM sys_dict_type
+            WHERE is_shared = 1
+            ORDER BY id
+            """)
+    List<SysDictTypeDO> selectSharedTypeAll();
+
     /** 按类型编码查字典类型（不区分租户，用于判断是否共享类型）。 */
     @InterceptorIgnore(tenantLine = "true")
     @Select("""

@@ -115,6 +115,7 @@ export interface DictTypeVo {
   dictName: string
   dictType: string
   status: number
+  isShared?: number
   remark?: string
   createdAt?: string
 }
@@ -276,6 +277,65 @@ export function updateDictData(data: Record<string, unknown>): Promise<void> {
 
 export function deleteDictData(id: number): Promise<void> {
   return request.delete(`/system/dict/data/${id}`)
+}
+
+export interface SharedDictTypeQuery {
+  pageNum: number
+  pageSize: number
+  dictName?: string
+  dictType?: string
+  status?: number
+}
+
+export function getSharedDictTypePage(params: SharedDictTypeQuery): Promise<PageResult<DictTypeVo>> {
+  return request.get('/system/dict/shared', { params })
+}
+
+export function createSharedDictType(data: Record<string, unknown>): Promise<number> {
+  return request.post('/system/dict/shared', data)
+}
+
+export function updateSharedDictType(data: Record<string, unknown>): Promise<void> {
+  return request.put('/system/dict/shared', data)
+}
+
+export interface ApiPermVo {
+  id: number
+  method: string
+  pathPattern: string
+  permCode: string
+  enabled: number
+  remark?: string
+  createdAt?: string
+}
+
+export interface ApiPermSaveRequest {
+  id?: number
+  method: string
+  pathPattern: string
+  permCode: string
+  enabled?: number
+  remark?: string
+}
+
+export function getApiPermPage(params: Record<string, unknown>): Promise<PageResult<ApiPermVo>> {
+  return request.get('/system/api-perm', { params })
+}
+
+export function createApiPerm(data: ApiPermSaveRequest): Promise<number> {
+  return request.post('/system/api-perm', data)
+}
+
+export function updateApiPerm(data: ApiPermSaveRequest): Promise<void> {
+  return request.put('/system/api-perm', data)
+}
+
+export function deleteApiPerm(id: number): Promise<void> {
+  return request.delete(`/system/api-perm/${id}`)
+}
+
+export function reloadApiPerm(): Promise<void> {
+  return request.post('/system/api-perm/reload')
 }
 
 export function getConfigPage(params: Record<string, unknown>): Promise<PageResult<ConfigVo>> {

@@ -73,6 +73,21 @@ public class SystemDictService {
         return new PageResult<>(records, result.getTotal() + shared.size(), page.getCurrent(), page.getSize());
     }
 
+    /**
+     * 共享字典类型分页（is_shared=1，tenant_id=0 全局一份）：供「共享字典」管理页专用，
+     * 需要 system:dict:shared:list 权限。共享在前、按 id 升序，内存过滤查询条件。
+     */
+    public PageResult<DictTypeVo> sharedTypePage(DictTypeQuery query) {
+        List<SysDictTypeDO> all = typeMapper.selectSharedTypeAll().stream()
+                .filter(t -> matchesTypeQuery(t, query))
+                .toList();
+        long total = all.size();
+        int from = (int) Math.min((query.getPageNum() - 1) * query.getPageSize(), total);
+        int to = (int) Math.min(query.getPageNum() * query.getPageSize(), total);
+        List<DictTypeVo> records = all.subList(from, to).stream().map(this::toTypeVo).toList();
+        return new PageResult<>(records, total, query.getPageNum(), query.getPageSize());
+    }
+
     public Long typeCreate(DictTypeSaveRequest request) {
         boolean shared = isSharedRequest(request);
         checkTypeUnique(request.getDictType(), null, shared);
@@ -87,6 +102,18 @@ public class SystemDictService {
             throw new BusinessException(ResultCode.DICT_TYPE_EXISTS);
         }
         return type.getId();
+    }
+
+    /** 共享字典类型新增（强制 is_shared=1、tenant_id=0 全局一份）：需要 system:dict:shared:add。 */
+    public Long sharedTypeCreate(DictTypeSaveRequest request) {
+        request.setIsShared(1);
+        return typeCreate(request);
+    }
+
+    /** 共享字典类型编辑（强制 is_shared=1，防止被改回私有）：需要 system:dict:shared:edit。 */
+    public void sharedTypeUpdate(DictTypeSaveRequest request) {
+        request.setIsShared(1);
+        typeUpdate(request);
     }
 
     @FieldAudit(entity = SysDictTypeDO.class, action = "UPDATE", module = "字典管理")
