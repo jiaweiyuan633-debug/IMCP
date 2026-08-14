@@ -54,6 +54,30 @@ async def test_duplicate_task_rejected_with_409() -> None:
 
 
 @pytest.mark.asyncio
+async def test_concurrent_duplicate_task_only_one_succeeds() -> None:
+    """R4-1.30：并发同 task_no 提交只有一方落库成功（SET NX 原子去重，无 check-then-set 竞态）。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    service = _FakeService()
+    manager = TaskManager(redis, Settings(worker_count=1), services={"job": service})
+
+    async def submit() -> int:
+        try:
+            await manager.create_task(TaskCreateRequest(task_no="dup", biz_type="job", params={}))
+            return 200
+        except HTTPException as exc:
+            return exc.status_code
+
+    results = await asyncio.gather(submit(), submit())
+    assert sorted(results) == [200, 409]
+
+    # 落库的任务被消费且只执行一次，无重复实例
+    await _wait(manager, ["dup"])
+    task = await manager.get_task("dup")
+    assert task.status == "SUCCEEDED"
+    assert len(service.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_unsupported_biz_type_rejected() -> None:
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     manager = TaskManager(redis, Settings(), services={"job": _FakeService()})

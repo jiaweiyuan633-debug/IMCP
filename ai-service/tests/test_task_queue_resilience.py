@@ -104,6 +104,47 @@ async def test_startup_recovery_requeues_stale_running_task() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ensure_workers_consumes_leftover_after_restart() -> None:
+    """R4-1.30：进程重启后遗留 QUEUED 任务即使无新提交也有消费者（ensure_workers 主动拉起）。
+
+    修复前 worker 仅在 create_task/retry 时被动启动：重启后队列有遗留任务但无人提交
+    新任务，_ensure_workers 永不触发，遗留任务永久停滞。lifespan 启动调用 ensure_workers。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    service = _FakeService()
+    manager = TaskManager(redis, Settings(worker_count=1), services={"job": service})
+
+    # 模拟重启前的残留：任务已落库并入队，但 worker 从未启动（无消费者）
+    leftover = {
+        "task_no": "leftover",
+        "biz_type": "job",
+        "status": "QUEUED",
+        "params": {},
+        "callback_url": None,
+        "request_id": None,
+        "result": None,
+        "error": None,
+        "retry_count": 0,
+        "max_retry": 3,
+        "priority": 5,
+        "timeout": 30,
+        "created_at": "2026-08-13T00:00:00+00:00",
+        "updated_at": "2026-08-13T00:00:00+00:00",
+    }
+    await manager._save("leftover", leftover)
+    await manager._enqueue_ready("leftover", 5)
+    assert not manager._workers  # 尚无消费者
+
+    manager.ensure_workers()
+    assert len(manager._workers) == 1
+
+    task = await _wait_terminal(manager, "leftover")
+    assert task.status == "SUCCEEDED"
+    assert service.calls == 1
+    await manager.close()
+
+
+@pytest.mark.asyncio
 async def test_execute_error_requeues_inflight_task() -> None:
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     service = _FakeService()

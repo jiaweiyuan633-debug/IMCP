@@ -261,7 +261,12 @@ class Scheduler:
             if not due_ids:
                 await asyncio.sleep(self.settings.scheduler_poll_seconds)
                 continue
-            await self.redis.zrem(self.settings.scheduler_due_key, *due_ids)
+            # R4-1.30：多副本领取互斥——zrangebyscore 只读，两实例可读到同一批到期项；
+            # zrem 返回实际删除数，仅删除到（>0）的实例拥有这批的处置权，另一实例跳过。
+            # 若不判 removed，两实例都会 _process_due 并各自 create_task，调度任务被重复触发。
+            removed = await self.redis.zrem(self.settings.scheduler_due_key, *due_ids)
+            if not removed:
+                continue
             for id_ in due_ids:
                 await self._process_due(id_, now)
 

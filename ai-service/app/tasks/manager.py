@@ -70,10 +70,6 @@ class TaskManager:
                 await asyncio.to_thread(self._callback_guard.validate, request.callback_url)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=f"非法回调地址: {exc}") from exc
-        # 去重：同名任务已存在（含已结束）直接 409，避免重复提交
-        if await self._get(request.task_no) is not None:
-            raise HTTPException(status_code=409, detail=f"task already exists: {request.task_no}")
-
         now = _now()
         data = {
             "task_no": request.task_no,
@@ -91,7 +87,14 @@ class TaskManager:
             "created_at": now,
             "updated_at": now,
         }
-        await self._save(request.task_no, data)
+        # R4-1.30：去重原子化——SET NX 单命令判定「已存在」并落库，杜绝 check-then-set 竞态
+        # （并发同 task_no 提交时，两个请求原本都经 _get 判空后各自覆盖写入产生重复任务，
+        #  调度器多副本触发同名调度即命中此竞态）。NX 未写入说明同名任务已存在（含终态）→ 409。
+        written = await self.redis.set(
+            KEY_PREFIX + request.task_no, json.dumps(data, ensure_ascii=False), nx=True
+        )
+        if not written:
+            raise HTTPException(status_code=409, detail=f"task already exists: {request.task_no}")
         await self._enqueue_ready(request.task_no, request.priority)
         self._ensure_workers()
         ai_task_created_total.inc()
@@ -127,6 +130,12 @@ class TaskManager:
             self._workers.add(task)
             task.add_done_callback(self._on_worker_done)
         ai_worker_count.set(len(self._workers))
+
+    def ensure_workers(self) -> None:
+        """确保工作线程在运行（幂等）。进程重启后队列可能残留未消费任务，若之后无人
+        提交新任务、_ensure_workers 不会被被动触发，遗留任务（QUEUED/delayed）将永久
+        停滞——应用启动时须调用本方法主动拉起消费者。"""
+        self._ensure_workers()
 
     def _on_worker_done(self, task: asyncio.Task[None]) -> None:
         self._workers.discard(task)

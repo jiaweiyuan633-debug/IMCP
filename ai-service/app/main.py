@@ -45,6 +45,10 @@ async def lifespan(app: FastAPI):
     # 崩溃自愈：启动时回收租约过期的 RUNNING 遗留任务重新入队（见
     # TaskManager.recover_stale_tasks），避免进程被杀/滚动发布后任务永久卡死
     await task_manager.recover_stale_tasks()
+    # R4-1.30：启动即拉起工作线程——否则进程重启后队列残留任务（QUEUED/delayed）若无
+    # 新提交触发 _ensure_workers，遗留任务将永远无人消费（worker 仅在 create_task/retry
+    # 时被动启动）
+    task_manager.ensure_workers()
     app.state.task_manager = task_manager
 
     scheduler = Scheduler(redis, settings)

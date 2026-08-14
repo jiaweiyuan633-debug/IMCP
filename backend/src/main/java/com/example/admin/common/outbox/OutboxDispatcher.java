@@ -18,6 +18,8 @@ import java.util.Map;
 /**
  * 发件箱投递器：把待投递行路由到对应 {@link OutboxHandler}，成功置终态，
  * 失败按指数退避写回 {@code next_retry_at} 待重试，超限进入终态失败。
+ * 投递以条件更新原子抢占（PENDING/FAILED → PROCESSING）为界，保证两路投递与
+ * 多副本清扫不会对同一行并发调用 handler。
  *
  * <p>投递入口有两路，互相兜底：
  * <ul>
@@ -40,6 +42,10 @@ public class OutboxDispatcher {
     private static final int STATUS_SUCCESS = 1;
     private static final int STATUS_FAILED = 2;
     private static final int STATUS_DEAD = 3;
+    /** R4-1.30：投递中（已被某实例原子抢占，防止同一行被重复投递）。 */
+    private static final int STATUS_PROCESSING = 4;
+    /** 投递中状态滞留超时（分钟）：超过即视为抢占者崩溃/超长处理，允许清扫回收重新投递。 */
+    private static final int PROCESSING_STALE_MINUTES = 5;
 
     private final JdbcTemplate jdbcTemplate;
     private final List<OutboxHandler> handlers;
@@ -60,15 +66,28 @@ public class OutboxDispatcher {
     }
 
     /**
-     * 投递单条发件箱行。成功置 1；失败记一次重试并退避（超限置 3）。
-     * 本方法幂等：对已成功/终态失败的行直接跳过。
+     * 投递单条发件箱行。先原子抢占（置 PROCESSING）再执行 handler：抢占成功才处理，
+     * 成功置 1；失败记一次重试并退避（超限置 3）；未抢到直接跳过。
+     *
+     * <p>抢占是防重复投递的关键——事务提交即时投递与定时清扫两路、以及多副本清扫都可能
+     * 并发处理同一行，若无中间态则 handler 会被重复调用产生重复副作用（webhook 重复外发等）。
      */
     public void dispatch(Long outboxId) {
         if (outboxId == null) {
             return;
         }
+        // R4-1.30：条件更新抢占——仅当行仍可投递（待投递/待重试且已到重试时间）且未被他人
+        // 领取时才置 PROCESSING；受影响行数为 0 说明已被抢占/已终态/未到重试时间，直接跳过。
+        int claimed = jdbcTemplate.update(
+                "UPDATE sys_outbox SET status = ?, updated_at = NOW() WHERE id = ?"
+                        + " AND status IN (?, ?) AND (next_retry_at IS NULL OR next_retry_at <= NOW())",
+                STATUS_PROCESSING, outboxId, STATUS_PENDING, STATUS_FAILED);
+        if (claimed == 0) {
+            return;
+        }
         Row row = queryRow(outboxId);
-        if (row == null || row.status == STATUS_SUCCESS || row.status == STATUS_DEAD) {
+        if (row == null) {
+            // 抢占后行被并发删除的极端情况：无行可投递，残留 PROCESSING 状态无意义
             return;
         }
         OutboxHandler handler = handlerFor(row.topic);
@@ -107,13 +126,15 @@ public class OutboxDispatcher {
                 STATUS_FAILED, retry, Timestamp.valueOf(nextRetry), error, outboxId);
     }
 
-    /** 定时清扫待投递/待重试行（每 30s）。 */
+    /** 定时清扫待投递/待重试行（每 30s），并回收滞留过久的投递中行（抢占者崩溃/超长处理）。 */
     @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
     public void pollExpired() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_outbox WHERE status IN (?, ?) AND (next_retry_at IS NULL OR next_retry_at <= NOW())"
+                "SELECT id FROM sys_outbox WHERE"
+                        + " ((status IN (?, ?) AND (next_retry_at IS NULL OR next_retry_at <= NOW()))"
+                        + "  OR (status = ? AND updated_at < NOW() - INTERVAL ? MINUTE))"
                         + " ORDER BY id LIMIT ?",
-                Long.class, STATUS_PENDING, STATUS_FAILED, POLL_BATCH_SIZE);
+                Long.class, STATUS_PENDING, STATUS_FAILED, STATUS_PROCESSING, PROCESSING_STALE_MINUTES, POLL_BATCH_SIZE);
         if (ids.isEmpty()) {
             return;
         }

@@ -32,8 +32,10 @@ public class DistributedLock {
      *
      * @param lockKey   业务锁键（同键互斥，建议含业务唯一标识）
      * @param waitTime  最多等待锁的时长，超时视为繁忙
-     * @param leaseTime 锁持有时长；执行超过该时长会被看门狗续期（Redisson 默认行为），
-     *                  传 0 时交给看门狗自动续期 30s 一次
+     * @param leaseTime 锁持有租约。传 0 或负值由 Redisson 看门狗自动续期（默认每 10s 续
+     *                  30s），适合执行时长不确定的任务；传正值则【固定持有、无看门狗续期】，
+     *                  到期自动释放——执行必须保证在该时长内完成，否则锁中途释放会放行并发，
+     *                  破坏临界区互斥。
      */
     public <T> T execute(String lockKey, Duration waitTime, Duration leaseTime, Supplier<T> action) {
         RLock lock = redissonClient.getLock(KEY_PREFIX + lockKey);
@@ -54,8 +56,14 @@ public class DistributedLock {
         }
     }
 
-    /** 便捷重载：默认最多等 3s、锁持有 10s。 */
+    /**
+     * 便捷重载：默认最多等 3s、租约交给看门狗自动续期（执行时长不限）。
+     *
+     * <p>R4-1.30 修正：此前固定 10s 租约且无看门狗续期，执行超过 10s 锁即自动释放，
+     * 另一实例可并发进入临界区（如大文件合并）；改为 0 租约启用 Redisson 看门狗，
+     * 长任务锁不会中途丢失。
+     */
     public <T> T execute(String lockKey, Supplier<T> action) {
-        return execute(lockKey, Duration.ofSeconds(3), Duration.ofSeconds(10), action);
+        return execute(lockKey, Duration.ofSeconds(3), Duration.ZERO, action);
     }
 }

@@ -187,6 +187,37 @@ async def test_run_loop_tolerates_enqueue_failure() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_loop_claim_is_atomic_under_two_instances() -> None:
+    """R4-1.30：多副本领取互斥——同一批到期项只被一个实例入队，杜绝调度任务重复触发。
+
+    修复前 run_loop 的 zrangebyscore（只读）+ zrem 不判返回值：两实例可读到同一批
+    到期项并各自 _process_due → 同名任务 create_task 两次（调度重复触发）。
+    修复后仅 zrem 删除到（>0）的实例持有处置权。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    fake_tm = FakeTaskManager()
+    sched_a = Scheduler(redis, settings)
+    sched_a.attach_task_manager(fake_tm)
+    sched_b = Scheduler(redis, settings)
+    sched_b.attach_task_manager(fake_tm)
+    info = await sched_a.register("job", "interval:60", "text_summary", {})
+    await redis.zadd(settings.scheduler_due_key, {info["id"]: 0})  # 立即到期
+
+    # 两实例并发跑后台循环（循环不退出，超时即取消）；interval:60 触发一轮后重排到
+    # 未来 60s、不再有到期项。若领取非原子，同一到期项会被两实例各入队一次。
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(
+            asyncio.gather(sched_a.run_loop(), sched_b.run_loop()), timeout=0.5
+        )
+
+    spec = json.loads(await redis.hget(settings.scheduler_spec_key, info["id"]))
+    assert spec["run_count"] == 1
+    task_nos = [req.task_no for req, _ in fake_tm.calls]
+    assert task_nos.count(f"SCHED:{info['id']}:1") == 1
+
+
+@pytest.mark.asyncio
 async def test_register_unknown_prefix_raises() -> None:
     """未知调度前缀抛 ValueError。"""
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
