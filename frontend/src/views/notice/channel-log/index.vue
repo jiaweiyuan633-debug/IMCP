@@ -48,6 +48,7 @@ import { getChannelLogPage } from '@/api/channel'
 import type { ChannelLogVo } from '@/api/channel'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -106,7 +107,7 @@ const columns = [
   { title: t('page.noticeChannelTitleField'), dataIndex: 'title', key: 'title', ellipsis: true },
   { title: t('page.noticeChannelStatus'), dataIndex: 'status', key: 'status', width: 80 },
   { title: t('page.noticeChannelError'), dataIndex: 'errorMsg', key: 'errorMsg', width: 200, ellipsis: true },
-  { title: t('page.noticeChannelTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.noticeChannelTime'), width: 170 }),
 ]
 
 const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =

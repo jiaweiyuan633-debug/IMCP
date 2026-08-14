@@ -31,6 +31,7 @@ import type { LoginLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -42,7 +43,7 @@ const columns = [
   { title: t('page.monitorUserAgent'), dataIndex: 'userAgent', key: 'userAgent' },
   { title: t('page.monitorStatus'), key: 'status', width: 90 },
   { title: t('page.monitorMessage'), dataIndex: 'message', key: 'message' },
-  { title: t('page.monitorLoginTime'), dataIndex: 'loginTime', key: 'loginTime' },
+  dateColumn('loginTime', { title: t('page.monitorLoginTime') }),
 ]
 
 const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =

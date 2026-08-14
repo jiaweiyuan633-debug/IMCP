@@ -75,6 +75,7 @@ import { getFileAccessToken, getStorageQuota, type StorageQuota } from '@/api/co
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
@@ -117,7 +118,7 @@ const columns = [
   { title: t('page.fileCategory'), key: 'category', width: 90 },
   { title: t('page.fileStorageType'), key: 'storageType', width: 90 },
   { title: t('page.fileScanStatus'), key: 'scanStatus', width: 100 },
-  { title: t('page.fileUploadTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.fileUploadTime'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 170 },
 ]
 

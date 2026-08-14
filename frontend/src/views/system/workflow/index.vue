@@ -209,7 +209,7 @@
           <a-descriptions-item :label="t('page.workflowFlowInstance')">{{ detail.flowInstanceId ?? '-' }}</a-descriptions-item>
           <a-descriptions-item :label="t('page.workflowContent')">{{ detail.content || '-' }}</a-descriptions-item>
           <a-descriptions-item :label="t('page.workflowApprovalRemark')">{{ detail.remark || '-' }}</a-descriptions-item>
-          <a-descriptions-item :label="t('page.workflowCreatedAt')">{{ detail.createdAt || '-' }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.workflowCreatedAt')">{{ formatDateTime(detail.createdAt) }}</a-descriptions-item>
         </a-descriptions>
 
         <a-descriptions :column="1" size="small" bordered :title="t('page.workflowFormDataTitle')" class="detail-section">
@@ -229,7 +229,7 @@
             </div>
             <div v-if="item.approver" class="trace-meta">{{ t('page.workflowTraceApprover') }}: {{ item.approver }}</div>
             <div v-if="item.message" class="trace-meta">{{ t('page.workflowTraceMessage') }}: {{ item.message }}</div>
-            <div v-if="item.createTime" class="trace-meta">{{ t('page.workflowTraceTime') }}: {{ item.createTime }}</div>
+            <div v-if="item.createTime" class="trace-meta">{{ t('page.workflowTraceTime') }}: {{ formatDateTime(item.createTime) }}</div>
           </a-timeline-item>
         </a-timeline>
       </template>
@@ -274,6 +274,7 @@ import type { ProcessDefVo, ProcessNodeVo, WorkflowDetailVo, WorkflowLogVo, Work
 import type { RoleOptionVo } from '@/types'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn, formatDateTime } from '@/utils/table'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -285,7 +286,7 @@ const instanceColumns = [
   { title: t('page.workflowApplicant'), dataIndex: 'applicantName', key: 'applicantName' },
   { title: t('page.workflowCurrentNode'), dataIndex: 'currentNodeName', key: 'currentNodeName' },
   { title: t('page.workflowStatus'), key: 'status', width: 100 },
-  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.workflowCreatedAt'), width: 170 }),
   { title: t('page.workflowActions'), key: 'actions', width: 170 },
 ]
 
@@ -309,7 +310,7 @@ const logColumns = [
   { title: t('page.monitorAction'), dataIndex: 'action', key: 'action', width: 110 },
   { title: t('page.workflowOperator'), dataIndex: 'operatorName', key: 'operatorName', width: 130 },
   { title: t('page.workflowApprovalRemark'), dataIndex: 'remark', key: 'remark' },
-  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.workflowCreatedAt'), width: 170 }),
 ]
 
 const nodeViewColumns = [

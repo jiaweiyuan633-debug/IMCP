@@ -90,6 +90,7 @@ import {
 import type { FormDefinitionSaveRequest, FormDefinitionVo } from '@/api/formEngine'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -112,7 +113,7 @@ const columns = [
   { title: t('page.formDefCode'), dataIndex: 'code', key: 'code', width: 140 },
   { title: t('page.formDefDescription'), dataIndex: 'description', key: 'description', ellipsis: true },
   { title: t('page.formDefStatus'), dataIndex: 'status', key: 'status', width: 100 },
-  { title: t('page.formDefCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.formDefCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 150 },
 ]
 

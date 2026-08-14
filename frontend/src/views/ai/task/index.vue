@@ -80,7 +80,7 @@
           <a-tag v-if="detail?.errorType" :color="errorTypeColor[detail.errorType] || 'default'">{{ errorTypeLabel(detail.errorType) }}</a-tag>
           <span v-else>-</span>
         </a-descriptions-item>
-        <a-descriptions-item :label="t('page.aiCreatedAt')">{{ detail?.createdAt }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.aiCreatedAt')">{{ formatDateTime(detail?.createdAt) }}</a-descriptions-item>
         <a-descriptions-item :label="t('page.aiError')" :span="2">{{ detail?.errorMsg || '-' }}</a-descriptions-item>
       </a-descriptions>
       <a-divider />
@@ -103,6 +103,7 @@ import type { SearchField } from '@/types'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
 import { API_BASE_URL } from '@/utils/env'
+import { dateColumn, formatDateTime } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -157,8 +158,8 @@ const columns = [
   { title: t('page.aiStatus'), key: 'status', width: 100 },
   { title: t('page.aiErrorType'), key: 'errorType', width: 120 },
   { title: t('page.aiRetry'), key: 'retryCount', width: 90 },
-  { title: t('page.aiCreatedAt'), dataIndex: 'createdAt', key: 'createdAt' },
-  { title: t('page.aiUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt' },
+  dateColumn('createdAt', { title: t('page.aiCreatedAt') }),
+  dateColumn('updatedAt', { title: t('page.aiUpdatedAt') }),
   { title: t('page.aiActions'), key: 'actions', width: 130 },
 ]
 

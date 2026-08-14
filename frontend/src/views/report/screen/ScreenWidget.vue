@@ -26,7 +26,7 @@
             {{ record.durationMs != null ? `${record.durationMs}ms` : '-' }}
           </template>
           <template v-else-if="column.key === 'operTime'">
-            {{ record.operTime || '-' }}
+            {{ formatDateTime(record.operTime) }}
           </template>
         </template>
       </a-table>
@@ -41,6 +41,7 @@ import { LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/utils/table'
 import type { ReportScreenVo, NameValueVo, RecentOperVo } from '@/api/report'
 import type { ScreenWidget } from './screenTypes'
 

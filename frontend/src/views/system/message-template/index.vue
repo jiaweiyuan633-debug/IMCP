@@ -112,6 +112,7 @@ import {
 import type { MessageTemplateSaveRequest, MessageTemplateVo } from '@/api/messageTemplate'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -136,7 +137,7 @@ const columns = [
   { title: t('page.messageTemplateType'), dataIndex: 'messageType', key: 'messageType', width: 110 },
   { title: t('page.messageTemplateContentType'), dataIndex: 'contentType', key: 'contentType', width: 90 },
   { title: t('page.messageTemplateStatus'), dataIndex: 'status', key: 'status', width: 90 },
-  { title: t('page.messageTemplateCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.messageTemplateCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 200 },
 ]
 

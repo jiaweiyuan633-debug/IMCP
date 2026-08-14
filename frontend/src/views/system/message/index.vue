@@ -102,7 +102,7 @@
       <div v-if="detailRecord" class="message-detail">
         <p>{{ detailRecord.content || '--' }}</p>
         <p class="message-meta">
-          {{ formatTime(detailRecord.createdAt) }}
+          {{ formatDateTime(detailRecord.createdAt) }}
         </p>
       </div>
     </a-modal>
@@ -151,7 +151,7 @@ import {
   type WorkflowVo,
 } from '@/api/system'
 import type { PageResult, SearchField } from '@/types'
-import dayjs from 'dayjs'
+import { dateColumn, formatDateTime } from '@/utils/table'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -186,7 +186,7 @@ const messageColumns = [
   { title: t('page.messageTitleField'), dataIndex: 'title', key: 'title', ellipsis: true },
   { title: t('page.messageTypeSystem'), key: 'messageType', width: 90 },
   { title: t('page.messageContentField'), dataIndex: 'content', key: 'content', ellipsis: true },
-  { title: t('page.fileUploadTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.fileUploadTime'), width: 170 }),
   { title: t('page.messageRead'), key: 'readFlag', width: 90 },
   { title: t('common.actions'), key: 'actions', width: 130 },
 ]
@@ -195,14 +195,14 @@ const todoColumns = [
   { title: t('page.workflowName'), dataIndex: 'processName', key: 'processName', ellipsis: true },
   { title: t('page.workflowCurrentNode'), dataIndex: 'currentNodeName', key: 'currentNodeName', width: 130 },
   { title: t('page.workflowApplicant'), dataIndex: 'applicantName', key: 'applicantName', width: 120 },
-  { title: t('page.fileUploadTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.fileUploadTime'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 90 },
 ]
 
 const noticeColumns = [
   { title: t('page.noticeTitleField'), dataIndex: 'noticeTitle', key: 'noticeTitle', ellipsis: true },
   { title: t('page.noticeType'), key: 'noticeType', width: 90 },
-  { title: t('page.fileUploadTime'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.fileUploadTime'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 80 },
 ]
 
@@ -330,10 +330,6 @@ function goBiz(record: MessageVo) {
   if (record.bizType) {
     navigateToBiz(router, record.bizType, record.bizId)
   }
-}
-
-function formatTime(value?: string): string {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : ''
 }
 
 async function openFromQuery() {

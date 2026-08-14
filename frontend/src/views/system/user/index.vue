@@ -140,6 +140,7 @@ import {
 import type { UserSaveRequest } from '@/api/system'
 import type { DeptVo, PostOptionVo, RoleOptionVo, SearchField, UserVo } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { isStrongPassword } from '@/utils/validation'
 
 const { t } = useI18n()
@@ -167,7 +168,7 @@ const columns = [
   { title: t('page.userEmail'), dataIndex: 'email', key: 'email' },
   { title: t('page.userPhone'), dataIndex: 'phone', key: 'phone' },
   { title: t('page.userStatus'), key: 'status', width: 90 },
-  { title: t('page.userLastLogin'), dataIndex: 'lastLoginTime', key: 'lastLoginTime' },
+  dateColumn('lastLoginTime', { title: t('page.userLastLogin') }),
   { title: t('page.userActions'), key: 'actions', width: 120 },
 ]
 

@@ -99,6 +99,7 @@ import {
 import type { ImportExportTemplateSaveRequest, ImportExportTemplateVo } from '@/api/importExport'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -122,7 +123,7 @@ const columns = [
   { title: t('page.ieTemplateType'), dataIndex: 'type', key: 'type', width: 90 },
   { title: t('page.ieTemplateEntityKey'), dataIndex: 'entityKey', key: 'entityKey', width: 130 },
   { title: t('page.ieTemplateStatus'), dataIndex: 'status', key: 'status', width: 90 },
-  { title: t('page.ieTemplateCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.ieTemplateCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 

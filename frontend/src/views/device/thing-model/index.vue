@@ -102,6 +102,7 @@ import {
 import type { ThingModelSaveRequest, ThingModelVo } from '@/api/thingModel'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -124,7 +125,7 @@ const columns = [
   { title: t('page.thingModelName'), dataIndex: 'name', key: 'name' },
   { title: t('page.thingModelDescription'), dataIndex: 'description', key: 'description', ellipsis: true },
   { title: t('page.thingModelStatus'), dataIndex: 'status', key: 'status', width: 90 },
-  { title: t('page.thingModelCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.thingModelCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
 

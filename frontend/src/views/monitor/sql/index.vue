@@ -38,6 +38,7 @@ import { getSqlLogPage } from '@/api/monitor'
 import type { SqlLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
@@ -50,7 +51,7 @@ const columns = [
   { title: t('page.monitorDuration'), key: 'durationMs', width: 100 },
   { title: t('page.monitorStatus'), key: 'success', width: 90 },
   { title: t('page.aiError'), dataIndex: 'errorMsg', key: 'errorMsg' },
-  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  dateColumn('createdAt', { title: t('page.workflowCreatedAt'), width: 180 }),
 ]
 
 const {

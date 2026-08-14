@@ -48,7 +48,7 @@
           <a-tag v-if="current" :color="statusMeta(current.status).color">{{ statusMeta(current.status).text }}</a-tag>
         </a-descriptions-item>
         <a-descriptions-item :label="t('page.formInstSubmitter')">{{ current?.submitterId ?? '—' }}</a-descriptions-item>
-        <a-descriptions-item :label="t('page.formInstSubmittedAt')">{{ current?.submittedAt || '—' }}</a-descriptions-item>
+        <a-descriptions-item :label="t('page.formInstSubmittedAt')">{{ formatDateTime(current?.submittedAt) }}</a-descriptions-item>
         <a-descriptions-item :label="t('page.formInstRemark')">{{ current?.remark || '—' }}</a-descriptions-item>
       </a-descriptions>
       <a-divider style="margin: 12px 0" />
@@ -69,6 +69,7 @@ import { approveFormInstance, getFormInstancePage } from '@/api/formEngine'
 import type { FormInstanceVo } from '@/api/formEngine'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn, formatDateTime } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -91,7 +92,7 @@ const columns = [
   { title: t('page.formInstFormCode'), dataIndex: 'formCode', key: 'formCode', width: 150 },
   { title: t('page.formInstStatus'), dataIndex: 'status', key: 'status', width: 110 },
   { title: t('page.formInstSubmitter'), dataIndex: 'submitterId', key: 'submitterId', width: 110 },
-  { title: t('page.formInstSubmittedAt'), dataIndex: 'submittedAt', key: 'submittedAt', width: 180 },
+  dateColumn('submittedAt', { title: t('page.formInstSubmittedAt'), width: 180 }),
   { title: t('page.formInstRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true },
   { title: t('common.actions'), key: 'actions', width: 180 },
 ]

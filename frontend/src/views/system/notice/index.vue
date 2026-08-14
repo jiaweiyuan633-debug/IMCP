@@ -62,7 +62,7 @@
     <a-modal v-model:open="detailOpen" :title="detailRecord?.noticeTitle || ''" :footer="null" width="680">
       <div class="notice-detail">
         <p>{{ detailRecord?.noticeContent || '--' }}</p>
-        <p class="notice-meta">{{ formatTime(detailRecord?.createdAt) }}</p>
+        <p class="notice-meta">{{ formatDateTime(detailRecord?.createdAt) }}</p>
       </div>
     </a-modal>
   </a-card>
@@ -80,7 +80,7 @@ import { createNotice, deleteNotice, getNoticeDetail, getNoticePage, markAllNoti
 import type { NoticeVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
-import dayjs from 'dayjs'
+import { dateColumn, formatDateTime } from '@/utils/table'
 import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
@@ -103,7 +103,7 @@ const columns = [
   { title: t('page.noticeTitleField'), dataIndex: 'noticeTitle', key: 'noticeTitle' },
   { title: t('page.noticeType'), key: 'noticeType', width: 90 },
   { title: t('page.noticeStatus'), key: 'status', width: 90 },
-  { title: t('common.createdAt'), dataIndex: 'createdAt', key: 'createdAt' },
+  dateColumn('createdAt', { title: t('common.createdAt') }),
   { title: t('common.actions'), key: 'actions', width: 130 },
 ]
 
@@ -157,10 +157,6 @@ function openEdit(record: NoticeVo) {
 function openDetail(record: NoticeVo) {
   detailRecord.value = record
   detailOpen.value = true
-}
-
-function formatTime(value?: string): string {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
 }
 
 async function onSubmit() {

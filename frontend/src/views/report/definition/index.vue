@@ -104,6 +104,7 @@ import {
 import type { ReportDefinitionSaveRequest, ReportDefinitionVo } from '@/api/reportDefinition'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -119,7 +120,7 @@ const columns = [
   { title: t('page.reportDefCategory'), dataIndex: 'category', key: 'category', width: 120 },
   { title: t('page.reportDefChartType'), dataIndex: 'chartType', key: 'chartType', width: 110 },
   { title: t('page.reportDefStatus'), dataIndex: 'status', key: 'status', width: 90 },
-  { title: t('page.reportDefCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.reportDefCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 160 },
 ]
 

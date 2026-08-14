@@ -66,7 +66,7 @@
           <a-descriptions-item :label="t('page.monitorFieldAuditAction')">{{ detail.action }}</a-descriptions-item>
           <a-descriptions-item :label="t('page.monitorFieldAuditEntity')">{{ detail.entityName }}</a-descriptions-item>
           <a-descriptions-item :label="t('page.monitorFieldAuditEntityId')">{{ detail.entityId }}</a-descriptions-item>
-          <a-descriptions-item :label="t('page.monitorOperTime')" :span="2">{{ detail.createdAt }}</a-descriptions-item>
+          <a-descriptions-item :label="t('page.monitorOperTime')" :span="2">{{ formatDateTime(detail.createdAt) }}</a-descriptions-item>
         </a-descriptions>
         <h4 class="detail-title">{{ t('page.monitorFieldAuditChanged') }}</h4>
         <a-table
@@ -95,6 +95,7 @@ import type { AuditLogVo, FieldAuditLogVo, FieldChange } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useI18n } from 'vue-i18n'
+import { dateColumn, formatDateTime } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -108,7 +109,7 @@ const columns = [
   { title: t('page.monitorRequestUrl'), dataIndex: 'params', key: 'params', ellipsis: true },
   { title: t('page.aiResult'), dataIndex: 'result', key: 'result', ellipsis: true },
   { title: t('page.monitorStatus'), key: 'status', width: 90 },
-  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  dateColumn('createdAt', { title: t('page.workflowCreatedAt'), width: 180 }),
 ]
 
 const { pageNum, pageSize, total, loading, records, error, loadData, onSearch, onReset } =
@@ -129,7 +130,7 @@ const fieldSearchFields: SearchField[] = [
 ]
 
 const fieldColumns = [
-  { title: t('page.workflowCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  dateColumn('createdAt', { title: t('page.workflowCreatedAt'), width: 180 }),
   { title: t('page.monitorModule'), dataIndex: 'module', key: 'module', width: 120 },
   { title: t('page.monitorFieldAuditEntity'), dataIndex: 'entityName', key: 'entityName', width: 140 },
   { title: t('page.monitorFieldAuditEntityId'), dataIndex: 'entityId', key: 'entityId', width: 100 },

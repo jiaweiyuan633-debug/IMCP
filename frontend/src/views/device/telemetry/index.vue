@@ -88,6 +88,7 @@ import { getDevicePage } from '@/api/device'
 import { getTelemetryHistory, getTelemetryLatest, reportTelemetry } from '@/api/telemetry'
 import type { TelemetryLatestVo, TelemetryPointVo } from '@/api/telemetry'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -111,7 +112,7 @@ const latestLoading = ref(false)
 const latestColumns = [
   { title: t('page.telemetryKey'), dataIndex: 'key', key: 'key' },
   { title: t('page.telemetryValue'), dataIndex: 'value', key: 'value' },
-  { title: t('page.telemetryTime'), dataIndex: 'occurredAt', key: 'occurredAt', width: 180 },
+  dateColumn('occurredAt', { title: t('page.telemetryTime'), width: 180 }),
 ]
 
 const historyRecords = ref<TelemetryPointVo[]>([])
@@ -125,7 +126,7 @@ const historyColumns = [
   { title: t('page.telemetryKey'), dataIndex: 'key', key: 'key', width: 140 },
   { title: t('page.telemetryValueNum'), dataIndex: 'valueNum', key: 'valueNum', width: 120 },
   { title: t('page.telemetryValueText'), dataIndex: 'valueText', key: 'valueText' },
-  { title: t('page.telemetryTime'), dataIndex: 'occurredAt', key: 'occurredAt', width: 180 },
+  dateColumn('occurredAt', { title: t('page.telemetryTime'), width: 180 }),
 ]
 
 function loadLatest() {

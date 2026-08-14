@@ -30,6 +30,7 @@ import { getOperLogPage } from '@/api/monitor'
 import type { OperLogVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
@@ -44,7 +45,7 @@ const columns = [
   { title: t('page.monitorStatus'), key: 'status', width: 90 },
   { title: t('page.monitorDuration'), dataIndex: 'durationMs', key: 'durationMs', width: 100 },
   { title: t('page.monitorIp'), dataIndex: 'ip', key: 'ip', width: 120 },
-  { title: t('page.monitorOperTime'), dataIndex: 'operTime', key: 'operTime' },
+  dateColumn('operTime', { title: t('page.monitorOperTime') }),
 ]
 
 const {

@@ -120,6 +120,7 @@ import {
 import type { ImportExportJobVo, ImportExportTemplateVo } from '@/api/importExport'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 
 const { t } = useI18n()
 
@@ -154,7 +155,7 @@ const columns = [
   { title: t('page.ieJobFile'), dataIndex: 'fileName', key: 'fileName', ellipsis: true },
   { title: t('page.ieJobProgress'), dataIndex: 'total', key: 'progress', width: 130 },
   { title: t('page.ieJobError'), dataIndex: 'errorMessage', key: 'errorMessage', ellipsis: true },
-  { title: t('page.ieJobCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+  dateColumn('createdAt', { title: t('page.ieJobCreatedAt'), width: 170 }),
   { title: t('common.actions'), key: 'actions', width: 100 },
 ]
 

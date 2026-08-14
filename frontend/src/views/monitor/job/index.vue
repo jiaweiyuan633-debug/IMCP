@@ -146,6 +146,7 @@ import {
 import type { JobLogVo, JobVo, SchedulerStatusVo } from '@/api/monitor'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { useTableQuery } from '@/composables/useTableQuery'
 
 const { t } = useI18n()
@@ -177,8 +178,8 @@ const logColumns = [
   { title: t('page.monitorInvokeTarget'), dataIndex: 'invokeTarget', key: 'invokeTarget' },
   { title: t('page.monitorStatus'), dataIndex: 'jobMessage', key: 'jobMessage' },
   { title: t('page.aiError'), dataIndex: 'exceptionInfo', key: 'exceptionInfo' },
-  { title: t('page.monitorJobStartTime'), dataIndex: 'startTime', key: 'startTime' },
-  { title: t('page.monitorJobEndTime'), dataIndex: 'endTime', key: 'endTime' },
+  dateColumn('startTime', { title: t('page.monitorJobStartTime') }),
+  dateColumn('endTime', { title: t('page.monitorJobEndTime') }),
 ]
 
 const statusOptions = [

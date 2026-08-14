@@ -19,6 +19,7 @@ import { message, Modal } from 'ant-design-vue'
 import { getOnlineUsers, kickOnlineUser } from '@/api/monitor'
 import type { OnlineUserVo } from '@/api/monitor'
 import { useI18n } from 'vue-i18n'
+import { dateColumn } from '@/utils/table'
 import { useUserStore } from '@/stores/user'
 
 const { t } = useI18n()
@@ -27,7 +28,7 @@ const userStore = useUserStore()
 const columns = [
   { title: t('page.monitorUsername'), dataIndex: 'username', key: 'username' },
   { title: t('page.monitorIp'), dataIndex: 'ip', key: 'ip' },
-  { title: t('page.monitorLoginTime'), dataIndex: 'loginTime', key: 'loginTime' },
+  dateColumn('loginTime', { title: t('page.monitorLoginTime') }),
   { title: t('page.monitorUserAgent'), dataIndex: 'userAgent', key: 'userAgent' },
   { title: t('common.actions'), key: 'actions', width: 120 },
 ]
