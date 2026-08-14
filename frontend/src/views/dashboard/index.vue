@@ -47,6 +47,23 @@ const barRef = ref<HTMLDivElement>()
 let pieChart: ReturnType<typeof init> | null = null
 let barChart: ReturnType<typeof init> | null = null
 
+// R4-1.26：失败分类色值（与 AI 任务页 orange/red/purple 语义一致，转为 ECharts 色值）；未知分类沿用图表默认色
+const errorTypeColor: Record<string, string> = {
+  timeout: '#fa8c16',
+  non_retryable: '#f5222d',
+  retries_exhausted: '#722ed1',
+}
+
+function errorTypeLabel(value: string): string {
+  const map: Record<string, string> = {
+    timeout: t('page.aiErrorTypeTimeout'),
+    non_retryable: t('page.aiErrorTypeNonRetryable'),
+    retries_exhausted: t('page.aiErrorTypeRetriesExhausted'),
+    other: t('page.aiErrorTypeOther'),
+  }
+  return map[value] || t('page.aiErrorTypeOther')
+}
+
 const statCards = computed(() => {
   const s = stats.value
   return [
@@ -68,6 +85,15 @@ function renderCharts() {
   pieChart = init(pieRef.value, appStore.darkTheme ? 'dark' : undefined)
   barChart = init(barRef.value, appStore.darkTheme ? 'dark' : undefined)
 
+  // R4-1.26：失败任务按 error_type 分层（超时/不可重试/重试耗尽 + other 兜底），各桶之和等于 aiTaskFailed
+  const failedByType = stats.value.aiTaskFailedByErrorType ?? []
+  const failedSlices = failedByType.map((item) => ({
+    name: errorTypeLabel(item.name),
+    value: item.value,
+    itemStyle: { color: errorTypeColor[item.name] },
+  }))
+  const failedTotal = failedByType.reduce((sum, item) => sum + item.value, 0)
+
   pieChart.setOption({
     tooltip: { trigger: 'item' },
     legend: { bottom: 0 },
@@ -78,9 +104,9 @@ function renderCharts() {
         radius: ['42%', '68%'],
         data: [
           { name: t('page.dashboardSucceeded'), value: stats.value.aiTaskSucceeded },
-          { name: t('page.dashboardFailed'), value: stats.value.aiTaskFailed },
+          ...failedSlices,
           { name: t('page.dashboardRunning'), value: stats.value.aiTaskRunning },
-          { name: t('page.dashboardOthers'), value: Math.max(stats.value.aiTaskTotal - stats.value.aiTaskSucceeded - stats.value.aiTaskFailed - stats.value.aiTaskRunning, 0) },
+          { name: t('page.dashboardOthers'), value: Math.max(stats.value.aiTaskTotal - stats.value.aiTaskSucceeded - stats.value.aiTaskRunning - failedTotal, 0) },
         ],
       },
     ],

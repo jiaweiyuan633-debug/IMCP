@@ -473,6 +473,7 @@ export default {
     aiErrorTypeTimeout: 'Timeout',
     aiErrorTypeNonRetryable: 'Non-retryable',
     aiErrorTypeRetriesExhausted: 'Retries exhausted',
+    aiErrorTypeOther: 'Other failed',
     aiServiceCode: 'Service Code',
     aiServiceName: 'Service',
     aiCreatedBy: 'Creator',

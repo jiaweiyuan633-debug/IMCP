@@ -1,6 +1,7 @@
 package com.example.admin.module.monitor;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
@@ -20,11 +21,15 @@ import com.example.admin.module.system.mapper.SysRoleMapper;
 import com.example.admin.module.system.mapper.SysUserMapper;
 import com.example.admin.security.TokenService;
 import com.example.admin.common.annotation.DataScope;
+import com.example.admin.module.report.vo.NameValueVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -84,6 +89,29 @@ public class MonitorService {
                         AiTaskStatus.PENDING.name(),
                         AiTaskStatus.QUEUED.name(),
                         AiTaskStatus.RUNNING.name()));
+        // R4-1.26：FAILED 任务按 error_type 分组，供大屏饼图区分失败构成（超时/不可重试/重试耗尽）。
+        // selectMaps 的 GROUP BY 同样被 @DataScope 数据权限拦截器改写，与上方 selectCount 口径一致。
+        // error_type 为空（历史数据 / AiTaskScanner 兜底置 FAILED 未写 error_type）归入 "other" 桶，保证各桶之和等于 aiTaskFailed。
+        List<NameValueVo> failedByErrorType = new ArrayList<>();
+        for (Map<String, Object> row : aiTaskMapper.selectMaps(new QueryWrapper<AiTaskDO>()
+                .select("error_type AS name", "COUNT(*) AS value")
+                .eq("status", AiTaskStatus.FAILED.name())
+                .groupBy("error_type"))) {
+            String name = readMapColumn(row, "name");
+            if (!StringUtils.hasText(name)) {
+                name = ERROR_TYPE_OTHER;
+            }
+            failedByErrorType.add(new NameValueVo(name, readMapLong(row, "value")));
+        }
+        // 已知分类按失败数降序，"other" 兜底桶固定排最后（饼图图例顺序友好）
+        failedByErrorType.sort((a, b) -> {
+            boolean aOther = ERROR_TYPE_OTHER.equals(a.getName());
+            boolean bOther = ERROR_TYPE_OTHER.equals(b.getName());
+            if (aOther != bOther) {
+                return aOther ? 1 : -1;
+            }
+            return Long.compare(b.getValue(), a.getValue());
+        });
         return DashboardStatsVo.builder()
                 .userCount(userMapper.selectCount(null))
                 .roleCount(roleMapper.selectCount(null))
@@ -94,7 +122,28 @@ public class MonitorService {
                 .aiTaskSucceeded(aiSucceeded)
                 .aiTaskFailed(aiFailed)
                 .aiTaskRunning(aiRunning)
+                .aiTaskFailedByErrorType(failedByErrorType)
                 .build();
+    }
+
+    /** 兜底分类：error_type 为空的失败任务（历史数据 / AiTaskScanner 兜底置 FAILED 未写 error_type）。 */
+    private static final String ERROR_TYPE_OTHER = "other";
+
+    /** 读取 selectMaps 行内列值，兼容别名大小写（不同数据库返回的列标签大小写可能不同）。 */
+    private static String readMapColumn(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value == null) {
+            value = row.get(key.toUpperCase(Locale.ROOT));
+        }
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private static long readMapLong(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value == null) {
+            value = row.get(key.toUpperCase(Locale.ROOT));
+        }
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 
 }

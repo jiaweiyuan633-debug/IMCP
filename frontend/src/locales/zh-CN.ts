@@ -473,6 +473,7 @@ export default {
     aiErrorTypeTimeout: '超时',
     aiErrorTypeNonRetryable: '不可重试',
     aiErrorTypeRetriesExhausted: '重试耗尽',
+    aiErrorTypeOther: '其他失败',
     aiServiceCode: '服务编码',
     aiServiceName: '服务',
     aiCreatedBy: '创建人',

@@ -38,6 +38,12 @@ export interface OnlineUserVo {
   loginTime?: string
 }
 
+/** 通用「名称-数值」统计项（图表数据），与后端 report.vo.NameValueVo 对齐。 */
+export interface NameValueVo {
+  name: string
+  value: number
+}
+
 export interface DashboardStatsVo {
   userCount: number
   roleCount: number
@@ -48,6 +54,8 @@ export interface DashboardStatsVo {
   aiTaskSucceeded: number
   aiTaskFailed: number
   aiTaskRunning: number
+  /** R4-1.26：FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败，各桶之和等于 aiTaskFailed */
+  aiTaskFailedByErrorType?: NameValueVo[]
 }
 
 export function getLoginLogPage(params: Record<string, unknown>): Promise<PageResult<LoginLogVo>> {
