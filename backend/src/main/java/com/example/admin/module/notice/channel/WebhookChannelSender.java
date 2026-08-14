@@ -6,6 +6,7 @@ import com.example.admin.module.notice.entity.SysChannelConfigDO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -35,6 +36,7 @@ public class WebhookChannelSender implements MessageChannelSender {
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
+    @Autowired
     public WebhookChannelSender(ObjectMapper objectMapper) {
         this(objectMapper, RestClient.builder().build());
     }
