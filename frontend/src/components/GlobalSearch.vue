@@ -25,6 +25,7 @@ import { useRouter } from 'vue-router'
 import { usePermissionStore } from '@/stores/permission'
 import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
+import { fullPathOf } from '@/utils/menuPath'
 
 interface SearchItem {
   title: string
@@ -49,7 +50,7 @@ const filtered = computed(() => {
 function flatten(menus: MenuNode[], parentPath = '/'): SearchItem[] {
   const result: SearchItem[] = []
   for (const menu of menus) {
-    const path = resolvePath(menu, parentPath)
+    const path = fullPathOf(menu, parentPath)
     if (menu.type === 'dir') {
       result.push(...flatten(menu.children || [], path))
     } else if (menu.type === 'menu' && menu.status === 1 && menu.visible === 1) {
@@ -57,22 +58,6 @@ function flatten(menus: MenuNode[], parentPath = '/'): SearchItem[] {
     }
   }
   return result
-}
-
-function lastSegment(path: string): string {
-  const parts = path.split('/').filter(Boolean)
-  return parts[parts.length - 1] || ''
-}
-
-function resolvePath(menu: MenuNode, parentPath: string): string {
-  const path = menu.path || ''
-  if (path.startsWith('/')) {
-    return path
-  }
-  if (path === lastSegment(parentPath)) {
-    return parentPath
-  }
-  return `${parentPath.replace(/\/$/, '')}/${path}`
 }
 
 function go(item: SearchItem) {

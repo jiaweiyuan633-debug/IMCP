@@ -113,6 +113,11 @@ service.interceptors.response.use(
     return Promise.reject(error)
   },
   async (error) => {
+    // R4-1.33：主动取消（AbortController，如 useTableQuery 卸载/重发时 abort）
+    // 不算业务错误——静默透传，不弹错误提示、不触发网络重试
+    if (error.code === 'ERR_CANCELED' || error.__CANCEL__) {
+      return Promise.reject(error)
+    }
     if (
       ['ECONNABORTED', 'ERR_NETWORK'].includes(error.code) &&
       !error.config?.retried

@@ -8,9 +8,12 @@ import router from './router'
 import { permission } from '@/directives/permission'
 import i18n from '@/locales'
 import { queryClient } from '@/queryClient'
+import { initAuthSync } from '@/utils/auth'
 import { registerSW } from 'virtual:pwa-register'
 
 registerSW({ immediate: true })
+// R4-1.33：跨标签页凭证同步（其他标签页登出时本标签页同步失效）
+initAuthSync()
 
 const app = createApp(App)
 

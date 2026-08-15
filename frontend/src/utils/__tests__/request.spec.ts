@@ -193,6 +193,18 @@ describe('request 拦截器', () => {
     expect(messageError).toHaveBeenCalled()
   })
 
+  it('主动取消（ERR_CANCELED）静默透传：不弹错误、不重试', async () => {
+    const error = {
+      code: 'ERR_CANCELED',
+      config: { retried: false, headers: {} },
+      message: 'canceled',
+    }
+
+    await expect(onRejected(error)).rejects.toBe(error)
+    expect(messageError).not.toHaveBeenCalled()
+    expect(instance.request).not.toHaveBeenCalled()
+  })
+
   it('请求拦截器为带 token 的请求附加 Authorization', () => {
     const config = { headers: {} }
     const out = onRequest(config) as { headers: Record<string, string> }

@@ -8,22 +8,22 @@
         <template v-else>{{ systemTitle }}</template>
       </div>
       <a-menu :selected-keys="[route.path]" theme="dark" mode="inline">
-        <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
-          <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
+        <template v-for="menu in permissionStore.menus" :key="fullPathOf(menu)">
+          <a-sub-menu v-if="hasChildren(menu)" :key="fullPathOf(menu)">
             <template #title>
               <component :is="iconOf(menu.icon)" />
               <span>{{ menuTitle(menu.name) }}</span>
             </template>
             <a-menu-item
               v-for="child in menu.children"
-              :key="fullPath(child, fullPath(menu))"
-              @click="navigate(fullPath(child, fullPath(menu)))"
+              :key="fullPathOf(child, fullPathOf(menu))"
+              @click="navigate(fullPathOf(child, fullPathOf(menu)))"
             >
               <component :is="iconOf(child.icon)" />
               <span>{{ menuTitle(child.name) }}</span>
             </a-menu-item>
           </a-sub-menu>
-          <a-menu-item v-else :key="fullPath(menu)" @click="navigate(fullPath(menu))">
+          <a-menu-item v-else :key="fullPathOf(menu)" @click="navigate(fullPathOf(menu))">
             <component :is="iconOf(menu.icon)" />
             <span>{{ menuTitle(menu.name) }}</span>
           </a-menu-item>
@@ -39,21 +39,21 @@
     >
       <div class="app-logo">{{ systemTitle }}</div>
       <a-menu :selected-keys="[route.path]" theme="dark" mode="inline" @click="onMenuNavigate">
-        <template v-for="menu in permissionStore.menus" :key="fullPath(menu)">
-          <a-sub-menu v-if="hasChildren(menu)" :key="fullPath(menu)">
+        <template v-for="menu in permissionStore.menus" :key="fullPathOf(menu)">
+          <a-sub-menu v-if="hasChildren(menu)" :key="fullPathOf(menu)">
             <template #title>
               <component :is="iconOf(menu.icon)" />
               <span>{{ menuTitle(menu.name) }}</span>
             </template>
             <a-menu-item
               v-for="child in menu.children"
-              :key="fullPath(child, fullPath(menu))"
+              :key="fullPathOf(child, fullPathOf(menu))"
             >
               <component :is="iconOf(child.icon)" />
               <span>{{ menuTitle(child.name) }}</span>
             </a-menu-item>
           </a-sub-menu>
-          <a-menu-item v-else :key="fullPath(menu)">
+          <a-menu-item v-else :key="fullPathOf(menu)">
             <component :is="iconOf(menu.icon)" />
             <span>{{ menuTitle(menu.name) }}</span>
           </a-menu-item>
@@ -144,7 +144,14 @@
             :closable="tab.path !== '/dashboard'"
           />
         </a-tabs>
-        <router-view />
+        <!-- R4-1.33：路由视图 keep-alive——切换 tab 时保留页面状态（表格分页/搜索条件/表单填写），
+             以 route.name 作缓存键（动态菜单路由 Menu-{id} 稳定），max 限制缓存总量防内存膨胀；
+             关闭的 tab 不立即释放缓存，由 max 溢出淘汰，属可接受权衡 -->
+        <router-view v-slot="{ Component: RouteComponent }">
+          <keep-alive :max="10">
+            <component :is="RouteComponent" :key="route.name" />
+          </keep-alive>
+        </router-view>
       </a-layout-content>
     </a-layout>
     <GlobalSearch />
@@ -198,6 +205,8 @@ import type { MenuNode } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { navigateToBiz } from '@/utils/bizRoute'
+import { fullPathOf } from '@/utils/menuPath'
+import { subscribeAuthCleared } from '@/utils/auth'
 import {
   getNotificationFeed,
   getNoticeSseTicket,
@@ -230,6 +239,7 @@ let messageSocket: WebSocket | null = null
 let noticeRetryCount = 0
 const NOTICE_MAX_RETRY = 5
 let noticeDisposed = false
+let unsubscribeAuthCleared: (() => void) | null = null
 const mobileDrawer = ref(false)
 const isMobile = ref(false)
 const offline = ref(false)
@@ -254,6 +264,15 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('offline', onOffline)
   window.addEventListener('online', onOnline)
+  // R4-1.33：其他标签页登出/凭证被清除时同步登出本标签页，避免残留有效会话
+  unsubscribeAuthCleared = subscribeAuthCleared(() => {
+    if (!userStore.isLoggedIn) {
+      return
+    }
+    userStore.reset()
+    appStore.resetTabs()
+    router.push('/login')
+  })
   await refreshNoticeItems()
   unreadCount.value = await getUnreadTotal()
   startNoticeStream()
@@ -262,6 +281,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   noticeDisposed = true
+  unsubscribeAuthCleared?.()
+  unsubscribeAuthCleared = null
   window.removeEventListener('resize', onResize)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('online', onOnline)
@@ -332,22 +353,6 @@ function hasChildren(menu: MenuNode): boolean {
 
 function iconOf(name?: string): Component {
   return (name && iconMap[name]) || ApiOutlined
-}
-
-function lastSegment(path: string): string {
-  const parts = path.split('/').filter(Boolean)
-  return parts[parts.length - 1] || ''
-}
-
-function fullPath(menu: MenuNode, parentPath = '/'): string {
-  const path = menu.path || ''
-  if (path.startsWith('/')) {
-    return path
-  }
-  if (path === lastSegment(parentPath)) {
-    return parentPath
-  }
-  return `${parentPath.replace(/\/$/, '')}/${path}`
 }
 
 function navigate(path: string) {

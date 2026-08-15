@@ -5,6 +5,7 @@ import { buildDynamicRouteChildren } from '@/router/dynamic'
 import BasicLayout from '@/layout/BasicLayout.vue'
 import type { MenuNode } from '@/types'
 import { useAppStore } from '@/stores/app'
+import { fullPathOf } from '@/utils/menuPath'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -37,25 +38,9 @@ const router = createRouter({
 
 let recoveringNotFound = false
 
-function lastSegment(path: string): string {
-  const parts = path.split('/').filter(Boolean)
-  return parts[parts.length - 1] || ''
-}
-
-function resolveMenuPath(menu: MenuNode, parentPath = '/'): string {
-  const path = menu.path || ''
-  if (path.startsWith('/')) {
-    return path
-  }
-  if (path === lastSegment(parentPath)) {
-    return parentPath
-  }
-  return `${parentPath.replace(/\/$/, '')}/${path}`
-}
-
 function firstMenuPath(menus: MenuNode[], parentPath = '/'): string {
   for (const menu of menus) {
-    const fullPath = resolveMenuPath(menu, parentPath)
+    const fullPath = fullPathOf(menu, parentPath)
     if (menu.type === 'dir') {
       const childPath = firstMenuPath(menu.children || [], fullPath)
       if (childPath) {

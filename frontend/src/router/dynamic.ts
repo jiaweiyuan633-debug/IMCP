@@ -1,22 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
 import type { MenuNode } from '@/types'
+import { resolveMenuPath } from '@/utils/menuPath'
 
 const viewModules = import.meta.glob('../views/**/*.vue')
-
-function lastSegment(path: string): string {
-  const parts = path.split('/').filter(Boolean)
-  return parts[parts.length - 1] || ''
-}
-
-function resolveFullPath(parentPath: string, path: string): string {
-  if (path.startsWith('/')) {
-    return path
-  }
-  if (path === lastSegment(parentPath)) {
-    return parentPath
-  }
-  return `${parentPath.replace(/\/$/, '')}/${path}`
-}
 
 function loadView(component?: string): () => Promise<unknown> {
   if (!component) {
@@ -35,7 +21,7 @@ export function buildDynamicRouteChildren(menus: MenuNode[], parentPath = '/'): 
     .filter((menu) => menu.type !== 'button' && menu.status === 1 && menu.visible === 1)
     .map((menu) => {
       const path = menu.path || ''
-      const fullPath = resolveFullPath(parentPath, path)
+      const fullPath = resolveMenuPath(parentPath, path)
       const meta = {
         title: menu.name,
         icon: menu.icon,
