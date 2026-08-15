@@ -10,6 +10,7 @@ from typing import Any
 
 from app.services.base import BaseTaskService
 from app.services.context import ServiceContext
+from app.tasks.errors import NonRetryableError
 
 
 class EmbeddingService(BaseTaskService):
@@ -20,7 +21,11 @@ class EmbeddingService(BaseTaskService):
         texts = params.get("texts")
         if not isinstance(texts, list) or not texts:
             raise ValueError("texts 不能为空")
-        provider = self.context.providers.get(str(params.get("provider", "mock")))
+        try:
+            provider = self.context.providers.get(str(params.get("provider", "mock")))
+        except KeyError as exc:
+            # R4-1.34：未知 provider 属参数配置错误，立即失败，不浪费重试次数
+            raise NonRetryableError(f"unknown provider: {params.get('provider')}") from exc
         vectors = await provider.embed(texts, model=params.get("model"))
         return {
             "vectors": vectors,

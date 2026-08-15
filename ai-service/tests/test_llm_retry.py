@@ -27,9 +27,10 @@ main_module.Redis = fakeredis.aioredis.FakeRedis
 class _CountingOp:
     """可编程 LLM 调用：前 fail_times 次抛可重试异常，随后成功。"""
 
-    def __init__(self, fail_times: int = 1, exc: Exception = LLMError("boom")) -> None:
+    def __init__(self, fail_times: int = 1, exc: Exception | None = None) -> None:
         self.fail_times = fail_times
-        self.exc = exc
+        # 默认异常改为构造期赋值（B008：不得在参数默认值中执行函数调用）
+        self.exc = exc if exc is not None else LLMError("boom")
         self.calls = 0
 
     async def __call__(self, tag: str = "x") -> str:

@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.llm.retry import retry_llm_call
+from app.pii import StreamMasker, detect, mask
 from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
@@ -39,8 +40,19 @@ def require_api_token(
 
 
 def _resolve_provider(request: Request, name: str | None) -> Any:
+    """解析调用方指定的 provider；未知名称属客户端错误返回 400，而非服务端 500。
+
+    修复前 ProviderRegistry.get 对未知名称抛 KeyError，FastAPI 未捕获 → 500。
+    /chat、/chat/stream、/embeddings、/vectors/upsert、/vectors/search 全部走此
+    函数统一收敛，避免每个端点各自 try/except。
+    """
     providers = request.app.state.providers
-    return providers.get(name) if name else providers.default()
+    if name:
+        try:
+            return providers.get(name)
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"unknown provider: {name}") from None
+    return providers.default()
 
 
 @router.get("/ping")
@@ -129,10 +141,18 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
         max_attempts=settings.llm_retry_max_attempts,
         base_delay=settings.llm_retry_base_seconds,
     )
+    # R4-1.34：PII 强制——模型输出默认脱敏，复述的敏感信息不出站；命中数随响应透出
+    pii_count = 0
+    if payload.mask_pii:
+        detected = detect(content)
+        if detected:
+            content = mask(content, settings.pii_mask_char)
+            pii_count = len(detected)
     return ChatResponse(
         content=content,
         model=payload.model or getattr(provider, "default_model", None),
         provider=getattr(provider, "name", None),
+        pii_count=pii_count,
     )
 
 
@@ -146,8 +166,11 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
     内部服务消费方（后端代理）通过 Authorization 头鉴权；
     浏览器 EventSource 无法带自定义头，须经后端 /api 代理转发。
     注：流式已开始产出即无法安全重试（用户已看到部分内容），上游故障由消费方决定是否重连。
+    R4-1.34：启用 PII 强制时经 StreamMasker 逐段脱敏（跨分片 PII 不泄漏），
+    分片边界可能与上游不同，消费方应按 delta 拼装全文。
     """
     provider = _resolve_provider(request, payload.provider)
+    masker = StreamMasker(settings.pii_mask_char) if payload.mask_pii else None
 
     async def event_stream() -> Any:
         async for delta in provider.stream(
@@ -156,7 +179,15 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
             temperature=payload.temperature,
             max_tokens=payload.max_tokens,
         ):
-            yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            if masker is None:
+                yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            else:
+                for chunk in masker.emit(delta):
+                    yield f"data: {json.dumps({'delta': chunk}, ensure_ascii=False)}\n\n"
+        if masker is not None:
+            tail = masker.flush()
+            if tail:
+                yield f"data: {json.dumps({'delta': tail}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -61,6 +61,8 @@ async def lifespan(app: FastAPI):
 
     await task_manager.close()
     await scheduler.stop()
+    # R4-1.34：释放 LLM 提供方连接池（httpx 持久 client），避免关闭阶段残留连接
+    await providers.aclose_all()
     await redis.aclose()
 
 

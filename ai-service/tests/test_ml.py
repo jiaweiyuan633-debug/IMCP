@@ -1,9 +1,15 @@
 import pytest
 from fakeredis.aioredis import FakeRedis
 
-from app.ml import KMeansTextClusterer, KNNClassifier, TfidfVectorizer, load_model, tokenize, train_model
+from app.ml import (
+    KMeansTextClusterer,
+    KNNClassifier,
+    TfidfVectorizer,
+    load_model,
+    tokenize,
+    train_model,
+)
 from app.ml.tfidf import cosine
-
 
 # ---------- tokenize ----------
 

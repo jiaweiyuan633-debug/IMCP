@@ -70,6 +70,17 @@ class TaskManager:
                 await asyncio.to_thread(self._callback_guard.validate, request.callback_url)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=f"非法回调地址: {exc}") from exc
+        # R4-1.34：超时治理——对 request.timeout 做上限裁剪。工作协程数量有限
+        # （worker_count），客户端提交任意大的 timeout 会长时间占用一个协程、
+        # 拖慢整条队列，且租约（= 超时 + 宽限）随超时等比放大、形同虚设。
+        # 超上限值在此 clamp 到 max_timeout_seconds，保证任何任务最长执行可控。
+        timeout = request.timeout or self.settings.default_timeout_seconds
+        if timeout > self.settings.max_timeout_seconds:
+            logger.warning(
+                "task %s timeout %gs exceeds cap %gs, clamped",
+                request.task_no, timeout, self.settings.max_timeout_seconds,
+            )
+            timeout = float(self.settings.max_timeout_seconds)
         now = _now()
         data = {
             "task_no": request.task_no,
@@ -83,7 +94,7 @@ class TaskManager:
             "retry_count": 0,
             "max_retry": self.settings.task_max_retry,
             "priority": request.priority,
-            "timeout": request.timeout or self.settings.default_timeout_seconds,
+            "timeout": timeout,
             "created_at": now,
             "updated_at": now,
         }
@@ -213,7 +224,12 @@ class TaskManager:
             return
         # 执行期间日志携带提交该任务的请求 ID，跨服务排障可串联调用方
         request_id_var.set(data.get("request_id") or "")
-        timeout = float(data.get("timeout") or self.settings.default_timeout_seconds)
+        # R4-1.34：执行侧同样做上限裁剪——兼容修复前已入库的旧任务（未 clamp 的超大
+        # timeout 可能已在 Redis 中），保证任何任务执行与租约都受 max_timeout 约束
+        timeout = min(
+            float(data.get("timeout") or self.settings.default_timeout_seconds),
+            float(self.settings.max_timeout_seconds),
+        )
         data["status"] = "RUNNING"
         data["started_at"] = _now()
         # 崩溃自愈租约：执行受 asyncio.wait_for 超时约束，租约 = 超时 + 宽限期，

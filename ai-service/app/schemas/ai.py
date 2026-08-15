@@ -17,6 +17,9 @@ class ChatRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_tokens: int | None = Field(default=None, ge=1)
     provider: str | None = None
+    # R4-1.34：PII 强制——默认对模型输出脱敏（可显式关停）。模型可能在回复中复述
+    # 输入里的手机号/身份证号等敏感信息，出站前统一脱敏，防止敏感数据外泄
+    mask_pii: bool = True
 
 
 class ChatResponse(BaseModel):
@@ -24,6 +27,9 @@ class ChatResponse(BaseModel):
     model: str | None = None
     provider: str | None = None
     usage: dict | None = None
+    # R4-1.34：本次输出命中的 PII 数量（mask_pii=False 或未命中时为 0），
+    # 供调用方感知脱敏生效情况
+    pii_count: int = 0
 
 
 class EmbedRequest(BaseModel):

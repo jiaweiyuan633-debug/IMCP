@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # 地址一律拒绝（SSRF 防护，见 app/core/callback_security.py）。生产必须显式注入。
     callback_allowed_origins: list[str] = []
     default_timeout_seconds: int = 60
+    # 单任务超时上限（秒）：客户端可提交任意大的 timeout 长时间占用有限的工作协程，
+    # 建单时对 request.timeout 做上限裁剪（见 TaskManager.create_task），保证任何
+    # 任务最长执行可控，租约（= 超时 + 宽限）不会因超时过大而形同虚设
+    max_timeout_seconds: int = 3600
     # 内部服务默认不开放跨域；如需浏览器直连，显式配置允许来源
     cors_origins: list[str] = []
 

@@ -180,3 +180,75 @@ async def test_missing_model_is_config_error() -> None:
     provider = OpenAICompatibleProvider(base_url="https://example.com")
     with pytest.raises(LLMConfigError):
         await provider.chat([{"role": "user", "content": "hi"}])
+
+
+# ---------- R4-1.34：连接复用与生命周期 ----------
+
+
+@pytest.mark.asyncio
+async def test_persistent_client_reused_across_calls(monkeypatch) -> None:
+    """连接池复用：多次调用（chat + embed）只创建一个 AsyncClient 实例。
+
+    修复前每次调用都 ``async with httpx.AsyncClient(...)`` 新建/销毁，每次请求
+    重建 TCP 连接与 TLS 握手；持久 client 应跨调用复用同一连接池。
+    """
+    created: list[dict] = []
+
+    class CountingClient(FakeAsyncClient):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            created.append(kwargs)
+
+    async def handler(*args, **kwargs):
+        # FakeAsyncClient.post 把 self 作为首个位置参数透传，真实 URL 在 args[1]
+        url = args[1] if len(args) > 1 else kwargs.get("url", "")
+        if "embeddings" in url:
+            return _FakeResponse(200, {"data": [{"index": 0, "embedding": [0.0, 1.0]}]})
+        return _FakeResponse(200, _chat_body("ok"))
+
+    FakeAsyncClient._handler = handler
+    monkeypatch.setattr("app.llm.openai_compat.httpx.AsyncClient", CountingClient)
+
+    provider = OpenAICompatibleProvider(base_url="https://example.com", default_model="gpt", embedding_model="emb")
+    await provider.chat([{"role": "user", "content": "hi"}])
+    await provider.chat([{"role": "user", "content": "hi"}])
+    await provider.embed(["hi"])
+
+    assert len(created) == 1  # 三个调用共享同一个 client（连接池）
+    assert created[0]["timeout"] == 120
+    assert created[0]["trust_env"] is False
+
+
+@pytest.mark.asyncio
+async def test_aclose_releases_and_recreates_client(monkeypatch) -> None:
+    """aclose 关闭连接池并置空；后续调用惰性重建新 client。"""
+    created: list[str] = []
+    closed: list[str] = []
+
+    class TrackingClient(FakeAsyncClient):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            created.append("client")
+
+        async def aclose(self):
+            closed.append("closed")
+
+    async def handler(*args, **kwargs):
+        return _FakeResponse(200, _chat_body("ok"))
+
+    FakeAsyncClient._handler = handler
+    monkeypatch.setattr("app.llm.openai_compat.httpx.AsyncClient", TrackingClient)
+
+    provider = OpenAICompatibleProvider(base_url="https://example.com", default_model="gpt")
+    await provider.chat([{"role": "user", "content": "hi"}])
+    await provider.aclose()
+    assert closed == ["closed"]
+
+    # 关闭后再次调用：惰性重建新 client，但旧 client 只关闭过一次
+    await provider.chat([{"role": "user", "content": "hi"}])
+    assert len(created) == 2
+    assert len(closed) == 1
+
+    # aclose 幂等：未创建/已关闭时不抛错
+    await provider.aclose()
+    await provider.aclose()

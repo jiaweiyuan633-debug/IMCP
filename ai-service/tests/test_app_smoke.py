@@ -6,6 +6,7 @@
 的唯一端到端验证；其余单测各自验证内部细节。
 """
 
+import json
 import time
 
 import fakeredis.aioredis
@@ -22,6 +23,23 @@ main_module.Redis = fakeredis.aioredis.FakeRedis
 
 def _boot_client():
     return TestClient(main_module.app)
+
+
+def _sse_deltas(body: str) -> list[str]:
+    """解析 SSE 响应体，拼装全部 ``data: {"delta": ...}`` 内容（跳过 [DONE]）。
+
+    PII 强制会重排分片边界（StreamMasker 滚动缓冲），消费方应拼装全文——
+    断言按 delta 全文拼装，而非锁定某个具体分片。
+    """
+    deltas: list[str] = []
+    for line in body.splitlines():
+        if not line.startswith("data: "):
+            continue
+        payload = line[len("data: ") :].strip()
+        if payload == "[DONE]":
+            continue
+        deltas.append(json.loads(payload)["delta"])
+    return deltas
 
 
 def test_health_ok_through_lifespan() -> None:
@@ -41,16 +59,16 @@ def test_chat_mock_provider() -> None:
 
 
 def test_chat_stream_sse() -> None:
-    with _boot_client() as client:
-        with client.stream(
-            "POST",
-            "/api/v1/chat/stream",
-            json={"messages": [{"role": "user", "content": "echo 你好世界"}]},
-            headers=AUTH,
-        ) as response:
-            assert response.status_code == 200
-            body = response.read().decode("utf-8")
-    assert "data: {\"delta\": \"你好\"}" in body
+    with _boot_client() as client, client.stream(
+        "POST",
+        "/api/v1/chat/stream",
+        json={"messages": [{"role": "user", "content": "echo 你好世界"}]},
+        headers=AUTH,
+    ) as response:
+        assert response.status_code == 200
+        body = response.read().decode("utf-8")
+    # PII 强制（默认开）经滚动缓冲可能重排分片边界，按 delta 拼装断言全文
+    assert "".join(_sse_deltas(body)) == "你好世界"
     assert "data: [DONE]" in body
 
 
@@ -62,6 +80,40 @@ def test_embeddings_dim() -> None:
     assert body["dim"] == 16
     assert len(body["vectors"]) == 2
     assert all(len(v) == 16 for v in body["vectors"])
+
+
+def test_unknown_provider_returns_400() -> None:
+    """R4-1.34：未知 provider 属客户端错误返回 400，而非 KeyError 导致的 500。
+
+    修复前 ProviderRegistry.get 抛 KeyError、FastAPI 未捕获 → 500；调用方无法
+    区分「服务端故障」与「provider 拼错」两种语义，也无法据此修正参数。
+    """
+    with _boot_client() as client:
+        chat = client.post(
+            "/api/v1/chat",
+            json={"messages": [{"role": "user", "content": "hi"}], "provider": "nope"},
+            headers=AUTH,
+        )
+        stream = client.post(
+            "/api/v1/chat/stream",
+            json={"messages": [{"role": "user", "content": "hi"}], "provider": "nope"},
+            headers=AUTH,
+        )
+        embed = client.post(
+            "/api/v1/embeddings",
+            json={"texts": ["hi"], "provider": "nope"},
+            headers=AUTH,
+        )
+        upsert = client.post(
+            "/api/v1/vectors/upsert",
+            json={"namespace": "kb", "doc_id": "d", "text": "hi", "provider": "nope"},
+            headers=AUTH,
+        )
+    assert chat.status_code == 400
+    assert chat.json()["detail"] == "unknown provider: nope"
+    assert stream.status_code == 400
+    assert embed.status_code == 400
+    assert upsert.status_code == 400
 
 
 def test_vector_upsert_and_search_roundtrip() -> None:
@@ -128,6 +180,55 @@ def test_schedule_crud() -> None:
 
         listed_after = client.get("/api/v1/schedules", headers=AUTH)
         assert all(item["id"] != schedule_id for item in listed_after.json())
+
+
+def test_chat_masks_pii_by_default() -> None:
+    """R4-1.34：PII 强制默认开启——模型复述的手机号出站前脱敏，命中数透出。"""
+    with _boot_client() as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={"messages": [{"role": "user", "content": "echo 手机 13812345678"}], "mask_pii": True},
+            headers=AUTH,
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "13812345678" not in body["content"]
+    assert body["pii_count"] == 1
+
+
+def test_chat_pii_can_be_explicitly_disabled() -> None:
+    """mask_pii=False 时原文透出（明确关停的调用放行）。"""
+    with _boot_client() as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={"messages": [{"role": "user", "content": "echo 手机 13812345678"}], "mask_pii": False},
+            headers=AUTH,
+        )
+    assert response.json()["content"] == "手机 13812345678"
+    assert response.json()["pii_count"] == 0
+
+
+def test_chat_stream_masks_split_pii() -> None:
+    """流式 PII 强制：手机号被拆到多个 2 字符 delta，仍被完整脱敏（跨分片不泄漏）。"""
+    with _boot_client() as client, client.stream(
+        "POST",
+        "/api/v1/chat/stream",
+        json={"messages": [{"role": "user", "content": "echo 13812345678"}], "mask_pii": True},
+        headers=AUTH,
+    ) as response:
+        body = response.read().decode("utf-8")
+    assert "".join(_sse_deltas(body)) == "***********"
+
+
+def test_chat_stream_pii_can_be_disabled() -> None:
+    with _boot_client() as client, client.stream(
+        "POST",
+        "/api/v1/chat/stream",
+        json={"messages": [{"role": "user", "content": "echo 13812345678"}], "mask_pii": False},
+        headers=AUTH,
+    ) as response:
+        body = response.read().decode("utf-8")
+    assert "".join(_sse_deltas(body)) == "13812345678"
 
 
 def test_unauthorized_rejected() -> None:

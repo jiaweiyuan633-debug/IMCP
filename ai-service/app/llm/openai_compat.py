@@ -3,12 +3,15 @@
 协议兼容 OpenAI Chat Completions 与 Embeddings，因此一个实现即可对接
 OpenAI、DeepSeek、通义千问、Moonshot、Ollama、vLLM、LM Studio 等绝大多数服务。
 网络错误与上游 5xx 抛 ``LLMError``（可重试）；认证/模型不存在（401/403/404）抛 ``LLMConfigError``（不可重试）。
+
+R4-1.34：连接复用——provider 持有单个持久 ``httpx.AsyncClient``（连接池），
+所有调用复用同一池，避免每次请求重建 TCP 连接与 TLS 握手；随服务关闭（``aclose``）释放。
 """
 
 from __future__ import annotations
 
 import json
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -36,6 +39,11 @@ class OpenAICompatibleProvider:
         self.embedding_model = embedding_model
         self.timeout_seconds = timeout_seconds
         self.name = name
+        # R4-1.34：持久复用单个 AsyncClient（连接池 + TLS 会话复用）。此前每次调用
+        # 都新建/销毁 client，每个请求都重建 TCP 连接与 TLS 握手；连接池在长连接
+        # keep-alive 下复用同一连接。惰性创建：首个请求才实例化（__init__ 可能
+        # 在事件循环外执行，httpx 连接池构造需在运行中的循环内进行）。
+        self._client: httpx.AsyncClient | None = None
 
     async def chat(
         self,
@@ -68,21 +76,21 @@ class OpenAICompatibleProvider:
             body["temperature"] = temperature
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
+        client = self._get_client()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-                async with client.stream("POST", self.base_url + CHAT_PATH, json=body, headers=self._headers()) as resp:
-                    if resp.status_code in (401, 403, 404):
-                        raise LLMConfigError(f"模型请求被拒绝: HTTP {resp.status_code}")
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if not line.startswith("data:"):
-                            continue
-                        data = line[len("data:") :].strip()
-                        if data == "[DONE]":
-                            break
-                        delta = self._extract_delta(data)
-                        if delta:
-                            yield delta
+            async with client.stream("POST", self.base_url + CHAT_PATH, json=body, headers=self._headers()) as resp:
+                if resp.status_code in (401, 403, 404):
+                    raise LLMConfigError(f"模型请求被拒绝: HTTP {resp.status_code}")
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:") :].strip()
+                    if data == "[DONE]":
+                        break
+                    delta = self._extract_delta(data)
+                    if delta:
+                        yield delta
         except httpx.HTTPError as exception:
             raise LLMError(f"模型流式请求失败: {exception}") from exception
 
@@ -105,13 +113,13 @@ class OpenAICompatibleProvider:
             body["temperature"] = temperature
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
+        client = self._get_client()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-                resp = await client.post(self.base_url + CHAT_PATH, json=body, headers=self._headers())
-                if resp.status_code in (401, 403, 404):
-                    raise LLMConfigError(f"模型请求被拒绝: HTTP {resp.status_code}")
-                resp.raise_for_status()
-                payload = resp.json()
+            resp = await client.post(self.base_url + CHAT_PATH, json=body, headers=self._headers())
+            if resp.status_code in (401, 403, 404):
+                raise LLMConfigError(f"模型请求被拒绝: HTTP {resp.status_code}")
+            resp.raise_for_status()
+            payload = resp.json()
         except httpx.HTTPError as exception:
             raise LLMError(f"模型请求失败: {exception}") from exception
         return self._parse_choices(payload, resolved_model)
@@ -122,21 +130,44 @@ class OpenAICompatibleProvider:
         resolved_model = model or self.embedding_model
         if not resolved_model:
             raise LLMConfigError("未配置 embedding_model")
+        client = self._get_client()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-                resp = await client.post(
-                    self.base_url + EMBED_PATH,
-                    json={"model": resolved_model, "input": texts},
-                    headers=self._headers(),
-                )
-                if resp.status_code in (401, 403, 404):
-                    raise LLMConfigError(f"Embedding 请求被拒绝: HTTP {resp.status_code}")
-                resp.raise_for_status()
-                payload = resp.json()
+            resp = await client.post(
+                self.base_url + EMBED_PATH,
+                json={"model": resolved_model, "input": texts},
+                headers=self._headers(),
+            )
+            if resp.status_code in (401, 403, 404):
+                raise LLMConfigError(f"Embedding 请求被拒绝: HTTP {resp.status_code}")
+            resp.raise_for_status()
+            payload = resp.json()
         except httpx.HTTPError as exception:
             raise LLMError(f"Embedding 请求失败: {exception}") from exception
         ordered = sorted(payload.get("data", []), key=lambda item: int(item.get("index", 0)))
         return [item["embedding"] for item in ordered]
+
+    # ---------- 连接池生命周期 ----------
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """惰性创建并复用持久 client：首个请求实例化，随服务关闭（``aclose``）销毁。
+
+        连接池复用 TCP 连接与 TLS 会话，避免每个请求重建握手。provider 为进程内
+        单例、运行在单一事件循环上，满足 httpx 连接池线程安全约束。
+        """
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False)
+        return self._client
+
+    async def aclose(self) -> None:
+        """释放连接池（应用关闭时调用）。未创建/已关闭时为 no-op。
+
+        用 ``getattr`` 兜底：测试环境替换的假 client 可能无 ``aclose``。
+        """
+        client, self._client = self._client, None
+        if client is not None:
+            closer = getattr(client, "aclose", None)
+            if closer is not None:
+                await closer()
 
     # ---------- 内部 ----------
 

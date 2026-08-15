@@ -9,10 +9,10 @@ from app.ml.cluster import KMeansTextClusterer
 from app.ml.tfidf import TfidfVectorizer, tokenize
 
 __all__ = [
+    "KMeansTextClusterer",
     "KNNClassifier",
     "TfidfVectorizer",
-    "KMeansTextClusterer",
-    "train_model",
     "load_model",
     "tokenize",
+    "train_model",
 ]

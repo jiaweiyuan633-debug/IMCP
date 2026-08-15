@@ -1,7 +1,7 @@
 """PII 检测与脱敏模块测试。"""
 
 from app.pii import PII_RULES
-from app.pii.masker import detect, mask, mask_fields
+from app.pii.masker import StreamMasker, detect, mask, mask_fields
 
 
 def test_detect_phone() -> None:
@@ -178,3 +178,57 @@ def test_all_kinds_match_rules_order() -> None:
     from app.pii import ALL_KINDS
 
     assert ALL_KINDS == tuple(rule.kind for rule in PII_RULES)
+
+
+# ---------- R4-1.34：流式脱敏（跨分片 PII 不泄漏） ----------
+
+
+def _run_stream_masker(text: str, chunk: int = 3) -> str:
+    """把文本按 chunk 长度分片喂给 StreamMasker，拼装全部发射分片 + flush。"""
+    masker = StreamMasker()
+    parts: list[str] = []
+    for i in range(0, len(text), chunk):
+        parts.extend(masker.emit(text[i : i + chunk]))
+    tail = masker.flush()
+    if tail:
+        parts.append(tail)
+    return "".join(parts)
+
+
+def test_stream_masker_split_phone_is_masked() -> None:
+    """手机号逐字吐出（任何单字符都不是完整模式）仍被完整脱敏，不泄漏。"""
+    text = "联系我 13812345678 结束"
+    out = _run_stream_masker(text, chunk=1)
+    assert "13812345678" not in out
+    assert out == mask(text)
+
+
+def test_stream_masker_output_matches_mask() -> None:
+    """流式拼装结果与一次性 mask 完全一致（仅分片边界可能不同）。"""
+    text = "手机 13812345678 邮箱 a@b.cn 身份证 11010519491231002X"
+    assert _run_stream_masker(text, chunk=2) == mask(text)
+    assert _run_stream_masker(text, chunk=5) == mask(text)
+    assert _run_stream_masker(text, chunk=11) == mask(text)
+
+
+def test_stream_masker_short_input_flushed_as_is() -> None:
+    """短输入全部留在缓冲，flush 时一次性返回；不完整号码不算 PII 原样透出。"""
+    masker = StreamMasker()
+    assert masker.emit("138") == []  # 不足 HOLD，暂不发射
+    assert masker.flush() == "138"  # 不完整号码未命中，原样返回
+
+
+def test_stream_masker_long_text_chunks_flow() -> None:
+    """长文本触发滚动缓冲：中段即发射部分分片（而非全部憋到 flush），结果仍一致。"""
+    text = "，".join(f"客户{i} 手机 13812345678 邮箱 a{i}@b.cn" for i in range(30))
+    chunks = _run_stream_masker(text, chunk=5)
+    assert "13812345678" not in chunks
+    assert chunks == mask(text)
+    assert chunks != text  # 确实发生了脱敏（mask 为 1:1 替换，长度不变但内容已变）
+    assert "*" in chunks  # 中段已发射脱敏分片，非全部憋到 flush
+
+
+def test_stream_masker_does_not_mutate_plain_text() -> None:
+    """普通文本流式拼装与原文一致（无 PII 时零改动）。"""
+    text = "这是一个完全没有敏感信息的普通段落。"
+    assert _run_stream_masker(text, chunk=4) == text

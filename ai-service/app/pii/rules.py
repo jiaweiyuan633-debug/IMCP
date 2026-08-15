@@ -5,8 +5,8 @@
 （如 18 位身份证号）内部的连续子串误判为手机号 / 银行卡号。
 """
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ Docker 镜像保持精简。大规模场景应切换 Milvus / pgvector / Qdrant�
 from __future__ import annotations
 
 import math
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def dot(a: Iterable[float], b: Iterable[float]) -> float:

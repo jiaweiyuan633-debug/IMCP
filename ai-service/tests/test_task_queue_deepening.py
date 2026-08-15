@@ -87,6 +87,78 @@ async def test_unsupported_biz_type_rejected() -> None:
 
 
 @pytest.mark.asyncio
+async def test_timeout_clamped_to_max() -> None:
+    """R4-1.34：超时治理——建单时把超上限的 timeout 裁剪到 max_timeout_seconds。
+
+    修复前 request.timeout 原样入库：客户端可提交一年级的超大超时，工作协程被
+    长时间占用（worker_count 有限，单任务拖垮整条队列），且租约（= 超时 + 宽限）
+    等比放大、形同虚设。裁剪后入库值即执行上限；未超限/未指定分别保留原值与默认值。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    service = _FakeService(sleep=0.01)
+    # max 取 300：高于默认 60，使「默认值不被裁剪」分支可单独验证
+    manager = TaskManager(redis, Settings(worker_count=1, max_timeout_seconds=300), services={"job": service})
+
+    capped = await manager.create_task(TaskCreateRequest(task_no="cap", biz_type="job", timeout=99999, params={}))
+    assert capped.timeout == 300  # 超上限 → clamp 到 max
+
+    normal = await manager.create_task(TaskCreateRequest(task_no="norm", biz_type="job", timeout=3, params={}))
+    assert normal.timeout == 3  # 未超限 → 原样保留
+
+    defaulted = await manager.create_task(TaskCreateRequest(task_no="def", biz_type="job", params={}))
+    assert defaulted.timeout == 60  # 未指定 → 默认值，未达上限不裁剪
+
+    # 裁剪后的任务以 clamp 值执行并正常完成
+    await _wait_terminal(manager, "cap")
+    assert (await manager.get_task("cap")).status == "SUCCEEDED"
+
+
+@pytest.mark.asyncio
+async def test_execute_clamps_legacy_huge_timeout() -> None:
+    """R4-1.34：执行侧兜底裁剪——修复前入库的超大 timeout 旧任务仍受上限约束。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    service = _FakeService(sleep=0.01)
+    settings = Settings(worker_count=1, max_timeout_seconds=10)
+    manager = TaskManager(redis, settings, services={"job": service})
+
+    # 模拟修复前旧记录：绕过 create_task 裁剪，直接把超大 timeout 写入 Redis
+    await manager._save("legacy", {
+        "task_no": "legacy", "biz_type": "job", "status": "QUEUED", "params": {},
+        "retry_count": 0, "max_retry": 3, "priority": 5, "timeout": 999999,
+    })
+    await manager._enqueue_ready("legacy", 5)
+    # create_task 才会被动拉起 worker；直接入队须显式启动消费者
+    manager._ensure_workers()
+
+    task = await _wait_terminal(manager, "legacy")
+    assert task.status == "SUCCEEDED"  # 未因 timeout 被误杀，clamp 到 10s 后正常执行
+    assert service.calls == ["run"]
+
+
+@pytest.mark.asyncio
+async def test_unknown_provider_task_fails_non_retryable() -> None:
+    """R4-1.34：任务路径未知 provider 属参数错误，立即失败不重试。
+
+    修复前 llm_chat/embedding 服务对未知 provider 抛 KeyError，被 TaskManager
+    按可重试异常处理（重试 3 次耗尽才进死信）——参数错误重试毫无意义且浪费
+    退避时间。改抛 NonRetryableError 后一次失败、reason=non_retryable。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    manager = TaskManager(redis, Settings(worker_count=1))
+    await manager.create_task(TaskCreateRequest(
+        task_no="bad-provider",
+        biz_type="llm_chat",
+        params={"messages": [{"role": "user", "content": "hi"}], "provider": "not-a-provider"},
+    ))
+
+    task = await _wait_terminal(manager, "bad-provider")
+    assert task.status == "FAILED"
+    assert task.reason == "non_retryable"
+    assert task.retry_count == 1  # 参数错误不重试
+    assert "unknown provider" in task.error
+
+
+@pytest.mark.asyncio
 async def test_timeout_fails_without_retry() -> None:
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     service = _FakeService(sleep=5)

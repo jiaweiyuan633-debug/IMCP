@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from app.llm.base import LLMResponse, ToolCall
 

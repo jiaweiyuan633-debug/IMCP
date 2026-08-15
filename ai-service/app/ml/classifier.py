@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from typing import Any, Self
+from typing import Self
 
 from app.ml.tfidf import TfidfVectorizer, cosine
 

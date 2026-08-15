@@ -42,6 +42,18 @@ class ProviderRegistry:
         provider = self.get(name) if name else self.default()
         return cast(Embedder, provider)
 
+    async def aclose_all(self) -> None:
+        """应用关闭时释放全部提供方持有的连接池（R4-1.34）。
+
+        仅对提供方公开 ``aclose`` 生命周期方法（OpenAICompatibleProvider 持久
+        复用连接池；MockProvider 等无连接资源，跳过）。启动失败前也可能已构造
+        部分提供方，遍历全部幂等释放。
+        """
+        for provider in self._providers.values():
+            closer = getattr(provider, "aclose", None)
+            if closer is not None:
+                await closer()
+
 
 def build_registry(settings: Settings) -> ProviderRegistry:
     registry = ProviderRegistry()
