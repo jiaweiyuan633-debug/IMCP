@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # 环境变量以 JSON 字符串注入（LLM_PROVIDERS），pydantic-settings 自动解析
     llm_providers: dict[str, dict] = {}
     llm_timeout_seconds: int = 120
+    # LLM 重试（仅非任务路径：/chat 与 Agent 引擎）。任务路径由 TaskManager 负责重试，
+    # 这里只对可重试异常（LLMError）做指数退避，配置/认证异常立即失败
+    llm_retry_max_attempts: int = 3
+    llm_retry_base_seconds: float = 0.5
 
     # ---------- 向量存储（Redis 精确余弦；scaffold 规模够用，大规模换 Milvus/pgvector） ----------
     vector_namespace_prefix: str = "ai:vec"

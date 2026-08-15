@@ -115,9 +115,13 @@ public class SystemRoleService {
 
     @Transactional
     public void delete(Long id) {
+        // R4-1.31：删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——删除前收集绑定用户，
+        // 提交后失效其权限缓存，使撤销的权限立即生效
+        List<Long> userIds = userRoleMapper.selectUserIdsByRoleIds(List.of(id));
         roleMapper.deleteById(id);
         roleMenuMapper.deleteByRoleId(id);
         roleDeptMapper.deleteByRoleId(id);
+        tokenService.evictPermissionsByUserIdsAfterCommit(userIds);
     }
 
     @Transactional

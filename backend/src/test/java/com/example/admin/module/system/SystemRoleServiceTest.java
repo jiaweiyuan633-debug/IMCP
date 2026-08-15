@@ -15,7 +15,6 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,10 +71,24 @@ class SystemRoleServiceTest {
     }
 
     @Test
-    void deleteRoleDoesNotTouchPermissions() {
-        // 删除角色本身不直接涉及用户权限缓存失效（角色菜单变更走 assignMenus）
-        when(roleMapper.deleteById(3L)).thenReturn(1);
+    void deleteRoleEvictsBoundUsers() {
+        // R4-1.31：删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——须失效绑定用户权限缓存
+        when(userRoleMapper.selectUserIdsByRoleIds(List.of(3L))).thenReturn(List.of(4L, 5L));
+
         roleService.delete(3L);
-        verifyNoInteractions(tokenService);
+
+        verify(roleMapper).deleteById(3L);
+        verify(roleMenuMapper).deleteByRoleId(3L);
+        verify(roleDeptMapper).deleteByRoleId(3L);
+        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of(4L, 5L));
+    }
+
+    @Test
+    void deleteRoleWithoutBindUsersSkipsEviction() {
+        when(userRoleMapper.selectUserIdsByRoleIds(List.of(3L))).thenReturn(List.of());
+
+        roleService.delete(3L);
+
+        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of());
     }
 }

@@ -169,6 +169,14 @@ public class TokenService {
         }
     }
 
+    /**
+     * 事务提交后清空全部权限缓存：菜单删除/权限编码变更影响所有绑定该菜单的用户且无法精确反查，
+     * 全清最安全（菜单变更低频，KEYS 扫描代价可接受）。
+     */
+    public void evictAllPermissionsAfterCommit() {
+        evictAfterCommit(this::evictAllPermissions);
+    }
+
     /** 精准失效单个用户的权限缓存（避免角色变更时 KEYS 全扫与全局缓存雪崩）。 */
     public void evictUserPermissions(Long userId) {
         if (userId == null) {

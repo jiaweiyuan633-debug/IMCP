@@ -179,6 +179,8 @@ public class SystemUserService {
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
         userPostMapper.deleteByUserId(id);
+        // R4-1.31：删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
+        tokenService.evictUserPermissionsAfterCommit(id);
     }
 
     public void updateStatus(Long id, Integer status) {
@@ -188,6 +190,9 @@ public class SystemUserService {
         }
         user.setStatus(status);
         userMapper.updateById(user);
+        // R4-1.31：禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照（期间角色
+        // 权限已变但用户非绑定角色路径未触达失效），会残留旧权限；清除后下次请求按库重新缓存
+        tokenService.evictUserPermissionsAfterCommit(id);
     }
 
     @Transactional

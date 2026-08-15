@@ -119,4 +119,28 @@ class SystemUserServiceTest {
         verify(userRoleMapper).deleteByUserId(7L);
         verify(tokenService).evictUserPermissionsAfterCommit(7L);
     }
+
+    @Test
+    void deleteUserEvictsPermissions() {
+        // R4-1.31：删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
+        userService.delete(7L);
+
+        verify(userMapper).deleteById(7L);
+        verify(userRoleMapper).deleteByUserId(7L);
+        verify(userPostMapper).deleteByUserId(7L);
+        verify(tokenService).evictUserPermissionsAfterCommit(7L);
+    }
+
+    @Test
+    void updateStatusEvictsPermissions() {
+        // R4-1.31：禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照会残留旧权限
+        SysUserDO user = new SysUserDO();
+        user.setId(7L);
+        when(userMapper.selectById(7L)).thenReturn(user);
+
+        userService.updateStatus(7L, 0);
+
+        verify(userMapper).updateById(user);
+        verify(tokenService).evictUserPermissionsAfterCommit(7L);
+    }
 }

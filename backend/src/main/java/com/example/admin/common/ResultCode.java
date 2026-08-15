@@ -57,6 +57,11 @@ public enum ResultCode {
     SCREEN_TEMPLATE_CODE_EXISTS(1039, "大屏模板编码已存在"),
     // R1-1.7：跨租户同名账号且未指定租户时无法唯一定位
     USERNAME_AMBIGUOUS(1040, "存在同名账号，请填写租户ID后重试"),
+    // R4-1.31：HTTP 语义标准化——标准异常映射精确状态码（业务码仍携带于 Result.code，前端本地化不受影响）
+    NOT_FOUND(404, "请求的资源不存在"),
+    METHOD_NOT_ALLOWED(405, "请求方法不支持"),
+    PAYLOAD_TOO_LARGE(413, "上传内容超过大小限制"),
+    MEDIA_TYPE_NOT_SUPPORTED(415, "不支持的媒体类型"),
     INTERNAL_ERROR(500, "系统繁忙，请稍后重试");
 
     private final int code;

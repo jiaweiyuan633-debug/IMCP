@@ -7,11 +7,14 @@ import com.example.admin.module.system.dto.MenuSaveRequest;
 import com.example.admin.module.system.entity.SysMenuDO;
 import com.example.admin.module.system.mapper.SysMenuMapper;
 import com.example.admin.module.system.vo.MenuVo;
+import com.example.admin.security.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,7 @@ public class SystemMenuService {
     private static final int ENABLED = 1;
 
     private final SysMenuMapper menuMapper;
+    private final TokenService tokenService;
 
     public List<MenuVo> tree() {
         List<SysMenuDO> menus = menuMapper.selectList(new LambdaQueryWrapper<SysMenuDO>()
@@ -37,19 +41,30 @@ public class SystemMenuService {
         return menu.getId();
     }
 
+    @Transactional
     public void update(MenuSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "菜单 ID 不能为空");
         }
-        if (menuMapper.selectById(request.getId()) == null) {
+        SysMenuDO existing = menuMapper.selectById(request.getId());
+        if (existing == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        menuMapper.updateById(toEntity(request));
+        SysMenuDO updated = toEntity(request);
+        menuMapper.updateById(updated);
+        // R4-1.31：仅权限编码（perm）变更才需清权限缓存——名称/图标/排序等改动不影响已缓存的权限集合，
+        // 且权限编码变更影响所有绑定该菜单的用户、无法精确反查，全清最安全（提交后执行防提交前竞态重缓存）
+        if (!Objects.equals(existing.getPerm(), updated.getPerm())) {
+            tokenService.evictAllPermissionsAfterCommit();
+        }
     }
 
+    @Transactional
     public void delete(Long id) {
         menuMapper.deleteById(id);
         menuMapper.delete(new LambdaQueryWrapper<SysMenuDO>().eq(SysMenuDO::getParentId, id));
+        // 菜单被删除则其权限编码随之消失，所有绑定用户需立即失效缓存，否则已删除权限残留至 TTL
+        tokenService.evictAllPermissionsAfterCommit();
     }
 
     private SysMenuDO toEntity(MenuSaveRequest request) {

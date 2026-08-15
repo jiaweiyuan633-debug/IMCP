@@ -12,6 +12,7 @@ import time
 
 from app.agents.tools import ToolRegistry
 from app.llm.base import LLMProvider
+from app.llm.retry import retry_llm_call
 
 # 达到最大步数仍未收敛时的兜底回复
 _MAX_STEPS_MSG = "已达最大步数，未得到最终答复"
@@ -63,7 +64,10 @@ class AgentEngine:
         started = time.perf_counter()
 
         while True:
-            response = await self._provider.chat_with_tools(
+            # R4-1.31：Agent 引擎也是非任务路径——单次模型调用失败（网络/5xx）会整轮失败，
+            # 对可重试异常做指数退避重试（LLMConfigError 立即上抛）
+            response = await retry_llm_call(
+                self._provider.chat_with_tools,
                 messages,
                 tools_schema,
                 model=model,

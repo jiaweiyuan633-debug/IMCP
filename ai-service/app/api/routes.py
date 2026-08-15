@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
+from app.llm.retry import retry_llm_call
 from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
@@ -117,12 +118,16 @@ async def retry_task(request: Request, task_id: str) -> TaskStatusResponse:
     dependencies=[Depends(require_api_token)],
 )
 async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
+    # R4-1.31：非任务路径（同步调用）无 TaskManager 重试，LLM 可重试异常（网络/5xx）须退避重试
     provider = _resolve_provider(request, payload.provider)
-    content = await provider.chat(
+    content = await retry_llm_call(
+        provider.chat,
         [m.model_dump() for m in payload.messages],
         model=payload.model,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
+        max_attempts=settings.llm_retry_max_attempts,
+        base_delay=settings.llm_retry_base_seconds,
     )
     return ChatResponse(
         content=content,
@@ -140,6 +145,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
 
     内部服务消费方（后端代理）通过 Authorization 头鉴权；
     浏览器 EventSource 无法带自定义头，须经后端 /api 代理转发。
+    注：流式已开始产出即无法安全重试（用户已看到部分内容），上游故障由消费方决定是否重连。
     """
     provider = _resolve_provider(request, payload.provider)
 

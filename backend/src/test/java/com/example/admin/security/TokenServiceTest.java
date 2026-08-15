@@ -127,6 +127,28 @@ class TokenServiceTest {
         verify(redisTemplate, never()).delete(anyCollection());
     }
 
+    // ---------- R4-1.31：菜单变更全量失效——提交后清空全部权限缓存 ----------
+
+    @Test
+    void evictAllPermissionsAfterCommitDefersUntilCommit() {
+        TransactionSynchronizationManager.initSynchronization();
+        when(redisTemplate.keys("auth:perms:*")).thenReturn(Set.of("auth:perms:1", "auth:perms:2"));
+
+        tokenService.evictAllPermissionsAfterCommit();
+        verify(redisTemplate, never()).delete(anyCollection());
+
+        runAfterCommit();
+        verify(redisTemplate).delete(anyCollection());
+    }
+
+    @Test
+    void evictAllPermissionsAfterCommitImmediateWithoutTransaction() {
+        when(redisTemplate.keys("auth:perms:*")).thenReturn(Set.of("auth:perms:3"));
+
+        tokenService.evictAllPermissionsAfterCommit();
+        verify(redisTemplate).delete(anyCollection());
+    }
+
     private void runAfterCommit() {
         List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
         if (synchronizations != null) {
