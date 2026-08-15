@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AxiosRequestConfig } from 'axios'
 import { message } from 'ant-design-vue'
 import router from '@/router'
 import type { Result } from '@/types'
@@ -10,6 +11,35 @@ const service = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
 })
+
+/**
+ * R4-1.32：泛型化请求包装——类型契约的唯一入口。
+ *
+ * 响应拦截器已把 Result 成功分支解包为 data（业务码非 0 或网络异常则 reject），
+ * 故这里把方法返回类型声明为 Promise<T>，由 api 层调用处显式传入期望的数据类型
+ * （如 request.get<PageResult<UserVo>>('/system/user')），使"api 声明的返回类型"
+ * 与"接口实际返回的数据形状"在编译期对齐；不传 <T> 时退化为 Promise<never>
+ * （保持旧行为：由 api 函数自身的返回类型声明兜底契约）。
+ * 拦截器内的 `as never` 与这里的 `as Promise<T>` 是仅有的两处类型逃生门，
+ * 全部集中在 axios 边界，业务代码不再需要任何断言。
+ */
+const request = {
+  get<T = never>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return service.get(url, config) as Promise<T>
+  },
+  post<T = never>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return service.post(url, data, config) as Promise<T>
+  },
+  put<T = never>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return service.put(url, data, config) as Promise<T>
+  },
+  delete<T = never>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return service.delete(url, config) as Promise<T>
+  },
+}
+
+export default request
+export { service }
 
 service.interceptors.request.use((config) => {
   const token = getAccessToken()
@@ -103,8 +133,6 @@ service.interceptors.response.use(
     return Promise.reject(error)
   },
 )
-
-export default service
 
 function localizedMessage(code: number | undefined, fallback: string): string {
   if (code == null) {

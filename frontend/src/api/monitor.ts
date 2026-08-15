@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import type { AxiosResponse } from 'axios'
 import { parseContentDispositionFilename, triggerBlobDownload } from '@/utils/download'
 import type { PageResult } from '@/types'
 
@@ -239,10 +240,14 @@ export function getAuditLogPage(params: Record<string, unknown>): Promise<PageRe
 }
 
 export async function exportAuditLogs(): Promise<void> {
-  const response = await request.get('/monitor/audit-log/export', { responseType: 'blob' })
+  // blob 响应在拦截器中原样返回完整 AxiosResponse（保留 Content-Disposition 头），
+  // 故显式声明为 AxiosResponse<Blob> 而非解包后的数据（R4-1.32 泛型契约）
+  const response = await request.get<AxiosResponse<Blob>>('/monitor/audit-log/export', {
+    responseType: 'blob',
+  })
   // 优先使用后端 Content-Disposition 文件名（含导出时间戳），缺失时回退默认名
   const filename = parseContentDispositionFilename(response.headers['content-disposition']) || 'audit-log.csv'
-  triggerBlobDownload(response.data as Blob, filename)
+  triggerBlobDownload(response.data, filename)
 }
 
 export interface FieldAuditLogVo {
