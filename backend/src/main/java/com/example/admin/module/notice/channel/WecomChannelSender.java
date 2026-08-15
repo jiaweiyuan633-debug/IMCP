@@ -1,5 +1,6 @@
 package com.example.admin.module.notice.channel;
 
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.module.notice.ChannelType;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -42,8 +43,10 @@ public class WecomChannelSender implements MessageChannelSender {
                     .body(String.class);
             return checkSuccess(response);
         } catch (Exception e) {
-            log.warn("企微发送失败: err={}", e.getMessage());
-            return e.getMessage();
+            // 批8d：异常消息可能内嵌请求 URL（webhook 地址携带的查询凭证），落库/日志前统一打码
+            String error = LogMaskUtils.sanitize(e.getMessage());
+            log.warn("企微发送失败: err={}", error);
+            return error;
         }
     }
 

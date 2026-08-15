@@ -1,5 +1,6 @@
 package com.example.admin.module.monitor.manager;
 
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.common.outbox.OutboxHandler;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -66,11 +67,12 @@ public class AlertWebhookOutboxHandler implements OutboxHandler {
             restTemplate.postForEntity(webhookUrl, body, String.class);
             return true;
         } catch (RestClientException exception) {
-            log.warn("Alert webhook send failed: {}", exception.getMessage());
+            // 批8d：异常消息可能内嵌请求 URL（含 webhook 地址查询凭证），日志前统一打码
+            log.warn("Alert webhook send failed: {}", LogMaskUtils.sanitize(exception.getMessage()));
             throw exception; // 由 @Retryable 重试
         } catch (Exception exception) {
             // JSON 解析等本地错误重试无意义，记日志并按失败处理（发件箱退避后仍会重试，留人工干预）
-            log.error("Alert webhook payload invalid: {}", payload, exception);
+            log.error("Alert webhook payload invalid: {}", LogMaskUtils.sanitize(payload), exception);
             return false;
         }
     }

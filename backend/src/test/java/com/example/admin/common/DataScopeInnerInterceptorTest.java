@@ -94,4 +94,26 @@ class DataScopeInnerInterceptorTest {
 
         assertThat(boundSql.getSql()).contains("u.id = -1");
     }
+
+    // ---------- 批8a：审计日志两表注册 user_id 关联列 ----------
+
+    @Test
+    void rewritesAuditLogTableWithUserIdColumn() {
+        when(ruleResolver.resolve("sys_audit_log"))
+                .thenReturn(new DataPermissionRuleResolver.Rule("sys_audit_log", "user_id", null));
+        BoundSql boundSql = run(new DataScopeContext.Filter(
+                List.of(3L, 7L), List.of(), Set.of("sys_audit_log"), false), "SELECT * FROM sys_audit_log");
+
+        assertThat(boundSql.getSql()).contains("sys_audit_log.user_id IN (3, 7)");
+    }
+
+    @Test
+    void rewritesFieldAuditLogTableWithUserIdColumn() {
+        when(ruleResolver.resolve("sys_field_audit_log"))
+                .thenReturn(new DataPermissionRuleResolver.Rule("sys_field_audit_log", "user_id", null));
+        BoundSql boundSql = run(new DataScopeContext.Filter(
+                List.of(3L, 7L), List.of(), Set.of("sys_field_audit_log"), false), "SELECT * FROM sys_field_audit_log");
+
+        assertThat(boundSql.getSql()).contains("sys_field_audit_log.user_id IN (3, 7)");
+    }
 }

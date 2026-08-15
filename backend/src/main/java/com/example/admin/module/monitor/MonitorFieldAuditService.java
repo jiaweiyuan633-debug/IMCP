@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.system.entity.SysFieldAuditLogDO;
 import com.example.admin.module.system.mapper.SysFieldAuditLogMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ public class MonitorFieldAuditService {
 
     private final SysFieldAuditLogMapper fieldAuditLogMapper;
 
+    @DataScope(tables = {"sys_field_audit_log"})
     public PageResult<SysFieldAuditLogDO> page(long pageNum, long pageSize, String module,
                                                String entityName, String action) {
         Page<SysFieldAuditLogDO> page = new Page<>(pageNum, pageSize);

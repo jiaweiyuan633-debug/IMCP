@@ -52,7 +52,7 @@ public class ChannelConfigController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('notice:channel:status')")
     @OperLog(module = "消息渠道", action = "修改渠道状态")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody ChannelStatusRequest request) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody ChannelStatusRequest request) {
         channelConfigService.updateStatus(id, request.getStatus());
         return Result.success();
     }

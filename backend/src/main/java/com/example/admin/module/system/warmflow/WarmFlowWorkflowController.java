@@ -64,7 +64,7 @@ public class WarmFlowWorkflowController {
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('system:workflow:approve')")
     @OperLog(module = "工作流", action = "审批通过")
-    public Result<Void> approve(@PathVariable Long id, @RequestBody WarmFlowWorkflowActionRequest request) {
+    public Result<Void> approve(@PathVariable Long id, @Valid @RequestBody WarmFlowWorkflowActionRequest request) {
         workflowService.approve(id, request.getTaskId(), request.getNodeId(), request.getRemark());
         return Result.success();
     }
@@ -72,7 +72,7 @@ public class WarmFlowWorkflowController {
     @PutMapping("/{id}/reject")
     @PreAuthorize("hasAuthority('system:workflow:reject')")
     @OperLog(module = "工作流", action = "审批拒绝")
-    public Result<Void> reject(@PathVariable Long id, @RequestBody WarmFlowWorkflowActionRequest request) {
+    public Result<Void> reject(@PathVariable Long id, @Valid @RequestBody WarmFlowWorkflowActionRequest request) {
         workflowService.reject(id, request.getTaskId(), request.getNodeId(), request.getRemark());
         return Result.success();
     }

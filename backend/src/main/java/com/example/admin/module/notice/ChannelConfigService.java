@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.notice.channel.ChannelFactory;
@@ -17,6 +18,7 @@ import com.example.admin.module.notice.mapper.SysChannelConfigMapper;
 import com.example.admin.module.notice.mapper.SysChannelLogMapper;
 import com.example.admin.module.notice.vo.ChannelConfigVo;
 import com.example.admin.module.notice.vo.ChannelLogVo;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -40,6 +42,7 @@ public class ChannelConfigService {
     private final SysChannelConfigMapper channelConfigMapper;
     private final SysChannelLogMapper channelLogMapper;
     private final ChannelFactory channelFactory;
+    private final ObjectMapper objectMapper;
 
     public PageResult<ChannelConfigVo> page(ChannelConfigQuery query) {
         Page<SysChannelConfigDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -149,11 +152,27 @@ public class ChannelConfigService {
         config.setId(request.getId());
         config.setChannelType(request.getChannelType());
         config.setChannelName(request.getChannelName());
-        config.setConfigJson(request.getConfigJson());
+        config.setConfigJson(resolveConfigJson(request));
         config.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         config.setSort(request.getSort() == null ? 0 : request.getSort());
         config.setDescription(request.getDescription());
         return config;
+    }
+
+    /**
+     * 解析落库的 configJson：更新场景合并打码占位（批8d）。回显时敏感值被 {@link LogMaskUtils}
+     * 打码为 ******，前端若未改动直接回写会把真实密钥覆盖为掩码；此处将请求中的占位符叶子
+     * 用库中原值补齐，仅"确系用户新输入"的值入库。新建（无 id）不合并。
+     */
+    private String resolveConfigJson(ChannelConfigSaveRequest request) {
+        if (request.getId() == null || !StringUtils.hasText(request.getConfigJson())) {
+            return request.getConfigJson();
+        }
+        SysChannelConfigDO existing = channelConfigMapper.selectById(request.getId());
+        if (existing == null || !StringUtils.hasText(existing.getConfigJson())) {
+            return request.getConfigJson();
+        }
+        return LogMaskUtils.mergeMasked(request.getConfigJson(), existing.getConfigJson(), objectMapper);
     }
 
     private ChannelConfigVo toVo(SysChannelConfigDO config) {
@@ -161,7 +180,7 @@ public class ChannelConfigService {
                 .id(config.getId())
                 .channelType(config.getChannelType())
                 .channelName(config.getChannelName())
-                .configJson(config.getConfigJson())
+                .configJson(LogMaskUtils.maskStructuredConfig(config.getConfigJson(), objectMapper))
                 .status(config.getStatus())
                 .sort(config.getSort())
                 .description(config.getDescription())

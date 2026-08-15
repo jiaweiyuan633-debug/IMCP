@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,10 @@ public class TokenService {
     private static final String BLACKLIST_KEY = "login:blacklist:";
     private static final String ONLINE_KEY = "login:online:";
     private static final String PERMS_KEY = "auth:perms:";
+
+    /** 权限缓存基础 TTL 与抖动上限（批8e）：TTL = 基础值 + 随机 [0, 抖动上限]。 */
+    private static final long PERMS_TTL_BASE_MINUTES = 30;
+    private static final long PERMS_TTL_JITTER_MAX_MINUTES = 5;
 
     // 缓存管理页允许清理的前缀白名单：仅限可自愈的业务缓存；
     // 认证令牌/授权码/限流计数/分布式锁等关键 key 禁止通过缓存页删除，避免造成会话失效或 DoS
@@ -156,10 +161,14 @@ public class TokenService {
     }
 
     public void cachePermissions(Long userId, List<String> perms) {
+        // 批8e：权限缓存 TTL 加随机抖动（30min ± 0~5min）。此前所有用户权限缓存统一 30 分钟
+        // 过期，登录高峰（如上班早高峰）集中写入后会在同一时刻批量过期、集中回查数据库重建，
+        // 形成权限缓存雪崩。抖动仅影响各用户重建时机，不涉及正确性。
+        long jitterMillis = ThreadLocalRandom.current().nextLong(0, PERMS_TTL_JITTER_MAX_MINUTES * 60_000 + 1);
         redisTemplate.opsForValue().set(
                 PERMS_KEY + userId,
                 String.join(",", perms),
-                Duration.ofMinutes(30));
+                Duration.ofMinutes(PERMS_TTL_BASE_MINUTES).plusMillis(jitterMillis));
     }
 
     public void evictAllPermissions() {

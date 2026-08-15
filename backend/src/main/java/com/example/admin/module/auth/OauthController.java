@@ -116,7 +116,7 @@ public class OauthController {
     @PutMapping("/config/{id}/status")
     @PreAuthorize("hasAuthority('system:oauth:status')")
     @OperLog(module = "第三方登录", action = "修改登录配置状态")
-    public Result<Void> updateConfigStatus(@PathVariable Long id, @RequestBody OauthStatusRequest request) {
+    public Result<Void> updateConfigStatus(@PathVariable Long id, @Valid @RequestBody OauthStatusRequest request) {
         oauthConfigService.updateStatus(id, request.getEnabled());
         return Result.success();
     }
@@ -155,7 +155,7 @@ public class OauthController {
     @PutMapping("/client/{id}/status")
     @PreAuthorize("hasAuthority('system:oauth:client:status')")
     @OperLog(module = "SSO 应用", action = "修改应用状态")
-    public Result<Void> updateClientStatus(@PathVariable Long id, @RequestBody OauthStatusRequest request) {
+    public Result<Void> updateClientStatus(@PathVariable Long id, @Valid @RequestBody OauthStatusRequest request) {
         oauthClientService.updateStatus(id, request.getEnabled());
         return Result.success();
     }

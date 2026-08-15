@@ -60,7 +60,7 @@ public class MonitorJobController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('monitor:job:changeStatus')")
     @OperLog(module = "定时任务", action = "修改任务状态")
-    public Result<Void> changeStatus(@PathVariable Long id, @RequestBody StatusRequest request) {
+    public Result<Void> changeStatus(@PathVariable Long id, @Valid @RequestBody StatusRequest request) {
         jobService.changeStatus(id, request.getStatus());
         return Result.success();
     }

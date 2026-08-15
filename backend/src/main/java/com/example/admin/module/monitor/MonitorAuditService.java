@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.system.entity.SysAuditLogDO;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +24,7 @@ public class MonitorAuditService {
 
     private final SysAuditLogMapper auditLogMapper;
 
+    @DataScope(tables = {"sys_audit_log"})
     public PageResult<SysAuditLogDO> page(long pageNum, long pageSize, String module, Integer status) {
         Page<SysAuditLogDO> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<SysAuditLogDO> wrapper = new LambdaQueryWrapper<SysAuditLogDO>()
@@ -33,6 +35,7 @@ public class MonitorAuditService {
         return PageResult.of(result, result.getRecords());
     }
 
+    @DataScope(tables = {"sys_audit_log"})
     public void export(HttpServletResponse response) throws IOException {
         response.setContentType("text/csv;charset=UTF-8");
         String fileName = URLEncoder.encode("audit-log.csv", StandardCharsets.UTF_8);

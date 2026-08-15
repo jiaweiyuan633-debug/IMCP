@@ -65,7 +65,7 @@ public class SystemRoleController {
     @PutMapping("/{id}/menus")
     @PreAuthorize("hasAuthority('system:role:assign')")
     @OperLog(module = "角色管理", action = "分配菜单权限")
-    public Result<Void> assignMenus(@PathVariable Long id, @RequestBody MenuIdsRequest request) {
+    public Result<Void> assignMenus(@PathVariable Long id, @Valid @RequestBody MenuIdsRequest request) {
         roleService.assignMenus(id, request.getMenuIds());
         return Result.success();
     }

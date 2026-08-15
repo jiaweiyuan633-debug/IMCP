@@ -1,5 +1,6 @@
 package com.example.admin.module.notice.channel;
 
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.notice.ChannelType;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
@@ -87,8 +88,10 @@ public class WebhookChannelSender implements MessageChannelSender {
                     .value();
             return status >= 200 && status < 300 ? null : "Webhook 返回状态: " + status;
         } catch (Exception e) {
-            log.warn("Webhook 发送失败: err={}", e.getMessage());
-            return e.getMessage();
+            // 批8d：异常消息可能内嵌完整请求 URL（含 query 中的 token 等凭证），落库/日志前统一打码
+            String error = LogMaskUtils.sanitize(e.getMessage());
+            log.warn("Webhook 发送失败: err={}", error);
+            return error;
         }
     }
 

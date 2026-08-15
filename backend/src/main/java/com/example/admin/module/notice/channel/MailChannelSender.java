@@ -1,5 +1,6 @@
 package com.example.admin.module.notice.channel;
 
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.module.notice.ChannelType;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,8 +54,10 @@ public class MailChannelSender implements MessageChannelSender {
             sender.send(message);
             return null;
         } catch (Exception e) {
-            log.warn("邮件发送失败: target={}, err={}", target, e.getMessage());
-            return e.getMessage();
+            // 批8d：异常消息可能内嵌 SMTP 配置或完整地址（含账号密码形态），落库/日志前统一打码
+            String error = LogMaskUtils.sanitize(e.getMessage());
+            log.warn("邮件发送失败: target={}, err={}", target, error);
+            return error;
         }
     }
 }

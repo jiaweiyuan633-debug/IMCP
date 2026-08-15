@@ -22,11 +22,15 @@ import java.util.Set;
  */
 public final class FieldDiffUtils {
 
-    /** 快照值需脱敏的字段名（与 LogMaskUtils 对齐） */
+    /** 快照值需脱敏的字段名（与 LogMaskUtils 对齐，批8c 同步扩充） */
     private static final Set<String> SENSITIVE_FIELDS = Set.of(
             "password", "oldPassword", "newPassword",
-            "totpSecret", "totpCode", "secret", "apiKey",
-            "accessToken", "refreshToken", "authorization",
+            "totpCode", "totpSecret", "secret", "secretKey",
+            "apiKey", "appSecret", "clientSecret",
+            "accessKeyId", "accessKeySecret",
+            "accessToken", "refreshToken", "authorization", "authCode",
+            "sign", "signature", "token",
+            "configValue", "configJson",
             "phone", "mobile", "email", "idCard", "idCardNo");
 
     /** 框架维护、不参与业务 diff 的字段 */

@@ -62,7 +62,7 @@ public class SystemUserController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('system:user:status')")
     @OperLog(module = "用户管理", action = "修改用户状态")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody UserStatusRequest request) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody UserStatusRequest request) {
         userService.updateStatus(id, request.getStatus());
         return Result.success();
     }
@@ -70,7 +70,7 @@ public class SystemUserController {
     @PutMapping("/{id}/roles")
     @PreAuthorize("hasAuthority('system:user:role')")
     @OperLog(module = "用户管理", action = "分配角色")
-    public Result<Void> assignRoles(@PathVariable Long id, @RequestBody RoleIdsRequest request) {
+    public Result<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody RoleIdsRequest request) {
         userService.assignRoles(id, request.getRoleIds());
         return Result.success();
     }
@@ -78,7 +78,7 @@ public class SystemUserController {
     @PutMapping("/{id}/posts")
     @PreAuthorize("hasAuthority('system:user:edit')")
     @OperLog(module = "用户管理", action = "分配岗位")
-    public Result<Void> assignPosts(@PathVariable Long id, @RequestBody PostIdsRequest request) {
+    public Result<Void> assignPosts(@PathVariable Long id, @Valid @RequestBody PostIdsRequest request) {
         userService.assignPosts(id, request.getPostIds());
         return Result.success();
     }

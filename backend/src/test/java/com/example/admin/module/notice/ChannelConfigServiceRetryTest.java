@@ -2,6 +2,7 @@ package com.example.admin.module.notice;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.module.notice.channel.ChannelFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.admin.module.notice.channel.MessageChannelSender;
 import com.example.admin.module.notice.dto.ChannelSendRequest;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
@@ -38,7 +39,7 @@ class ChannelConfigServiceRetryTest {
         logMapper = mock(SysChannelLogMapper.class);
         factory = mock(ChannelFactory.class);
         sender = mock(MessageChannelSender.class);
-        service = new ChannelConfigService(configMapper, logMapper, factory);
+        service = new ChannelConfigService(configMapper, logMapper, factory, new ObjectMapper());
     }
 
     private SysChannelConfigDO enabledConfig() {

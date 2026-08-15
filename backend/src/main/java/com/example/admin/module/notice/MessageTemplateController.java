@@ -50,7 +50,7 @@ public class MessageTemplateController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('system:message:template:status')")
     @OperLog(module = "消息模板", action = "修改消息模板状态")
-    public Result<Void> updateStatus(@PathVariable Long id, @RequestBody MessageTemplateSaveRequest request) {
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody MessageTemplateSaveRequest request) {
         templateService.updateStatus(id, request.getStatus());
         return Result.success();
     }

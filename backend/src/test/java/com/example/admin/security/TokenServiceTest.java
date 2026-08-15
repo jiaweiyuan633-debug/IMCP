@@ -7,18 +7,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -147,6 +152,41 @@ class TokenServiceTest {
 
         tokenService.evictAllPermissionsAfterCommit();
         verify(redisTemplate).delete(anyCollection());
+    }
+
+    // ---------- R4-1.35（批8e）：权限缓存 TTL 抖动——避免登录高峰集中过期雪崩 ----------
+
+    /** 多次写入（覆盖随机分布），每次 TTL 都必须落在 [基础 30min, 基础+抖动上限 35min]。 */
+    @Test
+    void cachePermissionsAppliesTtlJitterWithinBounds() {
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
+
+        for (int i = 0; i < 200; i++) {
+            tokenService.cachePermissions(7L, List.of("a", "b"));
+        }
+        verify(valueOps, times(200)).set(eq("auth:perms:7"), eq("a,b"), ttlCaptor.capture());
+
+        for (Duration ttl : ttlCaptor.getAllValues()) {
+            assertTrue(ttl.compareTo(Duration.ofMinutes(30)) >= 0, "TTL 不得低于基础 30min");
+            assertTrue(ttl.compareTo(Duration.ofMinutes(35)) <= 0, "TTL 不得超过 30min + 5min 抖动");
+        }
+    }
+
+    /** 同 key 连续写入，TTL 应随抖动变化（至少出现两种不同取值），证明随机偏移真实生效。 */
+    @Test
+    void cachePermissionsJitterYieldsVariedTtl() {
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
+
+        for (int i = 0; i < 100; i++) {
+            tokenService.cachePermissions(7L, List.of("a"));
+        }
+        verify(valueOps, times(100)).set(eq("auth:perms:7"), eq("a"), ttlCaptor.capture());
+        long distinct = ttlCaptor.getAllValues().stream().map(Duration::toMillis).distinct().count();
+        assertTrue(distinct > 1, "TTL 抖动应产生多种取值");
     }
 
     private void runAfterCommit() {

@@ -1,5 +1,6 @@
 package com.example.admin.module.notice.channel;
 
+import com.example.admin.common.LogMaskUtils;
 import com.example.admin.module.notice.ChannelType;
 import com.example.admin.module.notice.entity.SysChannelConfigDO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -48,8 +49,10 @@ public class SmsChannelSender implements MessageChannelSender {
                     .body(String.class);
             return checkSuccess(response);
         } catch (Exception e) {
-            log.warn("短信发送失败: target={}, err={}", target, e.getMessage());
-            return e.getMessage();
+            // 批8d：异常消息可能内嵌短信网关 URL（含 api_key 等查询凭证），落库/日志前统一打码
+            String error = LogMaskUtils.sanitize(e.getMessage());
+            log.warn("短信发送失败: target={}, err={}", target, error);
+            return error;
         }
     }
 
