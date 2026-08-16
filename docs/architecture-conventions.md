@@ -27,6 +27,7 @@
 - 业务异常统一抛出 `BusinessException`，错误码定义在 `ResultCode`
 - 禁止 `e.printStackTrace()`，统一使用 SLF4J `log.error/warn`
 - 日志与操作日志不得输出密码、Token、API Key、手机号、身份证等敏感字段
+- 敏感凭据落库必须加密（`SecretCipher`，AES-256-GCM，"enc:" 前缀）：OAuth clientSecret/appSecret 与通知渠道 `config_json` 中的密钥字段（SMTP 密码、短信 apiKey、钉钉加签 secret、Webhook headers 的 Authorization/token 等）已覆盖；回显打码、发送前解密。回显打码与落库加密共用 `LogMaskUtils` 的同一敏感键清单（大小写不敏感匹配），防止两套清单漂移
 - 新增错误码时同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包
 
 ## 数据访问

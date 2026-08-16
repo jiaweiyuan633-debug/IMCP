@@ -1,6 +1,7 @@
 package com.example.admin.module.notice;
 
 import com.example.admin.common.BusinessException;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.notice.channel.ChannelFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.admin.module.notice.channel.MessageChannelSender;
@@ -39,7 +40,10 @@ class ChannelConfigServiceRetryTest {
         logMapper = mock(SysChannelLogMapper.class);
         factory = mock(ChannelFactory.class);
         sender = mock(MessageChannelSender.class);
-        service = new ChannelConfigService(configMapper, logMapper, factory, new ObjectMapper());
+        ObjectMapper objectMapper = new ObjectMapper();
+        ChannelConfigCipher cipher = new ChannelConfigCipher(
+                new SecretCipher("unit-test-encryption-key-not-for-prod", null), objectMapper);
+        service = new ChannelConfigService(configMapper, logMapper, factory, objectMapper, cipher);
     }
 
     private SysChannelConfigDO enabledConfig() {

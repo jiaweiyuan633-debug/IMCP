@@ -8,6 +8,7 @@ import com.example.admin.common.FileAccessService;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.common.FileStorageManager;
 import com.example.admin.module.importexport.dto.JobCreateRequest;
 import com.example.admin.module.importexport.dto.JobQuery;
@@ -46,6 +47,12 @@ public class ImportExportJobService {
     private final FileStorageManager fileStorageManager;
     private final FileAccessService fileAccessService;
 
+    /**
+     * 任务记录分页（R4-1.37 行级数据权限）：非管理员仅可见自己创建的任务（created_by 命中
+     * 当前用户可见集合），管理员经 DataScopeAspect.isAdmin 短路不受限；受控表映射已在
+     * V61 迁移中注册到 sys_data_permission，后续按权限矩阵调整无需发版。
+     */
+    @DataScope(tables = {"import_export_job"})
     public PageResult<JobVo> page(JobQuery query) {
         Page<ImportExportJobDO> page = new Page<>(query.getPageNum(), query.getPageSize());
         LambdaQueryWrapper<ImportExportJobDO> wrapper = new LambdaQueryWrapper<ImportExportJobDO>()

@@ -49,6 +49,19 @@ class DataPermissionRuleResolverTest {
         assertThat(resolver.resolve("sys_login_log").usernameColumn()).isEqualTo("username");
     }
 
+    /** R4-1.37：V61 注册的提交记录/导入导出任务表映射可被解析器识别。 */
+    @Test
+    void resolvesBatch10RegisteredBusinessTables() {
+        when(mapper.selectList(any())).thenReturn(List.of(
+                row("form_instance", "submitter_id", null),
+                row("import_export_job", "created_by", null)));
+
+        resolver.reload();
+
+        assertThat(resolver.resolve("form_instance").userColumn()).isEqualTo("submitter_id");
+        assertThat(resolver.resolve("import_export_job").userColumn()).isEqualTo("created_by");
+    }
+
     @Test
     void returnsNullForUnconfiguredTable() {
         when(mapper.selectList(any())).thenReturn(List.of(row("sys_user", "id", null)));

@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 日志脱敏工具（批8c/8d 增强）。
@@ -28,6 +30,11 @@ public final class LogMaskUtils {
     /** 打码占位符：与前端约定的统一掩码。保存侧据此识别"未改动的敏感值"并合并保留原值。 */
     public static final String MASK = "******";
 
+    /** 判断键名是否命中敏感字段黑名单（R4-1.37 起供渠道配置加密与回显打码共用同一清单，防止两套清单漂移）。 */
+    public static boolean isSensitiveField(String key) {
+        return key != null && SENSITIVE_FIELDS_LOWER.contains(key.toLowerCase(Locale.ROOT));
+    }
+
     /** 对象字段黑名单：精确键名匹配，命中即整值打码（Textual 或结构内递归）。 */
     private static final Set<String> SENSITIVE_FIELDS = Set.of(
             "password", "oldPassword", "newPassword",
@@ -39,6 +46,10 @@ public final class LogMaskUtils {
             "sign", "signature",
             "configValue", "configJson",
             "phone", "mobile", "email", "idCard", "idCardNo");
+
+    /** 小写化副本：敏感键匹配大小写不敏感（R4-1.37），覆盖 Webhook 常见的 "Authorization" 等首字母大写键。 */
+    private static final Set<String> SENSITIVE_FIELDS_LOWER =
+            SENSITIVE_FIELDS.stream().map(s -> s.toLowerCase(Locale.ROOT)).collect(Collectors.toUnmodifiableSet());
 
     /** URL 查询参数黑名单：值一律打码，防止 URL 携带的 token/sign/secret 经错误消息或日志泄漏。 */
     private static final Set<String> SENSITIVE_QUERY_PARAMS = Set.of(
@@ -123,7 +134,7 @@ public final class LogMaskUtils {
         if (node instanceof ObjectNode objectNode) {
             objectNode.fields().forEachRemaining(entry -> {
                 JsonNode value = entry.getValue();
-                if (SENSITIVE_FIELDS.contains(entry.getKey())) {
+                if (isSensitiveField(entry.getKey())) {
                     objectNode.set(entry.getKey(), maskedValue(value));
                 } else if (value.isTextual()) {
                     maskTextualLeaf(objectNode, entry.getKey(), value.asText(), objectMapper);
@@ -161,7 +172,7 @@ public final class LogMaskUtils {
         if (node instanceof ObjectNode objectNode) {
             objectNode.fields().forEachRemaining(entry -> {
                 JsonNode value = entry.getValue();
-                if (SENSITIVE_FIELDS.contains(entry.getKey())) {
+                if (isSensitiveField(entry.getKey())) {
                     objectNode.set(entry.getKey(), maskedValue(value));
                 } else {
                     maskConfig(value);

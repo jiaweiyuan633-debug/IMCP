@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V60。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V61。
 
 ## 版本记录
 
@@ -66,6 +66,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V58 | 可靠投递发件箱处理状态字段 |
 | V59 | 审计日志数据权限注册：`sys_audit_log`/`sys_field_audit_log` → `sys_data_permission` |
 | V60 | 菜单 id 动态化：`uk_sys_menu_perm` 唯一索引，菜单业务定位键由「数字 id 区间」改为「perm 唯一键」 |
+| V61 | 业务表数据权限注册：`form_instance`/`import_export_job` → `sys_data_permission`（表单提交记录按提交人、导入导出任务按创建人过滤） |
 
 ## 表清单
 
@@ -140,7 +141,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - OAuth 三表隔离模型（R4-1.22，刻意不进租户白名单）：`sys_oauth_config` 为**平台级配置**，登录/授权在匿名上下文按 provider 全局解析（`OauthLoginService.requireEnabled`），注入租户条件会恒落租户 1 使非平台租户配置查不到——因此仅租户 1（平台）管理员可管理，服务层 `requirePlatformTenant` 守卫；`sys_oauth_client` 为**租户私有**（SSO 应用），page 过滤当前租户、create 落当前租户、update/status/delete 校验归属，且 `client_id` 跨租户全局唯一（SSO 匿名链路按 client_id `selectOne`，重名抛 `TooManyResultsException`）；`sys_user_oauth` 所有访问均已显式按租户过滤，无需额外约束。
 - 用户名唯一性按租户隔离：`sys_user` 使用 `uk_sys_user_tenant_username(tenant_id, username)`，多租户下各租户可存在同名账号。
 - 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
-- 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，对 `sys_user/ai_task/sys_oper_log/sys_login_log` 自动注入权限条件。
+- 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，受控表与关联列从 `sys_data_permission` 配置表读取（可热加载）。当前受控表：`sys_user`（按用户 ID）、`ai_task`（按创建人）、`sys_oper_log`/`sys_login_log`、`sys_audit_log`/`sys_field_audit_log`（日志类）、`form_instance`（按提交人 submitter_id）、`import_export_job`（按创建人 created_by）。**语义矩阵**：`report_definition`/`form_definition`/`screen_template` 是租户内全局共享的配置类数据（由租户隔离 + builtin/status 业务条件控制可见性），`sys_notice`/`sys_message` 公告全员可见、消息按接收人定向分发，`sys_channel_config`/`ai_service_config` 等配置表仅管理员管理——以上**明确不施加**行级过滤，靠业务查询条件或租户隔离兜底。
 - 权限、字典、参数支持 Redis 缓存，权限变更自动失效缓存。
 - 文件元数据统一写入 `sys_file`，存储后端支持本地目录与 MinIO。
 - SQL 日志阈值由 `SQL_LOG_THRESHOLD_MS` 控制，默认 50ms。

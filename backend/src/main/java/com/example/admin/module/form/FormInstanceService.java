@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.form.dto.FormInstanceQuery;
 import com.example.admin.module.form.dto.FormInstanceSubmitRequest;
 import com.example.admin.module.form.entity.FormDefinitionDO;
@@ -65,6 +66,12 @@ public class FormInstanceService {
         return instance.getId();
     }
 
+    /**
+     * 提交记录分页（R4-1.37 行级数据权限）：非管理员仅可见自己提交的记录（submitter_id 命中
+     * 当前用户可见集合），管理员经 DataScopeAspect.isAdmin 短路不受限；受控表映射已在
+     * V61 迁移中注册到 sys_data_permission，后续按权限矩阵调整无需发版。
+     */
+    @DataScope(tables = {"form_instance"})
     public PageResult<FormInstanceVo> page(FormInstanceQuery query) {
         Page<FormInstanceDO> page = new Page<>(query.getPageNum(), query.getPageSize());
         LambdaQueryWrapper<FormInstanceDO> wrapper = new LambdaQueryWrapper<FormInstanceDO>()

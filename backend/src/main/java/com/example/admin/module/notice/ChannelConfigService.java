@@ -43,6 +43,7 @@ public class ChannelConfigService {
     private final SysChannelLogMapper channelLogMapper;
     private final ChannelFactory channelFactory;
     private final ObjectMapper objectMapper;
+    private final ChannelConfigCipher channelConfigCipher;
 
     public PageResult<ChannelConfigVo> page(ChannelConfigQuery query) {
         Page<SysChannelConfigDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -91,6 +92,8 @@ public class ChannelConfigService {
         }
         ChannelType type = parseType(config.getChannelType());
         MessageChannelSender sender = channelFactory.get(type);
+        // R4-1.37：敏感字段落库为 enc: 密文，发送前解密为明文再交给渠道 sender（sender 不感知密文）
+        SysChannelConfigDO plainConfig = channelConfigCipher.decryptConfigOf(config);
 
         SysChannelLogDO log = new SysChannelLogDO();
         log.setChannelType(type.name());
@@ -99,7 +102,7 @@ public class ChannelConfigService {
         log.setTitle(request.getTitle());
         log.setContent(request.getContent());
         try {
-            String error = sender.send(config, request.getTarget(), request.getTitle(), request.getContent());
+            String error = sender.send(plainConfig, request.getTarget(), request.getTitle(), request.getContent());
             log.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
             log.setErrorMsg(error);
         } catch (Exception e) {
@@ -160,19 +163,25 @@ public class ChannelConfigService {
     }
 
     /**
-     * 解析落库的 configJson：更新场景合并打码占位（批8d）。回显时敏感值被 {@link LogMaskUtils}
-     * 打码为 ******，前端若未改动直接回写会把真实密钥覆盖为掩码；此处将请求中的占位符叶子
-     * 用库中原值补齐，仅"确系用户新输入"的值入库。新建（无 id）不合并。
+     * 解析落库的 configJson：更新场景合并打码占位（批8d），随后统一加密敏感字段（批10）。
+     * 回显时敏感值被 {@link LogMaskUtils} 打码为 ******，前端若未改动直接回写会把真实密钥覆盖为
+     * 掩码；此处将请求中的占位符叶子用库中原值补齐，仅"确系用户新输入"的值入库。
+     * {@link ChannelConfigCipher#encryptConfig} 幂等：未改动的敏感字段（merge 补回的 enc: 密文）
+     * 跳过，新输入的明文加密落库；地址字段（webhook/url 等）不加密，回显可正常编辑。新建（无 id）不合并。
      */
     private String resolveConfigJson(ChannelConfigSaveRequest request) {
+        String resolved;
         if (request.getId() == null || !StringUtils.hasText(request.getConfigJson())) {
-            return request.getConfigJson();
+            resolved = request.getConfigJson();
+        } else {
+            SysChannelConfigDO existing = channelConfigMapper.selectById(request.getId());
+            if (existing == null || !StringUtils.hasText(existing.getConfigJson())) {
+                resolved = request.getConfigJson();
+            } else {
+                resolved = LogMaskUtils.mergeMasked(request.getConfigJson(), existing.getConfigJson(), objectMapper);
+            }
         }
-        SysChannelConfigDO existing = channelConfigMapper.selectById(request.getId());
-        if (existing == null || !StringUtils.hasText(existing.getConfigJson())) {
-            return request.getConfigJson();
-        }
-        return LogMaskUtils.mergeMasked(request.getConfigJson(), existing.getConfigJson(), objectMapper);
+        return channelConfigCipher.encryptConfig(resolved);
     }
 
     private ChannelConfigVo toVo(SysChannelConfigDO config) {

@@ -3,6 +3,7 @@ package com.example.admin.module.notice;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.notice.channel.ChannelFactory;
 import com.example.admin.module.notice.dto.ChannelConfigQuery;
 import com.example.admin.module.notice.dto.ChannelConfigSaveRequest;
@@ -24,12 +25,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 渠道配置脱敏（批8d）：回显打码敏感配置 + 保存合并打码占位保留真实密钥。
+ * 渠道配置脱敏与加密（批8d + 批10）：
+ * 回显打码敏感配置 + 保存合并打码占位保留真实密钥 + 敏感字段落库前加密。
  */
 class ChannelConfigServiceMaskingTest {
 
     private SysChannelConfigMapper configMapper;
     private ChannelConfigService service;
+    private ChannelConfigCipher cipher;
+    private SecretCipher secretCipher;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
@@ -37,7 +41,9 @@ class ChannelConfigServiceMaskingTest {
         configMapper = mock(SysChannelConfigMapper.class);
         SysChannelLogMapper logMapper = mock(SysChannelLogMapper.class);
         ChannelFactory factory = mock(ChannelFactory.class);
-        service = new ChannelConfigService(configMapper, logMapper, factory, objectMapper);
+        secretCipher = new SecretCipher("unit-test-encryption-key-not-for-prod", null);
+        cipher = new ChannelConfigCipher(secretCipher, objectMapper);
+        service = new ChannelConfigService(configMapper, logMapper, factory, objectMapper, cipher);
     }
 
     private SysChannelConfigDO dingtalkConfig() {
@@ -68,9 +74,29 @@ class ChannelConfigServiceMaskingTest {
                 .doesNotContain("real-secret");
     }
 
-    /** 保存：请求中未改动的敏感值（******）用库中原值补齐，避免回写覆盖真实密钥。 */
+    /** 回显（批10）：库中已是 enc: 密文的敏感值同样被整体打码，不泄漏密文前缀，也无需先解密。 */
     @Test
-    void updateMergesMaskedPlaceholdersWithExistingSecrets() {
+    void pageMasksEncryptedSensitiveValues() {
+        SysChannelConfigDO config = dingtalkConfig();
+        config.setConfigJson("{\"webhook\":\"https://oapi.dingtalk.com/robot/send?access_token=tok\","
+                + "\"secret\":\"" + secretCipher.encrypt("real-secret") + "\"}");
+        Page<SysChannelConfigDO> result = new Page<>();
+        result.setRecords(List.of(config));
+        result.setTotal(1);
+        when(configMapper.selectPage(any(Page.class), any())).thenReturn(result);
+
+        PageResult<ChannelConfigVo> pageResult = service.page(new ChannelConfigQuery());
+
+        String masked = pageResult.getRecords().get(0).getConfigJson();
+        assertThat(masked)
+                .contains("\"secret\":\"******\"")
+                .doesNotContain("enc:")
+                .doesNotContain("real-secret");
+    }
+
+    /** 保存：请求中未改动的敏感值（******）用库中原值补齐，随后加密落库；地址字段保持明文。 */
+    @Test
+    void updateMergesMaskedPlaceholdersAndEncryptsSensitiveValues() {
         when(configMapper.selectById(1L)).thenReturn(dingtalkConfig());
 
         ChannelConfigSaveRequest request = new ChannelConfigSaveRequest();
@@ -84,14 +110,19 @@ class ChannelConfigServiceMaskingTest {
 
         ArgumentCaptor<SysChannelConfigDO> captor = ArgumentCaptor.forClass(SysChannelConfigDO.class);
         verify(configMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getConfigJson())
-                .contains("\"secret\":\"real-secret\"")
-                .contains("\"webhook\":\"https://oapi.dingtalk.com/robot/send?access_token=tok\"");
+        String saved = captor.getValue().getConfigJson();
+        assertThat(saved)
+                .contains("\"secret\":\"enc:")
+                .contains("\"webhook\":\"https://oapi.dingtalk.com/robot/send?access_token=tok\"")
+                .doesNotContain("real-secret")
+                .doesNotContain("******");
+        // 解密还原，确认合并确实补回了库中原值（而非把掩码当新值落库）
+        assertThat(cipher.decryptConfig(saved)).contains("\"secret\":\"real-secret\"");
     }
 
-    /** 新建（无 id）：不合并，直接采用请求值。 */
+    /** 新建（无 id）：不合并，直接采用请求值；敏感字段落库前加密。 */
     @Test
-    void createDoesNotMerge() {
+    void createEncryptsSensitiveValuesWithoutMerge() {
         ChannelConfigSaveRequest request = new ChannelConfigSaveRequest();
         request.setChannelType("DINGTALK");
         request.setChannelName("新渠道");
@@ -101,6 +132,10 @@ class ChannelConfigServiceMaskingTest {
 
         ArgumentCaptor<SysChannelConfigDO> captor = ArgumentCaptor.forClass(SysChannelConfigDO.class);
         verify(configMapper).insert(captor.capture());
-        assertThat(captor.getValue().getConfigJson()).contains("\"secret\":\"fresh-secret\"");
+        String saved = captor.getValue().getConfigJson();
+        assertThat(saved)
+                .contains("\"secret\":\"enc:")
+                .doesNotContain("fresh-secret");
+        assertThat(cipher.decryptConfig(saved)).contains("\"secret\":\"fresh-secret\"");
     }
 }

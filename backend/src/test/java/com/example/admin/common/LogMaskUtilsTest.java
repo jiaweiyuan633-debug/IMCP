@@ -127,6 +127,18 @@ class LogMaskUtilsTest {
         assertEquals("SMTP timeout", LogMaskUtils.sanitize("SMTP timeout"));
     }
 
+    /** R4-1.37：敏感键判定（渠道配置加密与回显打码共用同一清单）。 */
+    @Test
+    void isSensitiveFieldMatchesBlacklistKeysOnly() {
+        assertTrue(LogMaskUtils.isSensitiveField("password"));
+        assertTrue(LogMaskUtils.isSensitiveField("secret"));
+        assertTrue(LogMaskUtils.isSensitiveField("apiKey"));
+        assertTrue(LogMaskUtils.isSensitiveField("Authorization"));
+        assertFalse(LogMaskUtils.isSensitiveField("host"));
+        assertFalse(LogMaskUtils.isSensitiveField("webhook"));
+        assertFalse(LogMaskUtils.isSensitiveField(null));
+    }
+
     @Data
     @AllArgsConstructor
     private static class Payload {

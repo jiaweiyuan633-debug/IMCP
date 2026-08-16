@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.DataScope;
 import com.example.admin.module.form.dto.FormInstanceQuery;
 import com.example.admin.module.form.dto.FormInstanceSubmitRequest;
 import com.example.admin.module.form.entity.FormDefinitionDO;
@@ -177,6 +178,16 @@ class FormInstanceServiceTest {
 
         assertThat(result.getRecords()).hasSize(1);
         assertThat(result.getRecords().get(0).getData()).containsEntry("name", "张三");
+    }
+
+    /** R4-1.37：提交记录分页标注行级数据权限（受控表映射见 V61 迁移）。 */
+    @Test
+    void pageIsAnnotatedWithDataScopeForFormInstance() throws NoSuchMethodException {
+        DataScope annotation = FormInstanceService.class
+                .getMethod("page", FormInstanceQuery.class)
+                .getAnnotation(DataScope.class);
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.tables()).containsExactly("form_instance");
     }
 
     private FormDefinitionDO publishedDef(Long id, String code) {

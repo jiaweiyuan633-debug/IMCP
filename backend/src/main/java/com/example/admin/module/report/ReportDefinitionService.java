@@ -39,6 +39,15 @@ public class ReportDefinitionService {
     /** dataSource 中的命名占位 :param。 */
     private static final Pattern NAMED_PARAM_PATTERN = Pattern.compile(":(\\w+)");
 
+    /** 报表执行参数上限：SQL 占位符数量远小于此，防超量参数 DoS（R4-1.37）。 */
+    private static final int MAX_PARAMS = 64;
+
+    /** 单个参数 key 长度上限。 */
+    private static final int MAX_PARAM_KEY_LENGTH = 64;
+
+    /** 单个字符串参数值长度上限：值绑定为 SQL 参数，超大字符串无业务意义（R4-1.37）。 */
+    private static final int MAX_STRING_PARAM_LENGTH = 5000;
+
     private final ReportDefinitionMapper reportDefinitionMapper;
     private final JdbcTemplate jdbcTemplate;
     private final ReportSqlGuard reportSqlGuard;
@@ -103,6 +112,8 @@ public class ReportDefinitionService {
         }
         String sql = definition.getDataSource();
         Map<String, Object> params = request.getParams() == null ? Map.of() : request.getParams();
+        // 执行前防御校验：占位符缺失由 convertNamedParams 精确报错，此处拦截超量/类型混淆/超长参数
+        validateParams(params);
         // 执行期统一走守卫：只读校验 + 注入 tenant_id（JdbcTemplate 直查绕过 MyBatis 租户拦截器，必须显式注入）
         String guardedSql = reportSqlGuard.guard(sql);
         NamedSql named = convertNamedParams(guardedSql, params);
@@ -124,6 +135,40 @@ public class ReportDefinitionService {
                 .eq(ReportDefinitionDO::getCode, code.trim()));
         if (exists != null && (excludeId == null || !exists.getId().equals(excludeId))) {
             throw new BusinessException(ResultCode.REPORT_CODE_EXISTS);
+        }
+    }
+
+    /**
+     * 执行参数防御校验（R4-1.37）：参数直接绑定进 SQL 查询，虽经参数化无注入风险，仍需防 DoS 与
+     * 类型混淆——超量参数（数量上限）、超长/非法参数名、非基础类型值（集合/对象/数组）一律拒绝。
+     * ReportSqlGuard 已拦截危险函数与敏感列，此处补上参数侧纵深。
+     */
+    private void validateParams(Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return;
+        }
+        if (params.size() > MAX_PARAMS) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "报表参数过多（最多 " + MAX_PARAMS + " 个）");
+        }
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank() || key.length() > MAX_PARAM_KEY_LENGTH) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "报表参数名非法");
+            }
+            Object value = entry.getValue();
+            if (value == null) {
+                continue;
+            }
+            if (value instanceof CharSequence sequence) {
+                if (sequence.length() > MAX_STRING_PARAM_LENGTH) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                            "报表参数 " + key + " 过长（最多 " + MAX_STRING_PARAM_LENGTH + " 字符）");
+                }
+            } else if (!(value instanceof Number) && !(value instanceof Boolean)) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                        "报表参数 " + key + " 仅支持字符串/数字/布尔值");
+            }
         }
     }
 

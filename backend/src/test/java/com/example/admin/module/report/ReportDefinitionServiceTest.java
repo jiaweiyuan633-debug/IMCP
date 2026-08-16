@@ -181,6 +181,79 @@ class ReportDefinitionServiceTest {
                 .hasMessageContaining("已停用");
     }
 
+    // ---------- R4-1.37：执行参数防御校验（数量/类型/长度） ----------
+
+    @Test
+    void executeRejectsTooManyParams() {
+        ReportDefinitionDO definition = new ReportDefinitionDO();
+        definition.setId(20L);
+        definition.setStatus(1);
+        definition.setDataSource("SELECT 1");
+        when(mapper.selectById(20L)).thenReturn(definition);
+
+        Map<String, Object> tooMany = new java.util.HashMap<>();
+        for (int i = 0; i < 65; i++) {
+            tooMany.put("p" + i, i);
+        }
+        ReportExecuteRequest request = new ReportExecuteRequest();
+        request.setParams(tooMany);
+
+        assertThatThrownBy(() -> service.execute(20L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("参数过多");
+    }
+
+    @Test
+    void executeRejectsCollectionParamValue() {
+        ReportDefinitionDO definition = new ReportDefinitionDO();
+        definition.setId(21L);
+        definition.setStatus(1);
+        definition.setDataSource("SELECT 1");
+        when(mapper.selectById(21L)).thenReturn(definition);
+
+        ReportExecuteRequest request = new ReportExecuteRequest();
+        request.setParams(Map.of("nested", Map.of("k", "v")));
+
+        assertThatThrownBy(() -> service.execute(21L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅支持字符串/数字/布尔值");
+    }
+
+    @Test
+    void executeRejectsOverlongStringParam() {
+        ReportDefinitionDO definition = new ReportDefinitionDO();
+        definition.setId(22L);
+        definition.setStatus(1);
+        definition.setDataSource("SELECT 1");
+        when(mapper.selectById(22L)).thenReturn(definition);
+
+        ReportExecuteRequest request = new ReportExecuteRequest();
+        request.setParams(Map.of("big", "x".repeat(5001)));
+
+        assertThatThrownBy(() -> service.execute(22L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("过长");
+    }
+
+    @Test
+    void executeAcceptsBaseTypeParams() {
+        ReportDefinitionDO definition = new ReportDefinitionDO();
+        definition.setId(23L);
+        definition.setStatus(1);
+        definition.setDataSource(
+                "SELECT device_code FROM sys_device WHERE enabled = :enabled AND type = :type AND count = :count");
+        when(mapper.selectById(23L)).thenReturn(definition);
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of());
+
+        ReportExecuteRequest request = new ReportExecuteRequest();
+        request.setParams(Map.of("enabled", true, "type", "IT", "count", 3));
+
+        ReportExecuteResultVo result = service.execute(23L, request);
+
+        assertThat(result.getRows()).isEmpty();
+    }
+
     @Test
     void createDuplicateKeyRejectedWithBusinessCode() {
         // 并发同码创建：预检通过但 insert 命中唯一键 → 转精确业务码而非泛化 500
