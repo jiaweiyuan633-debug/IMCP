@@ -147,7 +147,7 @@ export default {
     oldPasswordRequired: '请输入原密码',
     newPasswordRequired: '请输入新密码',
     passwordMin: '密码至少 8 位',
-    passwordPolicy: '密码需 8-32 位，且同时包含字母和数字',
+    passwordPolicy: '密码需 8-32 位，且包含大写字母、小写字母、数字和特殊字符',
     passwordConfirm: '确认修改',
     passwordChanged: '密码修改成功',
     dashboardAiTitle: 'AI 任务状态分布',

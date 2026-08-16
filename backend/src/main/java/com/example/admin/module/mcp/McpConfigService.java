@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.mcp.dto.McpServerQuery;
 import com.example.admin.module.mcp.dto.McpServerSaveRequest;
 import com.example.admin.module.mcp.entity.SysMcpServerDO;
@@ -27,6 +29,7 @@ public class McpConfigService {
     private static final int ENABLED = 1;
 
     private final SysMcpServerMapper mcpServerMapper;
+    private final SecretCipher secretCipher;
 
     public PageResult<McpServerVo> page(McpServerQuery query) {
         Page<SysMcpServerDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -41,6 +44,7 @@ public class McpConfigService {
     }
 
     public Long create(McpServerSaveRequest request) {
+        validateUrl(request.getUrl());
         SysMcpServerDO server = toEntity(request);
         mcpServerMapper.insert(server);
         return server.getId();
@@ -50,6 +54,7 @@ public class McpConfigService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "服务 ID 不能为空");
         }
+        validateUrl(request.getUrl());
         SysMcpServerDO server = toEntity(request);
         // 令牌不回显给前端，编辑留空表示不修改：从库中保留原令牌，避免空串覆盖
         if (!StringUtils.hasText(request.getAuthToken())) {
@@ -86,11 +91,30 @@ public class McpConfigService {
         server.setId(request.getId());
         server.setName(request.getName());
         server.setUrl(request.getUrl());
-        server.setAuthToken(request.getAuthToken());
+        server.setAuthToken(encryptToken(request.getAuthToken()));
         server.setEnabled(request.getEnabled() == null ? ENABLED : request.getEnabled());
         server.setSort(request.getSort() == null ? 0 : request.getSort());
         server.setRemark(request.getRemark());
         return server;
+    }
+
+    /** R4-1.40：authToken 落库加密（SecretCipher，"enc:" 前缀幂等跳过）——此前明文落库，数据库泄露即第三方凭据泄露。 */
+    private String encryptToken(String token) {
+        if (!StringUtils.hasText(token) || secretCipher.isEncrypted(token)) {
+            return token;
+        }
+        return secretCipher.encrypt(token);
+    }
+
+    /**
+     * R4-1.40：保存时静态 SSRF 校验（协议/主机/IP 字面量，不发 DNS）——外部 MCP 地址若指向
+     * 内网/云元数据，平台服务端作为跳板可探测内网。投递时 McpClientService 还会做 DNS 复核。
+     */
+    private void validateUrl(String url) {
+        String error = SsrfUrlValidator.validateOutboundHttpUrl(url);
+        if (error != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "MCP Server 地址不合法：" + error);
+        }
     }
 
     private McpServerVo toVo(SysMcpServerDO server) {

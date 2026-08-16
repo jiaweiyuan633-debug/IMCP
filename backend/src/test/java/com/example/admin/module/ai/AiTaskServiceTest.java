@@ -23,6 +23,7 @@ import com.example.admin.module.ai.mapper.AiTaskResultMapper;
 import com.example.admin.module.ai.manager.AiTaskManager;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.system.DataScopeHelper;
 import com.example.admin.module.system.entity.SysUserDO;
 import com.example.admin.module.system.mapper.SysRoleMapper;
@@ -92,6 +93,9 @@ class AiTaskServiceTest {
     @Mock
     private SysRoleMapper roleMapper;
 
+    @Mock
+    private SecretCipher secretCipher;
+
     @InjectMocks
     private AiTaskService aiTaskService;
 
@@ -137,9 +141,38 @@ class AiTaskServiceTest {
             assertEquals(11L, id);
         }
 
-        ArgumentCaptor<AiTaskDO> captor = ArgumentCaptor.forClass(AiTaskDO.class);
-        verify(taskMapper).updateById(captor.capture());
-        assertEquals(AiTaskStatus.QUEUED.name(), captor.getValue().getStatus());
+        // R4-1.40：create 提交后置 QUEUED 改条件更新（前置 status=PENDING），避免与并发回调互踩
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<AbstractWrapper> wrapperCaptor = ArgumentCaptor.forClass(AbstractWrapper.class);
+        verify(taskMapper).update(isNull(), wrapperCaptor.capture());
+        Map<String, Object> params = wrapperCaptor.getValue().getParamNameValuePairs();
+        assertTrue(params.containsValue(AiTaskStatus.QUEUED.name()), "params=" + params);
+    }
+
+    /**
+     * R4-1.40：cancel 同样用条件更新（前置 status ∈ PENDING/QUEUED/RUNNING），
+     * 影响 0 行即被并发抢占终态，取消无效静默返回——不得用无条件 updateById 覆盖终态。
+     */
+    @Test
+    void cancelUsesConditionalUpdate() {
+        AiTaskDO task = new AiTaskDO();
+        task.setId(1L);
+        task.setTenantId(1L);
+        task.setCreatedBy(1L);
+        task.setStatus(AiTaskStatus.RUNNING.name());
+        when(taskMapper.selectById(1L)).thenReturn(task);
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+
+        aiTaskService.cancel(1L);
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<AbstractWrapper> wrapperCaptor = ArgumentCaptor.forClass(AbstractWrapper.class);
+        verify(taskMapper).update(isNull(), wrapperCaptor.capture());
+        Map<String, Object> params = wrapperCaptor.getValue().getParamNameValuePairs();
+        assertThat(params).containsValue(AiTaskStatus.CANCELLED.name());
+        // 条件前置必须含非终态集合，而非无条件覆盖
+        assertThat(wrapperCaptor.getValue().getSqlSegment()).contains("IN");
+        verify(taskMapper, never()).updateById(any(AiTaskDO.class));
     }
 
     @Test
@@ -154,6 +187,8 @@ class AiTaskServiceTest {
         config.setApiKey("secret");
         when(configMapper.selectOne(any())).thenReturn(config);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        // R4-1.40：apiKey 落库为密文，回调 HMAC 校验前先解密回明文
+        when(secretCipher.decrypt("secret")).thenReturn("secret");
         // handleCallback 用条件 UPDATE 抢占终态，mock 需返回 1 才能继续走结果入库与通知
         when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(1);
 
@@ -203,6 +238,7 @@ class AiTaskServiceTest {
         AiServiceConfigDO config = new AiServiceConfigDO();
         config.setApiKey("secret");
         when(configMapper.selectOne(any())).thenReturn(config);
+        when(secretCipher.decrypt("secret")).thenReturn("secret");
         when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(1);
 
         AiCallbackRequest request = new AiCallbackRequest();

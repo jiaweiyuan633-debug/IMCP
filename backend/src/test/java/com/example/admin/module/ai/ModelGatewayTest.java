@@ -1,5 +1,6 @@
 package com.example.admin.module.ai;
 
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.ai.dto.AiChatRequest;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
@@ -66,7 +67,7 @@ class ModelGatewayTest {
         LlmProvider otherProvider = mock(LlmProvider.class);
 
         ModelGateway gateway = new ModelGateway(configMapper, List.of(openAiProvider, otherProvider),
-                promptTemplateService, knowledgeService, redisTemplate);
+                promptTemplateService, knowledgeService, redisTemplate, mock(SecretCipher.class));
 
         AiChatRequest request = request("你好");
         AiChatVo result = gateway.chat(request);
@@ -90,7 +91,7 @@ class ModelGatewayTest {
         when(named.providerNames()).thenReturn(Set.of("gemini"));
 
         ModelGateway gateway = new ModelGateway(configMapper, List.of(fallback, named),
-                promptTemplateService, knowledgeService, redisTemplate);
+                promptTemplateService, knowledgeService, redisTemplate, mock(SecretCipher.class));
 
         AiChatVo result = gateway.chat(request("hi"));
 
@@ -109,7 +110,7 @@ class ModelGatewayTest {
         when(fallback.chat(any(), any(), any(), any())).thenReturn("default");
 
         ModelGateway gateway = new ModelGateway(configMapper, List.of(fallback),
-                promptTemplateService, knowledgeService, redisTemplate);
+                promptTemplateService, knowledgeService, redisTemplate, mock(SecretCipher.class));
 
         AiChatVo result = gateway.chat(request("hi"));
 

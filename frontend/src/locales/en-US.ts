@@ -147,7 +147,7 @@ export default {
     oldPasswordRequired: 'Enter old password',
     newPasswordRequired: 'Enter new password',
     passwordMin: 'At least 8 characters',
-    passwordPolicy: 'Password needs 8-32 characters with letters and digits',
+    passwordPolicy: 'Password needs 8-32 characters with upper, lower, digits and special chars',
     passwordConfirm: 'Confirm change',
     passwordChanged: 'Password changed',
     dashboardAiTitle: 'AI Task Status',

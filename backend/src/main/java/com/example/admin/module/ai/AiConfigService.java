@@ -3,6 +3,7 @@ package com.example.admin.module.ai;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.ai.dto.AiConfigSaveRequest;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import com.example.admin.module.ai.mapper.AiServiceConfigMapper;
@@ -22,6 +23,7 @@ public class AiConfigService {
     private static final int ENABLED = 1;
 
     private final AiServiceConfigMapper configMapper;
+    private final SecretCipher secretCipher;
 
     public List<AiConfigVo> list() {
         return configMapper.selectList(new LambdaQueryWrapper<AiServiceConfigDO>()
@@ -40,8 +42,11 @@ public class AiConfigService {
         config.setProvider(request.getProvider());
         config.setModel(request.getModel());
         config.setBaseUrl(request.getBaseUrl());
-        if (request.getApiKey() != null && !request.getApiKey().isBlank()) {
-            config.setApiKey(request.getApiKey());
+        // R4-1.40：apiKey 落库加密（SecretCipher，"enc:" 前缀幂等跳过）——此前明文落库，
+        // 与批10 渠道敏感字段加密标准不一致，数据库泄露即模型凭据泄露。回显仅 hasApiKey
+        // 布尔，编辑留空不改；加密后下游发送/回调 HMAC 路径在使用前统一解密。
+        if (StringUtils.hasText(request.getApiKey()) && !secretCipher.isEncrypted(request.getApiKey())) {
+            config.setApiKey(secretCipher.encrypt(request.getApiKey()));
         }
         config.setTimeoutSeconds(request.getTimeoutSeconds() == null
                 ? DEFAULT_TIMEOUT_SECONDS

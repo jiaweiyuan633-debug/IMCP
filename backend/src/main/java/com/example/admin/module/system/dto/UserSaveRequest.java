@@ -1,5 +1,6 @@
 package com.example.admin.module.system.dto;
 
+import com.example.admin.common.PasswordPolicy;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -18,9 +19,12 @@ public class UserSaveRequest {
     private String username;
 
     @Pattern(
-            regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,32}$",
-            message = "密码需 8-32 位，且同时包含字母和数字")
+            regexp = PasswordPolicy.PATTERN,
+            message = PasswordPolicy.MESSAGE)
     private String password;
+
+    @Size(max = 255, message = "头像地址长度不能超过 255")
+    private String avatar;
 
     @Size(max = 50, message = "昵称长度不能超过 50")
     private String nickname;

@@ -13,6 +13,8 @@
 
 现有 `AiTaskManager`、`AlertWebhookManager` 是外部能力封装的示例。文件存储通过 `FileStorage` 接口隔离本地/MinIO 实现，配额校验统一走 `StorageQuotaService`，当前用户提取统一走 `SecurityUtils.tryGetUserId()`。
 
+- 流程审批/驳回入参（`WarmFlowWorkflowActionRequest`）的 `taskId`/`nodeId` 必须保持可空：Service 的 `resolveTaskId` 负责"taskId → nodeId → 唯一待办回退"的解析兜底，DTO 不得强制要求前端补齐字段——否则旧客户端/未选节点的调用直接 400（R4-1.35 曾误加 `@NotNull`，R4-1.40 回退）
+
 ## 命名与领域模型
 
 - DO：数据库实体，表字段与 Java 属性映射，统一使用 `Sys*DO` / `Ai*DO` 命名
@@ -27,7 +29,7 @@
 - 业务异常统一抛出 `BusinessException`，错误码定义在 `ResultCode`
 - 禁止 `e.printStackTrace()`，统一使用 SLF4J `log.error/warn`
 - 日志与操作日志不得输出密码、Token、API Key、手机号、身份证等敏感字段
-- 敏感凭据落库必须加密（`SecretCipher`，AES-256-GCM，"enc:" 前缀）：OAuth clientSecret/appSecret 与通知渠道 `config_json` 中的密钥字段（SMTP 密码、短信 apiKey、钉钉加签 secret、Webhook headers 的 Authorization/token 等）已覆盖；回显打码、发送前解密。回显打码与落库加密共用 `LogMaskUtils` 的同一敏感键清单（大小写不敏感匹配），防止两套清单漂移
+- 敏感凭据落库必须加密（`SecretCipher`，AES-256-GCM，"enc:" 前缀）：OAuth clientSecret/appSecret、通知渠道 `config_json` 中的密钥字段（SMTP 密码、短信 apiKey、钉钉加签 secret、Webhook headers 的 Authorization/token 等）、AI 服务 `apiKey`、MCP Server `authToken` 已覆盖；回显打码、使用前解密（加密值入库带 "enc:" 前缀幂等跳过，编辑留空不改）。回显打码与落库加密共用 `LogMaskUtils` 的同一敏感键清单（大小写不敏感匹配），防止两套清单漂移
 - 渠道发送正文/接收目标（`sys_channel_log.content`/`target`）按 PII 加密落库，回显解密、存量明文行 fail-closed 打码；发送类接口的操作日志用 `@OperLog(maskFields = ...)` 声明式对正文/参数整值打码，避免把 `content` 等通用键加入全局敏感键清单误伤公告/通知审计
 - 新增错误码时同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包
 
@@ -38,6 +40,7 @@
 - 高频查询字段建立组合索引，索引命名使用 `idx_表名_字段名`
 - 每次结构变更通过 Flyway 迁移，禁止手工改库
 - 分页 pageSize 全局封顶 200（`MybatisPlusConfig.MAX_PAGE_SIZE` + `PaginationInnerInterceptor.setMaxLimit`），新增分页入口不得绕过；内存分页统一走 `PageUtil.fromIndex/toIndex` 钳制 pageNum≤0/pageSize≤0，禁止手写 `(pageNum-1)*pageSize` 下标
+- 状态机字段（AI 任务 `ai_task.status` 等）的流转必须用条件 UPDATE：MyBatis-Plus `LambdaUpdateWrapper` 以 `.eq/in(status, 允许前置)` 限定 + `.set(...)`，禁止"check-then-act 读状态再无条件 updateById"——并发回调/扫描器/取消/重试会互相覆盖终态。影响 0 行视为已被并发抢先，静默返回不报错（`handleCallback`/`AiTaskScanner`/`retry`/`cancel`/`create` 提交后置 QUEUED 均为此模式）
 
 ## 安全与访问控制
 
@@ -45,6 +48,8 @@
 - 登录失败锁定键带租户维度（`login:fail:{tenantId}:{username}`），锁定超阈值按 2 的幂指数退避（10→80 分钟封顶），禁止全局单键——否则未认证者可对任一租户账号制造跨租户 DoS
 - 数据权限 `@DataScope` 只约束列表查询，按 id 直查的写路径（update/delete/updateStatus/assignRoles/assignPosts 等）必须单独做单条归属校验：`loadUserOrThrow` + `checkUserDataScope`（admin 短路 → `allowedUserIds()` 为 null 放行 → 目标 id 命中集合否则 403）
 - JWT 过期/签名非法（refresh/logout 重放）应映射 401（`GlobalExceptionHandler` 兜底 JwtException），不得落入兜底 500
+- 出站外部地址（告警 Webhook、通用 Webhook 渠道、MCP Server 等）必须过 `SsrfUrlValidator` 双层校验：保存时静态校验（协议仅 http/https、禁 URL 用户信息、拒 localhost/回环/链路本地/站点本地/保留网段 IP 字面量，不发起 DNS）+ 投递/连接前 DNS 复核（任一解析地址落内部/保留网段即拒）——否则服务端可被当作探测内网/云元数据的跳板
+- 密码复杂度统一走 `PasswordPolicy.PATTERN`/`MESSAGE` 常量（8-32 位，须含大写/小写/数字/特殊字符四类），DTO `@Pattern` 与 Service 层显式校验共用，避免正则漂移；前端 `validation.ts` 的 `PASSWORD_PATTERN` 跨语言无法共享，需人工同步。批量导入（importUsers）默认密码有意豁免校验，避免破坏演示
 
 ## 工程与测试
 

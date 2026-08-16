@@ -2,6 +2,8 @@ package com.example.admin.module.mcp;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.mcp.entity.SysMcpServerDO;
 import com.example.admin.module.mcp.vo.McpCallResultVo;
 import com.example.admin.module.mcp.vo.McpToolVo;
@@ -35,6 +37,7 @@ public class McpClientService {
 
     private final McpConfigService configService;
     private final ObjectMapper objectMapper;
+    private final SecretCipher secretCipher;
 
     private final Map<Long, McpSyncClient> clients = new ConcurrentHashMap<>();
 
@@ -91,7 +94,15 @@ public class McpClientService {
         if (!StringUtils.hasText(url)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "MCP Server 地址不能为空");
         }
-        String authToken = server.getAuthToken();
+        // R4-1.40：投递时 SSRF 复核——保存时静态校验兜不住"主机名解析到内网 IP"与"保存后 DNS 变更"，
+        // 连接前按解析后的全部地址复核，任一落在内网/保留网段即拒绝
+        String ssrfError = SsrfUrlValidator.validateOutboundHttpUrlWithDns(url);
+        if (ssrfError != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "MCP Server 地址存在 SSRF 风险：" + ssrfError);
+        }
+        // R4-1.40：authToken 落库为 SecretCipher 密文，连接前解密为明文放入 Authorization 头；
+        // 存量明文 decrypt 原样放行（兼容），解密失败返回 null（无令牌请求）
+        String authToken = secretCipher.decrypt(server.getAuthToken());
         HttpClientSseClientTransport transport = HttpClientSseClientTransport.builder(url)
                 .customizeClient(builder -> builder.connectTimeout(Duration.ofSeconds(5)))
                 .customizeRequest(builder -> {

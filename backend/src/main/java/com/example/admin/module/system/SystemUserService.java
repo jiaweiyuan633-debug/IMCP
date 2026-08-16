@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.PasswordPolicy;
 import com.example.admin.common.ResultCode;
 import com.example.admin.module.system.dto.UserExcelDTO;
 import com.example.admin.module.system.dto.UserQuery;
@@ -119,12 +120,17 @@ public class SystemUserService {
         if (!StringUtils.hasText(request.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
         }
+        // R4-1.40：Service 层复杂度兜底（Controller @Valid 之外防内部调用绕过），与 PasswordPolicy 共用规则
+        if (!PasswordPolicy.matches(request.getPassword())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), PasswordPolicy.MESSAGE);
+        }
         checkTenantUserLimit();
         SysUserDO user = new SysUserDO();
         user.setTenantId(TenantContext.getTenantId());
         user.setUsername(request.getUsername().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
+        user.setAvatar(request.getAvatar());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
@@ -156,9 +162,14 @@ public class SystemUserService {
         }
         user.setUsername(request.getUsername().trim());
         if (StringUtils.hasText(request.getPassword())) {
+            // R4-1.40：编辑改密同样走 PasswordPolicy 复杂度校验
+            if (!PasswordPolicy.matches(request.getPassword())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), PasswordPolicy.MESSAGE);
+            }
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
         user.setNickname(request.getNickname());
+        user.setAvatar(request.getAvatar());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setDeptId(request.getDeptId());

@@ -594,6 +594,8 @@ function openReject(record: WorkflowVo) {
   approvalAction.value = 'reject'
   approvalRemark.value = ''
   approvalTarget.value = record
+  // R4-1.40：驳回复用 selectedNodeId 存待办 taskId，精确定位当前待办（多待办场景）
+  selectedNodeId.value = record.currentTaskId
   approvalModalOpen.value = true
 }
 
@@ -606,7 +608,7 @@ async function onApprovalSubmit() {
     if (approvalAction.value === 'approve') {
       await approveWorkflow(approvalTarget.value.id, approvalRemark.value, selectedNodeId.value)
     } else {
-      await rejectWorkflow(approvalTarget.value.id, approvalRemark.value)
+      await rejectWorkflow(approvalTarget.value.id, approvalRemark.value, selectedNodeId.value)
     }
     message.success(t('page.workflowOperationSuccess'))
     approvalModalOpen.value = false

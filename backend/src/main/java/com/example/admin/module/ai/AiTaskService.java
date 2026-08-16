@@ -10,6 +10,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.MessageBizType;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.ai.dto.AiCallbackRequest;
 import com.example.admin.module.ai.dto.AiTaskCreateRequest;
 import com.example.admin.module.ai.dto.AiTaskQuery;
@@ -85,6 +86,7 @@ public class AiTaskService {
     private final SystemMessageService messageService;
     private final SysUserMapper userMapper;
     private final SysRoleMapper roleMapper;
+    private final SecretCipher secretCipher;
 
     @Value("${app.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
@@ -136,18 +138,31 @@ public class AiTaskService {
             if (StringUtils.hasText(aiBaseUrl)) {
                 config.setBaseUrl(aiBaseUrl);
             }
+            // R4-1.40：apiKey 落库为 SecretCipher 密文，提交前解密为明文供 Bearer 鉴权；存量明文原样放行
+            config.setApiKey(secretCipher.decrypt(config.getApiKey()));
             aiTaskManager.submit(
                     config,
                     taskNo,
                     request.getBizType(),
                     request.getParams() == null ? Map.of() : request.getParams(),
                     task.getCallbackUrl());
-            task.setStatus(AiTaskStatus.QUEUED.name());
-            taskMapper.updateById(task);
+            // R4-1.40：置 QUEUED 改条件更新（前置 PENDING）——与 cancel 并发时防止无条件覆盖已取消任务
+            // （cancel 已把 PENDING→CANCELLED，此处影响 0 行则保持取消态，AI 侧孤儿任务由回调忽略兜底）
+            taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                    .eq(AiTaskDO::getId, task.getId())
+                    .eq(AiTaskDO::getStatus, AiTaskStatus.PENDING.name())
+                    .set(AiTaskDO::getStatus, AiTaskStatus.QUEUED.name())
+                    .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
         } catch (BusinessException exception) {
             task.setStatus(AiTaskStatus.FAILED.name());
             task.setErrorMsg(exception.getMessage());
-            taskMapper.updateById(task);
+            // 同样条件更新：提交失败置 FAILED 不覆盖并发取消已写入的 CANCELLED
+            taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                    .eq(AiTaskDO::getId, task.getId())
+                    .eq(AiTaskDO::getStatus, AiTaskStatus.PENDING.name())
+                    .set(AiTaskDO::getStatus, AiTaskStatus.FAILED.name())
+                    .set(AiTaskDO::getErrorMsg, exception.getMessage())
+                    .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
             throw exception;
         }
         return task.getId();
@@ -289,12 +304,17 @@ public class AiTaskService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         checkDataScope(task);
-        if (isTerminal(task.getStatus())) {
-            return;
-        }
-        task.setStatus(AiTaskStatus.CANCELLED.name());
-        task.setUpdatedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
+        // R4-1.40：check-then-act 存在竞态——cancel 读到非终态后、写回前若回调/扫描器已抢占终态，
+        // 无条件 updateById 会把终态覆盖回 CANCELLED（如任务实际成功却被标记取消）。改条件更新：
+        // 仅当任务仍处于非终态时才置取消，影响 0 行说明已被并发抢占为终态，取消无效静默返回。
+        taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
+                .eq(AiTaskDO::getId, id)
+                .in(AiTaskDO::getStatus,
+                        AiTaskStatus.PENDING.name(),
+                        AiTaskStatus.QUEUED.name(),
+                        AiTaskStatus.RUNNING.name())
+                .set(AiTaskDO::getStatus, AiTaskStatus.CANCELLED.name())
+                .set(AiTaskDO::getUpdatedAt, LocalDateTime.now()));
     }
 
     /**
@@ -330,6 +350,8 @@ public class AiTaskService {
                 continue;
             }
             try {
+                // R4-1.40：apiKey 落库为密文，重试前解密为明文供 Bearer 鉴权
+                config.setApiKey(secretCipher.decrypt(config.getApiKey()));
                 aiTaskManager.retry(config, task.getTaskNo());
             } catch (BusinessException exception) {
                 log.warn("AI task {} retry failed: {}", task.getTaskNo(), exception.getMessage());
@@ -367,7 +389,8 @@ public class AiTaskService {
         TenantContext.setTenantId(task.getTenantId());
         AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
                 .eq(AiServiceConfigDO::getCode, task.getServiceCode()));
-        if (config == null || !validCallbackHmac(config.getApiKey(), rawBody, timestamp, signature)) {
+        // R4-1.40：apiKey 落库为密文，HMAC 校验前解密（config==null 短路，不触发解密）
+        if (config == null || !validCallbackHmac(secretCipher.decrypt(config.getApiKey()), rawBody, timestamp, signature)) {
             throw new BusinessException(ResultCode.AI_CALLBACK_INVALID);
         }
         if (isTerminal(task.getStatus())) {

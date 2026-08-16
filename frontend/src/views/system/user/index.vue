@@ -68,7 +68,12 @@
             :field-names="{ label: 'deptName', value: 'id', children: 'children' }"
           />
         </a-form-item>
-        <a-form-item :label="editingId ? t('page.userPasswordEditHint') : t('page.userPassword')" required>
+        <a-form-item
+          :label="editingId ? t('page.userPasswordEditHint') : t('page.userPassword')"
+          name="password"
+          :rules="passwordRules"
+          required
+        >
           <a-input-password v-model:value="form.password" />
         </a-form-item>
         <a-form-item :label="t('page.userNickname')">
@@ -141,9 +146,12 @@ import type { UserSaveRequest } from '@/api/system'
 import type { DeptVo, PostOptionVo, RoleOptionVo, SearchField, UserVo } from '@/types'
 import { useI18n } from 'vue-i18n'
 import { dateColumn } from '@/utils/table'
-import { isStrongPassword } from '@/utils/validation'
+import { isStrongPassword, PASSWORD_PATTERN } from '@/utils/validation'
 
 const { t } = useI18n()
+
+// R4-1.40：密码框行内即时校验（编辑时可空，仅当填写时按复杂度规则校验）
+const passwordRules = [{ pattern: PASSWORD_PATTERN, message: t('page.passwordPolicy'), trigger: 'blur' }]
 
 const searchFields: SearchField[] = [
   { label: t('page.userUsername'), prop: 'username', placeholder: `${t('common.inputPlaceholder')}${t('page.userUsername')}` },

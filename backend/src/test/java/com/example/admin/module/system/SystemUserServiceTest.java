@@ -18,6 +18,7 @@ import com.example.admin.security.TokenService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -83,7 +84,7 @@ class SystemUserServiceTest {
         TenantContext.setTenantId(1L);
         when(userMapper.exists(any())).thenReturn(false);
         when(tenantMapper.selectOne(any())).thenReturn(null);
-        when(passwordEncoder.encode("abc12345")).thenReturn("encoded");
+        when(passwordEncoder.encode("Abc@12345")).thenReturn("encoded");
         doAnswer(invocation -> {
             SysUserDO user = invocation.getArgument(0);
             user.setId(10L);
@@ -92,7 +93,7 @@ class SystemUserServiceTest {
 
         UserSaveRequest request = new UserSaveRequest();
         request.setUsername("alice");
-        request.setPassword("abc12345");
+        request.setPassword("Abc@12345");
         request.setNickname("Alice");
         request.setRoleIds(List.of(2L));
         request.setPostIds(List.of(3L));
@@ -100,9 +101,33 @@ class SystemUserServiceTest {
         Long id = userService.create(request);
 
         assertEquals(10L, id);
-        verify(passwordEncoder).encode("abc12345");
+        verify(passwordEncoder).encode("Abc@12345");
         verify(userRoleMapper).insert(eq(10L), eq(2L));
         verify(userPostMapper).insert(eq(10L), eq(3L));
+    }
+
+    /**
+     * R4-1.40：创建用户须持久化头像字段——此前 UserSaveRequest 缺 avatar 字段，
+     * 前端已上传且 DB 列/VO 均存在，但 create 从未把值写库导致编辑后头像丢失。
+     */
+    @Test
+    void createPersistsAvatar() {
+        TenantContext.setTenantId(1L);
+        when(userMapper.exists(any())).thenReturn(false);
+        when(tenantMapper.selectOne(any())).thenReturn(null);
+        when(passwordEncoder.encode("Abc@12345")).thenReturn("encoded");
+        when(userMapper.insert(any(SysUserDO.class))).thenReturn(1);
+
+        UserSaveRequest request = new UserSaveRequest();
+        request.setUsername("bob");
+        request.setPassword("Abc@12345");
+        request.setAvatar("/uploads/avatar.png");
+
+        userService.create(request);
+
+        ArgumentCaptor<SysUserDO> captor = ArgumentCaptor.forClass(SysUserDO.class);
+        verify(userMapper).insert(captor.capture());
+        assertEquals("/uploads/avatar.png", captor.getValue().getAvatar());
     }
 
     @Test

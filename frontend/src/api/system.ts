@@ -564,8 +564,9 @@ export function approveWorkflow(id: number, remark?: string, taskId?: number, no
   return request.put(`/system/workflow-engine/${id}/approve`, { remark, taskId, nodeId })
 }
 
-export function rejectWorkflow(id: number, remark?: string): Promise<void> {
-  return request.put(`/system/workflow-engine/${id}/reject`, { remark })
+// R4-1.40：驳回补传 taskId 精确定位待办（多待办场景避免"请指定要处理的待办任务"）
+export function rejectWorkflow(id: number, remark?: string, taskId?: number): Promise<void> {
+  return request.put(`/system/workflow-engine/${id}/reject`, { remark, taskId })
 }
 
 export function withdrawWorkflow(id: number, remark?: string): Promise<void> {

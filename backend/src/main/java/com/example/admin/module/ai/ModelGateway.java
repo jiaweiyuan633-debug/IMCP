@@ -3,6 +3,7 @@ package com.example.admin.module.ai;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.ai.dto.AiChatRequest;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
@@ -32,6 +33,7 @@ public class ModelGateway {
     private final PromptTemplateService promptTemplateService;
     private final KnowledgeService knowledgeService;
     private final StringRedisTemplate redisTemplate;
+    private final SecretCipher secretCipher;
 
     public AiChatVo chat(AiChatRequest request) {
         AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
@@ -63,6 +65,8 @@ public class ModelGateway {
                     .forEach(m -> messages.add(Map.of("role", m.getRole(), "content", m.getContent())));
         }
 
+        // R4-1.40：apiKey 落库为 SecretCipher 密文，直连 LLM 前解密为明文供 Bearer 鉴权
+        config.setApiKey(secretCipher.decrypt(config.getApiKey()));
         long start = System.currentTimeMillis();
         String content = resolveProvider(config.getProvider())
                 .chat(config, request.getModel(), messages, request.getTemperature());
