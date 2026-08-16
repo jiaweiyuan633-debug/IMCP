@@ -6,6 +6,7 @@ import com.example.admin.common.MessageBizType;
 import com.example.admin.common.Result;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.SystemMessageService;
 import com.example.admin.security.SecurityUtils;
@@ -55,6 +56,7 @@ public class CommonController {
     }
 
     @PostMapping("/upload")
+    @OperLog(module = "文件管理", action = "上传文件")
     public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file,
                                          @RequestParam(required = false) String category) {
         UploadResponse response = fileStorageManager.store(file, category);

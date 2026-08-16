@@ -22,10 +22,13 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
@@ -143,7 +146,21 @@ public class OperLogAspect {
     private List<Object> filterArgs(Object[] args) {
         return Arrays.stream(args)
                 .filter(arg -> !(arg instanceof ServletRequest) && !(arg instanceof ServletResponse))
+                // R4-1.42：MultipartFile 只保留元信息，不序列化二进制内容——Jackson valueToTree
+                // 会对 MultipartFile 调用 getBytes() 整读文件进堆并 base64 序列化（大文件每次上传
+                // 额外占一份完整文件内存），此前 CommonController/FileChunkController 的
+                // @OperLog 已把文件字节写入入参 JSON
+                .map(arg -> arg instanceof MultipartFile file ? fileMetadata(file) : arg)
                 .toList();
+    }
+
+    /** 上传入参的文件元信息快照（不含内容）：记录"谁在何时上传了哪个文件"，避免二进制序列化。 */
+    private Map<String, Object> fileMetadata(MultipartFile file) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("originalFilename", file.getOriginalFilename());
+        metadata.put("size", file.getSize());
+        metadata.put("contentType", file.getContentType());
+        return metadata;
     }
 
     /** R4-1.38：按注解 maskFields 对入参/结果中的发送类正文与参数整体打码（见 @OperLog.maskFields）。 */

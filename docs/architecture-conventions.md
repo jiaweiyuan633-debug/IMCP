@@ -31,6 +31,7 @@
 - 日志与操作日志不得输出密码、Token、API Key、手机号、身份证等敏感字段
 - 敏感凭据落库必须加密（`SecretCipher`，AES-256-GCM，"enc:" 前缀）：OAuth clientSecret/appSecret、通知渠道 `config_json` 中的密钥字段（SMTP 密码、短信 apiKey、钉钉加签 secret、Webhook headers 的 Authorization/token 等）、AI 服务 `apiKey`、MCP Server `authToken` 已覆盖；回显打码、使用前解密（加密值入库带 "enc:" 前缀幂等跳过，编辑留空不改）。回显打码与落库加密共用 `LogMaskUtils` 的同一敏感键清单（大小写不敏感匹配），防止两套清单漂移。`@OperLog` 操作日志的入参/结果脱敏走同一黑名单：新增任何凭据字段必须同步加入 `LogMaskUtils.SENSITIVE_FIELDS`——`authToken` 曾漏入清单，导致 MCP 新增/编辑服务的 `McpServerSaveRequest.authToken` 明文落操作日志（R4-1.41 补齐）
 - 渠道发送正文/接收目标（`sys_channel_log.content`/`target`）按 PII 加密落库，回显解密、存量明文行 fail-closed 打码；发送类接口的操作日志用 `@OperLog(maskFields = ...)` 声明式对正文/参数整值打码，避免把 `content` 等通用键加入全局敏感键清单误伤公告/通知审计
+- 上传类接口（普通上传/分片上传/预签名直传）一律带 `@OperLog`，`MultipartFile` 入参由 `OperLogAspect.filterArgs` 自动降级为元信息快照（originalFilename/size/contentType）——Jackson `valueToTree` 会对 `MultipartFile` 调 `getBytes()` 整读文件进堆并 base64 序列化，大文件每次上传会额外占一份完整文件内存（R4-1.42 补齐普通上传审计并统一处理分片上传既有隐患）
 - 新增错误码时同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包
 
 ## 数据访问
@@ -45,7 +46,7 @@
 ## 安全与访问控制
 
 - 受保护文件路径（`/files/**`、`/uploads/**`）校验令牌前必须与 Spring MVC 同序规范化（剥 `;` 矩阵参数 → URL 解码 → `StringUtils.cleanPath`），防止 `;`/编码变体绕过 `FileAccessFilter` 正则匹配造成 IDOR
-- 本地 Docker 栈 nginx 反代路径集合（`docker/nginx.conf`：`/api/`、`/uploads/`、`/files/`）必须与 K8s Ingress（`k8s/helm/admin-scaffold/templates/all.yaml`：`/api`、`/files`）保持一致：上传文件 `contentUrl=/files/{id}` 带 `?token=` 访问，漏配会让本地部署的文件/头像/预览落入 SPA 回退返回 index.html 而全部失效（`/files` 曾漏配，R4-1.41 补齐）；新增受保护路径时两个入口必须同步
+- 本地 Docker 栈 nginx 反代路径集合（`docker/nginx.conf`：`/api/`、`/uploads/`、`/files/`）必须与 K8s Ingress（`k8s/helm/admin-scaffold/templates/all.yaml`：`/api`、`/files`、`/uploads`）保持一致：上传文件 `contentUrl=/files/{id}` 带 `?token=` 访问，漏配会让对应部署的文件/头像/预览落入 SPA 回退返回 index.html 而全部失效（`/files` 曾漏配 docker nginx，R4-1.41 补齐；`/uploads` 曾漏配 K8s Ingress，导致历史 `/uploads/` URL 的存量文件/头像在 K8s 失效，R4-1.42 补齐）；新增受保护路径时两个入口必须同步
 - 登录失败锁定键带租户维度（`login:fail:{tenantId}:{username}`），锁定超阈值按 2 的幂指数退避（10→80 分钟封顶），禁止全局单键——否则未认证者可对任一租户账号制造跨租户 DoS
 - 数据权限 `@DataScope` 只约束列表查询，按 id 直查的写路径（update/delete/updateStatus/assignRoles/assignPosts 等）必须单独做单条归属校验：`loadUserOrThrow` + `checkUserDataScope`（admin 短路 → `allowedUserIds()` 为 null 放行 → 目标 id 命中集合否则 403）
 - JWT 过期/签名非法（refresh/logout 重放）应映射 401（`GlobalExceptionHandler` 兜底 JwtException），不得落入兜底 500

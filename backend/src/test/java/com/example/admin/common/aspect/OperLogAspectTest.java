@@ -16,6 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -162,5 +163,29 @@ class OperLogAspectTest {
         assertThat(params).contains("\"channelId\":1");
         // 审计日志与操作日志 params 同源，同样脱敏
         assertThat(entities.auditLog().getParams()).isEqualTo(params);
+    }
+
+    // ---------- R4-1.42：上传接口 MultipartFile 只记元信息，不序列化二进制 ----------
+
+    /** MultipartFile 入参替换为元信息快照（文件名/大小/类型），文件内容不进入日志 JSON。 */
+    @Test
+    void multipartFileArgIsReducedToMetadataWithoutContent() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "a.png", "image/png", "binary-content-xyz".getBytes());
+        // buildEntities 需读 signature 的类名/方法名拼 method，复用 mockJoinPoint 的签名再覆盖入参
+        ProceedingJoinPoint joinPoint = mockJoinPoint();
+        when(joinPoint.getArgs()).thenReturn(new Object[]{"avatar", file});
+
+        OperLogAspect aspect = new OperLogAspect(operLogMapper, auditLogMapper, new ObjectMapper(),
+                businessMetrics, task -> {
+        });
+        OperLogAspect.LogEntities entities = aspect.buildEntities(joinPoint, mockOperLog(), 100L, null, null);
+
+        String params = entities.operLog().getParams();
+        assertThat(params).contains("\"originalFilename\":\"a.png\"");
+        assertThat(params).contains("\"size\":18");
+        assertThat(params).contains("\"contentType\":\"image/png\"");
+        // 二进制内容与 base64 均不得入日志
+        assertThat(params).doesNotContain("binary-content-xyz");
     }
 }

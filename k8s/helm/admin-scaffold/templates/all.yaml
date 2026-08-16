@@ -455,6 +455,16 @@ spec:
                 name: {{ .Release.Name }}-backend
                 port:
                   number: 8080
+          # 历史 /uploads/ 文件地址（R3-1.2 令牌化改造前的存量 URL，CommonController.isAccessiblePath
+          # 仍为其签发令牌）同源直达后端，FileAccessFilter 仍校验令牌。此前缺失导致存量文件/头像
+          # 在 K8s 落入 SPA 回退返回 index.html（R4-1.42 与批14 docker nginx 补 /files 对齐）
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-backend
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

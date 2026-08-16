@@ -48,7 +48,9 @@ async function resolveUrl(url: string): Promise<string> {
     const token = await getFileAccessToken(url)
     url = `${url}?token=${encodeURIComponent(token)}`
   } catch {
-    // keep original url if token endpoint unavailable
+    // 令牌签发失败时不再保留无 token 的原 URL：FileAccessFilter 对 /files、/uploads 一律
+    // 要求令牌，无令牌请求必然 403，保留只会产生裂图与错误请求（R4-1.42）
+    return ''
   }
   // 未注入时默认同源 /api（contentUrl 为 /files/xxx，经 Ingress /files 反代到后端）；
   // 注入绝对地址时取 origin 拼接（独立部署直连后端）
