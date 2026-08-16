@@ -685,7 +685,6 @@ export interface FileVo {
   url: string
   size: number
   storageType: string
-  accessToken?: string
   contentType?: string
   category?: string
   sha256?: string

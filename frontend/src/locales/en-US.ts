@@ -377,6 +377,8 @@ export default {
     fileDeleted: 'Deleted',
     fileCopyLink: 'Copy link',
     fileCopied: 'Link copied',
+    fileLinkFailed: 'Failed to get file link',
+    fileCopyFailed: 'Failed to copy link',
     fileCategory: 'Category',
     fileCategoryImage: 'Image',
     fileCategoryPdf: 'PDF',

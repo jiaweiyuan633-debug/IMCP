@@ -1,8 +1,8 @@
 package com.example.admin.module.common;
 
 import cn.hutool.crypto.digest.DigestUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
-import com.example.admin.common.FileAccessService;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.common.vo.UploadResponse;
@@ -32,7 +32,6 @@ public class FileStorageManager {
     private final FileStorage fileStorage;
     private final SysFileMapper fileMapper;
     private final StorageQuotaService storageQuotaService;
-    private final FileAccessService fileAccessService;
     private final FileVirusScanner fileVirusScanner;
     private final FileUploadProperties uploadProperties;
 
@@ -105,7 +104,8 @@ public class FileStorageManager {
                 .sha256(validation.sha256())
                 .scanStatus(entity.getScanStatus())
                 .contentUrl(contentUrl)
-                .accessToken(fileAccessService.issue(contentUrl, SecurityUtils.tryGetUserId()))
+                // R4-1.43：上传响应不再签发 accessToken——令牌生命周期收敛为「需要时经
+                // /api/common/file-token 现取」，列表/上传缓存的令牌 TTL 过期后必 403
                 .build();
     }
 
@@ -131,6 +131,22 @@ public class FileStorageManager {
 
     public SysFileDO getOwnedOrThrow(Long id) {
         SysFileDO file = fileMapper.selectById(id);
+        if (file == null || !TenantContext.getTenantId().equals(file.getTenantId())) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return file;
+    }
+
+    /**
+     * 按历史 {@code /uploads/{objectKey}} URL 校验文件归属并返回（供 file-token 签发前的跨租户校验）。
+     * 存量文件 sys_file.url 即 {@code /uploads/{objectKey}}（与 {@link #resolveObjectKey} 的
+     * 回退解析同源），精确匹配后校验租户，与 {@link #getOwnedOrThrow} 对 /files/{id} 的校验对齐——
+     * 否则任何人登录即可为任意 objectKey 签发令牌，猜中对象键即可跨租户读历史文件（R4-1.43）。
+     */
+    public SysFileDO getOwnedByLegacyUrlOrThrow(String legacyUploadUrl) {
+        SysFileDO file = fileMapper.selectOne(new LambdaQueryWrapper<SysFileDO>()
+                .eq(SysFileDO::getUrl, legacyUploadUrl)
+                .last("LIMIT 1"));
         if (file == null || !TenantContext.getTenantId().equals(file.getTenantId())) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }

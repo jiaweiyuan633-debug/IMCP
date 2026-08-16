@@ -26,7 +26,7 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'originalName'">
-          <a :href="withToken(record)" target="_blank" rel="noopener">{{ record.originalName || record.fileName }}</a>
+          <a @click.prevent="onOpenLink(record)">{{ record.originalName || record.fileName }}</a>
         </template>
         <template v-else-if="column.key === 'size'">
           {{ formatSize(record.size) }}
@@ -71,7 +71,8 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import { deleteFile, downloadFile, getFilePage } from '@/api/system'
 import { triggerBlobDownload } from '@/utils/download'
-import { getFileAccessToken, getStorageQuota, type StorageQuota } from '@/api/common'
+import { getStorageQuota, type StorageQuota } from '@/api/common'
+import { withFileToken } from '@/utils/fileUrl'
 import type { FileVo } from '@/api/system'
 import type { SearchField } from '@/types'
 import { useI18n } from 'vue-i18n'
@@ -160,12 +161,22 @@ function contentUrl(record: FileVo): string {
   return record.contentUrl || record.url
 }
 
+// R4-1.43：扩展名判断统一走 contentUrl(record)（contentUrl||url 兜底），避免 record.url
+// 缺失时 .split 抛 TypeError 导致表格渲染崩溃
 function isImage(record: FileVo | null): boolean {
-  return !!record && (record.category === 'image' || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(record.url.split('?')[0]))
+  if (!record) {
+    return false
+  }
+  const url = contentUrl(record) || ''
+  return record.category === 'image' || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url.split('?')[0])
 }
 
 function isPdf(record: FileVo | null): boolean {
-  return !!record && (record.category === 'pdf' || /\.pdf$/i.test(record.url.split('?')[0]))
+  if (!record) {
+    return false
+  }
+  const url = contentUrl(record) || ''
+  return record.category === 'pdf' || /\.pdf$/i.test(url.split('?')[0])
 }
 
 function scanStatusMeta(status?: string): { text: string; color: string } {
@@ -179,29 +190,35 @@ function scanStatusMeta(status?: string): { text: string; color: string } {
 }
 
 async function openPreview(record: FileVo) {
-  previewRecord.value = record
-  previewUrl.value = await freshUrl(record)
-  previewName.value = record.originalName || record.fileName
-  previewOpen.value = true
+  try {
+    previewRecord.value = record
+    previewUrl.value = await withFileToken(contentUrl(record))
+    previewName.value = record.originalName || record.fileName
+    previewOpen.value = true
+  } catch {
+    message.error(t('page.fileLinkFailed'))
+  }
 }
 
-function withToken(record: FileVo): string {
-  const url = contentUrl(record)
-  if (!record.accessToken) {
-    return url
+// R4-1.43：文件名外链不再用列表缓存的 accessToken（TTL 1h 后失效点击必 403），点击时现取令牌
+async function onOpenLink(record: FileVo) {
+  try {
+    const url = await withFileToken(contentUrl(record))
+    if (url) {
+      window.open(url, '_blank', 'noopener')
+    }
+  } catch {
+    message.error(t('page.fileLinkFailed'))
   }
-  return `${url}?token=${encodeURIComponent(record.accessToken)}`
 }
 
 async function onCopyLink(record: FileVo) {
-  await navigator.clipboard.writeText(await freshUrl(record))
-  message.success(t('page.fileCopied'))
-}
-
-async function freshUrl(record: FileVo): Promise<string> {
-  const url = contentUrl(record)
-  const token = await getFileAccessToken(url)
-  return `${url}?token=${encodeURIComponent(token)}`
+  try {
+    await navigator.clipboard.writeText(await withFileToken(contentUrl(record)))
+    message.success(t('page.fileCopied'))
+  } catch {
+    message.error(t('page.fileCopyFailed'))
+  }
 }
 
 async function onDownload(record: FileVo) {

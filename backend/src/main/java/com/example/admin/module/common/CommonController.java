@@ -34,15 +34,22 @@ public class CommonController {
     @GetMapping("/file-token")
     @PreAuthorize("isAuthenticated()")
     public Result<String> fileToken(@RequestParam String url) {
-        if (!isAccessiblePath(url)) {
+        // 签发/校验共用同一规范化口径（FileAccessService.normalizePath），防止 ; 矩阵参数等
+        // 路径变体绕过 isAccessiblePath 白名单（R4-1.43 与 FileAccessFilter 对齐）
+        String normalized = FileAccessService.normalizePath(url);
+        if (!isAccessiblePath(normalized)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "非法文件地址");
         }
         // 文件内容令牌签发前校验文件归属，防止为其他租户的文件签发访问令牌（跨租户文件读取）
-        Long fileId = parseFileId(url);
+        Long fileId = parseFileId(normalized);
         if (fileId != null) {
             fileStorageManager.getOwnedOrThrow(fileId);
+        } else {
+            // 历史 /uploads/{objectKey} 存量文件：按 URL 精确匹配 + 租户校验，与 /files/{id} 对齐——
+            // 否则任何人登录即可为任意 objectKey 签发令牌，猜中对象键即可跨租户读历史文件（R4-1.43）
+            fileStorageManager.getOwnedByLegacyUrlOrThrow(normalized);
         }
-        return Result.success(fileAccessService.issue(url, SecurityUtils.getUserId()));
+        return Result.success(fileAccessService.issue(normalized, SecurityUtils.getUserId()));
     }
 
     private Long parseFileId(String url) {

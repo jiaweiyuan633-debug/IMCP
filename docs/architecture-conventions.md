@@ -45,7 +45,9 @@
 
 ## 安全与访问控制
 
-- 受保护文件路径（`/files/**`、`/uploads/**`）校验令牌前必须与 Spring MVC 同序规范化（剥 `;` 矩阵参数 → URL 解码 → `StringUtils.cleanPath`），防止 `;`/编码变体绕过 `FileAccessFilter` 正则匹配造成 IDOR
+- 受保护文件路径（`/files/**`、`/uploads/**`）校验令牌前必须与 Spring MVC 同序规范化（剥 `;` 矩阵参数 → URL 解码 → `StringUtils.cleanPath`），防止 `;`/编码变体绕过 `FileAccessFilter` 正则匹配造成 IDOR；签发与校验共用 `FileAccessService.normalizePath` 同一规范化口径（R4-1.43 自 FileAccessFilter 提升，`CommonController` 签发令牌前同样规范化）
+- 文件访问令牌统一经 `GET /api/common/file-token` 按需现取，禁止列表/上传接口缓存签发令牌随数据下发——缓存令牌 TTL(1h) 后失效，页面停留超 1h 点击/渲染必然 403（`SystemFileService.page`/`FileStorageManager.persist` 曾签发 `accessToken`，R4-1.43 移除收敛）；前端取令牌 + origin 拼接统一走 `frontend/src/utils/fileUrl.ts` 的 `withFileToken`/`absoluteFileUrl`（基于 `API_BASE_URL`），禁止各页面手写重复
+- 文件令牌签发前必须校验文件归属，防止为其他租户的文件签发访问令牌（跨租户文件读取）：`/files/{id}` 走 `FileStorageManager.getOwnedOrThrow`（按 id + tenant_id），历史 `/uploads/{objectKey}` 走 `getOwnedByLegacyUrlOrThrow`（按 URL 精确匹配 + tenant_id）——`/uploads/` 曾无归属校验，登录用户可为任意 objectKey 签发令牌（R4-1.43 补齐）
 - 本地 Docker 栈 nginx 反代路径集合（`docker/nginx.conf`：`/api/`、`/uploads/`、`/files/`）必须与 K8s Ingress（`k8s/helm/admin-scaffold/templates/all.yaml`：`/api`、`/files`、`/uploads`）保持一致：上传文件 `contentUrl=/files/{id}` 带 `?token=` 访问，漏配会让对应部署的文件/头像/预览落入 SPA 回退返回 index.html 而全部失效（`/files` 曾漏配 docker nginx，R4-1.41 补齐；`/uploads` 曾漏配 K8s Ingress，导致历史 `/uploads/` URL 的存量文件/头像在 K8s 失效，R4-1.42 补齐）；新增受保护路径时两个入口必须同步
 - 登录失败锁定键带租户维度（`login:fail:{tenantId}:{username}`），锁定超阈值按 2 的幂指数退避（10→80 分钟封顶），禁止全局单键——否则未认证者可对任一租户账号制造跨租户 DoS
 - 数据权限 `@DataScope` 只约束列表查询，按 id 直查的写路径（update/delete/updateStatus/assignRoles/assignPosts 等）必须单独做单条归属校验：`loadUserOrThrow` + `checkUserDataScope`（admin 短路 → `allowedUserIds()` 为 null 放行 → 目标 id 命中集合否则 403）

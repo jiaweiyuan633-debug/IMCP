@@ -11,12 +11,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.UriUtils;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 @Component
 // 置于 Spring Security filter 链之后（默认 order -100），确保 JWT 已解析、可取得当前用户做令牌绑定校验
@@ -33,7 +30,8 @@ public class FileAccessFilter extends OncePerRequestFilter {
         // R4-1.39：用与 Spring MVC 路径解析一致的规范化 URI 匹配受保护路径。原始 getRequestURI()
         // 直接正则匹配可被 ; 矩阵参数绕过：/files/5;x 不命中 /files/\d+ 漏检，而路由层剥掉 ;x
         // 落到 /files/5 并读文件，匿名即可跨租户下载任意文件（IDOR）。
-        String uri = normalizePath(request.getRequestURI());
+        // 规范化口径与签发令牌的 CommonController 共用（FileAccessService.normalizePath，R4-1.43 提升）。
+        String uri = FileAccessService.normalizePath(request.getRequestURI());
         if (!uri.startsWith("/uploads/") && !uri.matches("/files/\\d+")) {
             filterChain.doFilter(request, response);
             return;
@@ -52,15 +50,5 @@ public class FileAccessFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), Result.error(ResultCode.FORBIDDEN));
-    }
-
-    /**
-     * 与 Spring UrlPathHelper 相同顺序规范化受保护路径：先剥离 {@code ;} 矩阵参数（removeSemicolonContent），
-     * 再 URL 解码，最后 cleanPath 归一化 {@code ./ ../ //} 序列——保证校验路径与签发令牌的路径一致。
-     */
-    private static String normalizePath(String rawUri) {
-        int semicolon = rawUri.indexOf(';');
-        String path = semicolon >= 0 ? rawUri.substring(0, semicolon) : rawUri;
-        return StringUtils.cleanPath(UriUtils.decode(path, StandardCharsets.UTF_8));
     }
 }

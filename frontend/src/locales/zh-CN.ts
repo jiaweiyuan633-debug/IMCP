@@ -377,6 +377,8 @@ export default {
     fileDeleted: '删除成功',
     fileCopyLink: '复制链接',
     fileCopied: '链接已复制',
+    fileLinkFailed: '获取文件链接失败',
+    fileCopyFailed: '复制链接失败',
     fileCategory: '分类',
     fileCategoryImage: '图片',
     fileCategoryPdf: 'PDF',

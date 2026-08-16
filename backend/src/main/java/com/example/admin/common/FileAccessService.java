@@ -2,6 +2,8 @@ package com.example.admin.common;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -86,5 +88,16 @@ public class FileAccessService {
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("File token signing failed", exception);
         }
+    }
+
+    /**
+     * 与 Spring UrlPathHelper 相同顺序规范化受保护路径：先剥离 {@code ;} 矩阵参数（removeSemicolonContent），
+     * 再 URL 解码，最后 cleanPath 归一化 {@code ./ ../ //} 序列——保证签发令牌的路径与 FileAccessFilter
+     * 校验的路径完全一致，防止同一 url 因两种规范化口径分叉被变体绕过（R4-1.43 自 FileAccessFilter 提升共用）。
+     */
+    public static String normalizePath(String rawUri) {
+        int semicolon = rawUri.indexOf(';');
+        String path = semicolon >= 0 ? rawUri.substring(0, semicolon) : rawUri;
+        return StringUtils.cleanPath(UriUtils.decode(path, StandardCharsets.UTF_8));
     }
 }

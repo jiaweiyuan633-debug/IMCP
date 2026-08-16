@@ -7,9 +7,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.common.FileStorageManager;
 import com.example.admin.module.system.entity.SysFileDO;
-import com.example.admin.security.SecurityUtils;
 import com.example.admin.module.system.mapper.SysFileMapper;
-import com.example.admin.common.FileAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -19,7 +17,6 @@ import org.springframework.util.StringUtils;
 public class SystemFileService {
 
     private final SysFileMapper fileMapper;
-    private final FileAccessService fileAccessService;
     private final FileStorageManager fileStorageManager;
 
     public PageResult<SysFileDO> page(long pageNum, long pageSize, String fileName, String originalName,
@@ -33,11 +30,9 @@ public class SystemFileService {
                 .eq(StringUtils.hasText(storageType), SysFileDO::getStorageType, storageType)
                 .orderByDesc(SysFileDO::getId);
         IPage<SysFileDO> result = fileMapper.selectPage(page, wrapper);
-        result.getRecords().forEach(file -> {
-            String contentUrl = "/files/" + file.getId();
-            file.setContentUrl(contentUrl);
-            file.setAccessToken(fileAccessService.issue(contentUrl, SecurityUtils.tryGetUserId()));
-        });
+        // R4-1.43：列表不再签发 accessToken——令牌统一由 /api/common/file-token 现取，列表缓存的
+        // 令牌 TTL(1h) 后失效，页面停留超过 1h 后点击文件名链接必然 403
+        result.getRecords().forEach(file -> file.setContentUrl("/files/" + file.getId()));
         return PageResult.of(result, result.getRecords());
     }
 

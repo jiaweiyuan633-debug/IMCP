@@ -110,6 +110,7 @@ import ProSearchForm from '@/components/ProSearchForm.vue'
 import ProTable from '@/components/ProTable.vue'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { uploadFile } from '@/api/common'
+import { absoluteFileUrl } from '@/utils/fileUrl'
 import {
   createExportJob,
   createImportJob,
@@ -307,9 +308,8 @@ async function onCreateExport() {
 async function onDownload(record: ImportExportJobVo) {
   try {
     const result = await getImportJobDownload(record.id)
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
-    const url = base.startsWith('http') ? `${new URL(base).origin}${result.url}` : result.url
-    window.open(url, '_blank')
+    // R4-1.43：origin 拼接统一走 absoluteFileUrl（基于 API_BASE_URL，已去尾部 /）
+    window.open(absoluteFileUrl(result.url), '_blank')
   } catch {
     message.error(t('page.ieJobDownloadFailed'))
   }

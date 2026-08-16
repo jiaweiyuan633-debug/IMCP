@@ -1,7 +1,7 @@
 package com.example.admin.module.common;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
-import com.example.admin.common.FileAccessService;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.common.vo.UploadResponse;
 import com.example.admin.module.system.entity.SysFileDO;
@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -35,7 +35,6 @@ class FileStorageManagerTest {
     private FileStorage storage;
     private SysFileMapper fileMapper;
     private StorageQuotaService quotaService;
-    private FileAccessService accessService;
     private FileVirusScanner scanner;
     private FileUploadProperties properties;
     private FileStorageManager manager;
@@ -45,10 +44,9 @@ class FileStorageManagerTest {
         storage = mock(FileStorage.class);
         fileMapper = mock(SysFileMapper.class);
         quotaService = mock(StorageQuotaService.class);
-        accessService = mock(FileAccessService.class);
         scanner = mock(FileVirusScanner.class);
         properties = new FileUploadProperties();
-        manager = new FileStorageManager(storage, fileMapper, quotaService, accessService, scanner, properties);
+        manager = new FileStorageManager(storage, fileMapper, quotaService, scanner, properties);
         TenantContext.setTenantId(1L);
     }
 
@@ -99,7 +97,6 @@ class FileStorageManagerTest {
         when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
         when(storage.store(any(), any(), any(), any(), any()))
                 .thenReturn(new StoredObject("2026/08/09/a.png", "local", "/uploads/2026/08/09/a.png"));
-        when(accessService.issue(eq("/files/1"), any())).thenReturn("token");
         when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
             SysFileDO entity = invocation.getArgument(0);
             entity.setId(1L);
@@ -122,7 +119,6 @@ class FileStorageManagerTest {
         when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
         when(storage.store(any(), any(), any(), any(), any()))
                 .thenReturn(new StoredObject("2026/08/09/merged.png", "local", null));
-        when(accessService.issue(eq("/files/2"), any())).thenReturn("token");
         when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
             SysFileDO entity = invocation.getArgument(0);
             entity.setId(2L);
@@ -140,7 +136,6 @@ class FileStorageManagerTest {
     void registerObjectReadsBackAndPersistsWithoutReUploading() throws Exception {
         when(storage.open("1/x.png")).thenReturn(new ByteArrayInputStream(PNG_CONTENT));
         when(scanner.scan(any(), any(), any())).thenReturn(FileVirusScanner.ScanResult.ok());
-        when(accessService.issue(eq("/files/3"), any())).thenReturn("token");
         when(fileMapper.insert(any(SysFileDO.class))).thenAnswer(invocation -> {
             SysFileDO entity = invocation.getArgument(0);
             entity.setId(3L);
@@ -183,5 +178,43 @@ class FileStorageManagerTest {
         // 中毒文件不滞留存储
         verify(storage).delete("1/x.png");
         verify(fileMapper, never()).insert(any(SysFileDO.class));
+    }
+
+    // ---------- R4-1.43：历史 /uploads/{objectKey} 归属校验（file-token 签发前防跨租户） ----------
+
+    /** URL 精确匹配且租户一致：返回文件，允许签发令牌。 */
+    @Test
+    void legacyUrlOwnershipResolvesFileOfCurrentTenant() {
+        SysFileDO file = new SysFileDO();
+        file.setId(5L);
+        file.setTenantId(1L);
+        file.setUrl("/uploads/2026/01/01/abc.png");
+        when(fileMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(file);
+
+        SysFileDO resolved = manager.getOwnedByLegacyUrlOrThrow("/uploads/2026/01/01/abc.png");
+
+        assertNotNull(resolved);
+        assertEquals(5L, resolved.getId());
+    }
+
+    /** URL 无匹配记录：拒绝签发（404），不泄露对象是否存在。 */
+    @Test
+    void legacyUrlOwnershipRejectsMissingRecord() {
+        when(fileMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> manager.getOwnedByLegacyUrlOrThrow("/uploads/2026/01/01/ghost.png"));
+        assertEquals(com.example.admin.common.ResultCode.DATA_NOT_FOUND.getCode(), exception.getCode());
+    }
+
+    /** 记录存在但属于其他租户：拒绝签发，防跨租户读历史文件。 */
+    @Test
+    void legacyUrlOwnershipRejectsCrossTenant() {
+        SysFileDO otherTenant = new SysFileDO();
+        otherTenant.setId(9L);
+        otherTenant.setTenantId(2L);
+        when(fileMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(otherTenant);
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> manager.getOwnedByLegacyUrlOrThrow("/uploads/2026/01/01/abc.png"));
+        assertEquals(com.example.admin.common.ResultCode.DATA_NOT_FOUND.getCode(), exception.getCode());
     }
 }

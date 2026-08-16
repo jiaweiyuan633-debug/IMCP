@@ -5,7 +5,6 @@ export interface UploadResponse {
   url: string
   name: string
   size: number
-  accessToken?: string
   contentType?: string
   category?: string
   sha256?: string
