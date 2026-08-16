@@ -103,7 +103,7 @@ public class SystemMessageController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('system:message:add')")
-    @OperLog(module = "消息中心", action = "发送消息")
+    @OperLog(module = "消息中心", action = "发送消息", maskFields = {"content"})
     public Result<Long> send(@Valid @RequestBody MessageSendRequest request) {
         Long senderId = SecurityUtils.getUserId();
         return Result.success(messageService.send(

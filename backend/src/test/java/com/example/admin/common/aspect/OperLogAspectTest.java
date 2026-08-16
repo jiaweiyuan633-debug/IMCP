@@ -3,6 +3,7 @@ package com.example.admin.common.aspect;
 import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.OperLog;
+import com.example.admin.module.notice.dto.ChannelSendRequest;
 import com.example.admin.module.system.entity.SysAuditLogDO;
 import com.example.admin.module.system.entity.SysOperLogDO;
 import com.example.admin.module.system.mapper.SysAuditLogMapper;
@@ -123,5 +124,43 @@ class OperLogAspectTest {
         // 异步写库失败不得向上抛出影响任何调用方
         captured.get().run();
         verify(operLogMapper).insert(any(SysOperLogDO.class));
+    }
+
+    // ---------- R4-1.38：@OperLog.maskFields 发送类正文/参数脱敏 ----------
+
+    /** 发送渠道消息：content/target 按注解 maskFields 整体打码入操作/审计日志，title 等定位信息保留。 */
+    @Test
+    void maskFieldsMaskDeclaredSendFieldsInParams() {
+        OperLog operLog = mock(OperLog.class);
+        when(operLog.module()).thenReturn("消息渠道");
+        when(operLog.action()).thenReturn("发送渠道消息");
+        when(operLog.maskFields()).thenReturn(new String[]{"content", "target"});
+
+        Signature signature = mock(Signature.class);
+        when(signature.getDeclaringTypeName()).thenReturn("com.example.admin.ChannelController");
+        when(signature.getName()).thenReturn("send");
+        ChannelSendRequest request = new ChannelSendRequest();
+        request.setChannelId(1L);
+        request.setTarget("13800138000");
+        request.setTitle("验证码");
+        request.setContent("您的验证码是 123456");
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        when(joinPoint.getSignature()).thenReturn(signature);
+        when(joinPoint.getArgs()).thenReturn(new Object[]{request});
+
+        OperLogAspect aspect = new OperLogAspect(operLogMapper, auditLogMapper, new ObjectMapper(),
+                businessMetrics, task -> {
+        });
+        OperLogAspect.LogEntities entities = aspect.buildEntities(joinPoint, operLog, 100L, null, null);
+
+        String params = entities.operLog().getParams();
+        assertThat(params).contains("\"content\":\"******\"");
+        assertThat(params).contains("\"target\":\"******\"");
+        assertThat(params).doesNotContain("123456");
+        assertThat(params).doesNotContain("13800138000");
+        assertThat(params).contains("\"title\":\"验证码\"");
+        assertThat(params).contains("\"channelId\":1");
+        // 审计日志与操作日志 params 同源，同样脱敏
+        assertThat(entities.auditLog().getParams()).isEqualTo(params);
     }
 }

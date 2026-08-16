@@ -41,9 +41,9 @@ class ChannelConfigServiceRetryTest {
         factory = mock(ChannelFactory.class);
         sender = mock(MessageChannelSender.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        ChannelConfigCipher cipher = new ChannelConfigCipher(
-                new SecretCipher("unit-test-encryption-key-not-for-prod", null), objectMapper);
-        service = new ChannelConfigService(configMapper, logMapper, factory, objectMapper, cipher);
+        SecretCipher secretCipher = new SecretCipher("unit-test-encryption-key-not-for-prod", null);
+        ChannelConfigCipher cipher = new ChannelConfigCipher(secretCipher, objectMapper);
+        service = new ChannelConfigService(configMapper, logMapper, factory, objectMapper, cipher, secretCipher);
     }
 
     private SysChannelConfigDO enabledConfig() {

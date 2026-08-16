@@ -1,5 +1,6 @@
 package com.example.admin.common.outbox;
 
+import com.example.admin.common.LogMaskUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -103,8 +104,10 @@ public class OutboxDispatcher {
             ok = handler.handle(row.payload);
         } catch (Throwable t) {
             ok = false;
-            error = truncate(t.getMessage());
-            log.warn("发件箱投递失败，topic={}，outboxId={}，retryCount={}", row.topic, outboxId, row.retryCount, t);
+            // R4-1.38：异常消息可能内嵌完整 webhook URL（含查询凭证），handler 层已自 sanitize，
+            // 投递器层再统一兜底，防绕过脱敏进入日志与 last_error 列。
+            error = LogMaskUtils.sanitize(truncate(t.getMessage()));
+            log.warn("发件箱投递失败，topic={}，outboxId={}，retryCount={}，err={}", row.topic, outboxId, row.retryCount, error, t);
         }
         if (ok) {
             jdbcTemplate.update("UPDATE sys_outbox SET status = ?, last_error = NULL, updated_at = NOW() WHERE id = ?",

@@ -118,8 +118,8 @@ public class OperLogAspect {
             operLogEntity.setRequestMethod(request.getMethod());
             operLogEntity.setIp(request.getRemoteAddr());
         }
-        operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs())));
-        operLogEntity.setResult(toJson(result));
+        operLogEntity.setParams(toJson(filterArgs(joinPoint.getArgs()), operLog.maskFields()));
+        operLogEntity.setResult(toJson(result, operLog.maskFields()));
         return new LogEntities(operLogEntity, buildAuditLog(operLogEntity));
     }
 
@@ -146,11 +146,12 @@ public class OperLogAspect {
                 .toList();
     }
 
-    private String toJson(Object value) {
+    /** R4-1.38：按注解 maskFields 对入参/结果中的发送类正文与参数整体打码（见 @OperLog.maskFields）。 */
+    private String toJson(Object value, String[] maskFields) {
         if (value == null) {
             return null;
         }
-        return truncate(LogMaskUtils.toMaskedJson(value, objectMapper), MAX_RESULT_LENGTH);
+        return truncate(LogMaskUtils.toMaskedJson(value, objectMapper, maskFields), MAX_RESULT_LENGTH);
     }
 
     private String truncate(String value, int maxLength) {

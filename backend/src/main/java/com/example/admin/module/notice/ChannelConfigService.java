@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.LogMaskUtils;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SecretCipher;
 import com.example.admin.module.notice.channel.ChannelFactory;
 import com.example.admin.module.notice.channel.MessageChannelSender;
 import com.example.admin.module.notice.dto.ChannelConfigQuery;
@@ -44,6 +45,7 @@ public class ChannelConfigService {
     private final ChannelFactory channelFactory;
     private final ObjectMapper objectMapper;
     private final ChannelConfigCipher channelConfigCipher;
+    private final SecretCipher secretCipher;
 
     public PageResult<ChannelConfigVo> page(ChannelConfigQuery query) {
         Page<SysChannelConfigDO> page = new Page<>(query.getPageNum(), query.getPageSize());
@@ -98,9 +100,10 @@ public class ChannelConfigService {
         SysChannelLogDO log = new SysChannelLogDO();
         log.setChannelType(type.name());
         log.setChannelId(config.getId());
-        log.setTarget(request.getTarget());
+        // R4-1.38：target/content 加密落库（PII 防护，列长已随 V62 扩列）。title 为定位信息不含正文，明文保留。
+        log.setTarget(encryptSensitive(request.getTarget()));
         log.setTitle(request.getTitle());
-        log.setContent(request.getContent());
+        log.setContent(encryptSensitive(request.getContent()));
         try {
             String error = sender.send(plainConfig, request.getTarget(), request.getTitle(), request.getContent());
             log.setStatus(error == null ? STATUS_SUCCESS : STATUS_FAILURE);
@@ -202,12 +205,32 @@ public class ChannelConfigService {
                 .id(log.getId())
                 .channelType(log.getChannelType())
                 .channelId(log.getChannelId())
-                .target(log.getTarget())
+                .target(decryptOrMask(log.getTarget()))
                 .title(log.getTitle())
-                .content(log.getContent())
+                .content(decryptOrMask(log.getContent()))
                 .status(log.getStatus())
                 .errorMsg(log.getErrorMsg())
                 .createdAt(log.getCreatedAt())
                 .build();
+    }
+
+    /** 落库加密：空值原样保留，非空明文用 SecretCipher 加密（"enc:" 前缀）。 */
+    private String encryptSensitive(String plain) {
+        return StringUtils.hasText(plain) ? secretCipher.encrypt(plain) : plain;
+    }
+
+    /**
+     * 回显解密（R4-1.38）：仅解密 "enc:" 密文；解密失败（密钥变更/损坏）与存量明文
+     * （V62 之前的旧数据）统一 fail-closed 打码，不回显真实内容。
+     */
+    private String decryptOrMask(String stored) {
+        if (!StringUtils.hasText(stored)) {
+            return stored;
+        }
+        if (secretCipher.isEncrypted(stored)) {
+            String plain = secretCipher.decrypt(stored);
+            return plain != null ? plain : LogMaskUtils.MASK;
+        }
+        return LogMaskUtils.MASK;
     }
 }

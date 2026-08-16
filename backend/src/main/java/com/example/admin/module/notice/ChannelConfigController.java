@@ -67,7 +67,7 @@ public class ChannelConfigController {
 
     @PostMapping("/send")
     @PreAuthorize("hasAuthority('notice:channel:send')")
-    @OperLog(module = "消息渠道", action = "发送渠道消息")
+    @OperLog(module = "消息渠道", action = "发送渠道消息", maskFields = {"content", "target"})
     public Result<Long> send(@Valid @RequestBody ChannelSendRequest request) {
         return Result.success(channelConfigService.send(request));
     }

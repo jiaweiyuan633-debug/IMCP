@@ -92,7 +92,8 @@ public class ReportSqlGuard {
      * AI 网关密钥（ai_service_config.api_key）。
      */
     private static final Map<String, Set<String>> SENSITIVE_TABLE_COLUMNS = Map.ofEntries(
-            Map.entry("sys_user", Set.of("password", "totp_secret")),
+            // phone/email（R4-1.38）：手机号/邮箱为 PII 列，报表 SQL 读取同样禁止，防经报表导出用户隐私
+            Map.entry("sys_user", Set.of("password", "totp_secret", "phone", "email")),
             Map.entry("sys_config", Set.of("config_value")),
             Map.entry("sys_channel_config", Set.of("config_json")),
             Map.entry("ai_service_config", Set.of("api_key")));

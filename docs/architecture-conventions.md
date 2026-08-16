@@ -28,6 +28,7 @@
 - 禁止 `e.printStackTrace()`，统一使用 SLF4J `log.error/warn`
 - 日志与操作日志不得输出密码、Token、API Key、手机号、身份证等敏感字段
 - 敏感凭据落库必须加密（`SecretCipher`，AES-256-GCM，"enc:" 前缀）：OAuth clientSecret/appSecret 与通知渠道 `config_json` 中的密钥字段（SMTP 密码、短信 apiKey、钉钉加签 secret、Webhook headers 的 Authorization/token 等）已覆盖；回显打码、发送前解密。回显打码与落库加密共用 `LogMaskUtils` 的同一敏感键清单（大小写不敏感匹配），防止两套清单漂移
+- 渠道发送正文/接收目标（`sys_channel_log.content`/`target`）按 PII 加密落库，回显解密、存量明文行 fail-closed 打码；发送类接口的操作日志用 `@OperLog(maskFields = ...)` 声明式对正文/参数整值打码，避免把 `content` 等通用键加入全局敏感键清单误伤公告/通知审计
 - 新增错误码时同步维护前端 `zh-CN.ts` / `en-US.ts` 语言包
 
 ## 数据访问

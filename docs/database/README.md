@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V61。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V62。
 
 ## 版本记录
 
@@ -67,6 +67,7 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V59 | 审计日志数据权限注册：`sys_audit_log`/`sys_field_audit_log` → `sys_data_permission` |
 | V60 | 菜单 id 动态化：`uk_sys_menu_perm` 唯一索引，菜单业务定位键由「数字 id 区间」改为「perm 唯一键」 |
 | V61 | 业务表数据权限注册：`form_instance`/`import_export_job` → `sys_data_permission`（表单提交记录按提交人、导入导出任务按创建人过滤） |
+| V62 | 渠道发送日志 PII 落库加固：`sys_channel_log` 的 `target`/`content` 扩列以容纳加密密文（VARCHAR→TEXT） |
 
 ## 表清单
 

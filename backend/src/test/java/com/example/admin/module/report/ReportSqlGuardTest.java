@@ -215,6 +215,10 @@ class ReportSqlGuardTest {
             "SELECT totp_secret FROM sys_user WHERE id = 1",
             "SELECT u.password FROM sys_user u WHERE u.id = 1",
             "SELECT u.totp_secret FROM sys_user u JOIN sys_device d ON d.id = u.id",
+            // R4-1.38：手机号/邮箱为 PII 列，报表读取同样禁止
+            "SELECT phone FROM sys_user",
+            "SELECT email FROM sys_user WHERE id = 1",
+            "SELECT u.phone, u.email FROM sys_user u",
             "SELECT api_key FROM ai_service_config WHERE enabled = 1",
             "SELECT config_value FROM sys_config WHERE config_key = 'smtp.password'",
             "SELECT config_json FROM sys_channel_config WHERE channel_type = 'MAIL'",

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.springframework.util.StringUtils;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -63,12 +64,28 @@ public final class LogMaskUtils {
 
     /** 全量 JSON 脱敏：序列化 → 递归打码（通用日志/审计快照路径）。失败回退 null。 */
     public static String toMaskedJson(Object value, ObjectMapper objectMapper) {
+        return toMaskedJson(value, objectMapper, null);
+    }
+
+    /**
+     * 全量 JSON 脱敏 + 额外字段整值打码（R4-1.38，@OperLog.maskFields）：先按黑名单递归打码，
+     * 再对 extraFields 命中的键名（大小写不敏感，数组内对象与嵌套对象均覆盖）整值打码。
+     * 用于发送类操作的正文/参数脱敏，避免向黑名单加入 content 等通用键误伤公告/通知审计留痕。
+     */
+    public static String toMaskedJson(Object value, ObjectMapper objectMapper, String[] extraFields) {
         if (value == null) {
             return null;
         }
         try {
             JsonNode node = objectMapper.valueToTree(value);
             mask(node, objectMapper);
+            if (extraFields != null && extraFields.length > 0) {
+                Set<String> extras = Arrays.stream(extraFields)
+                        .filter(StringUtils::hasText)
+                        .map(f -> f.toLowerCase(Locale.ROOT))
+                        .collect(Collectors.toSet());
+                maskExtraFields(node, extras);
+            }
             return objectMapper.writeValueAsString(node);
         } catch (JsonProcessingException | RuntimeException exception) {
             return null;
@@ -144,6 +161,21 @@ public final class LogMaskUtils {
             });
         } else {
             node.elements().forEachRemaining(child -> mask(child, objectMapper));
+        }
+    }
+
+    /** 额外字段打码：命中的键名整值打码，其余节点递归（数组元素、嵌套对象均覆盖）。 */
+    private static void maskExtraFields(JsonNode node, Set<String> extraLower) {
+        if (node instanceof ObjectNode objectNode) {
+            objectNode.fields().forEachRemaining(entry -> {
+                if (extraLower.contains(entry.getKey().toLowerCase(Locale.ROOT))) {
+                    objectNode.set(entry.getKey(), TextNode.valueOf(MASK));
+                } else {
+                    maskExtraFields(entry.getValue(), extraLower);
+                }
+            });
+        } else {
+            node.elements().forEachRemaining(child -> maskExtraFields(child, extraLower));
         }
     }
 

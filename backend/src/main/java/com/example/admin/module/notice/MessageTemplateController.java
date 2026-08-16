@@ -65,7 +65,7 @@ public class MessageTemplateController {
 
     @PostMapping("/send")
     @PreAuthorize("hasAuthority('system:message:template:send')")
-    @OperLog(module = "消息模板", action = "按模板发送消息")
+    @OperLog(module = "消息模板", action = "按模板发送消息", maskFields = {"params"})
     public Result<Long> send(@Valid @RequestBody MessageTemplateSendRequest request) {
         return Result.success(templateService.sendByTemplate(request));
     }

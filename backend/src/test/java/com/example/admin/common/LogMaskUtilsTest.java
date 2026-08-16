@@ -139,6 +139,36 @@ class LogMaskUtilsTest {
         assertFalse(LogMaskUtils.isSensitiveField(null));
     }
 
+    // ---------- R4-1.38：@OperLog.maskFields 额外字段整值打码 ----------
+
+    /** maskFields 命中的键（大小写不敏感、嵌套覆盖）整值打码，其余字段保留。 */
+    @Test
+    void toMaskedJsonWithExtraFieldsMasksDeclaredKeys() throws Exception {
+        Payload payload = new Payload("admin", "plain-password", "real@example.com", "13800138000",
+                Map.of("content", "您的验证码是 123456", "target", "a@example.com"));
+
+        String json = LogMaskUtils.toMaskedJson(payload, objectMapper, new String[]{"content", "TARGET"});
+
+        // target 大小写不敏感命中；content 不在黑名单但被 maskFields 精确打码
+        assertTrue(json.contains("\"content\":\"******\""));
+        assertTrue(json.contains("\"target\":\"******\""));
+        assertFalse(json.contains("123456"));
+        assertFalse(json.contains("a@example.com"));
+        assertEquals("admin", objectMapper.readTree(json).get("username").asText());
+    }
+
+    /** 无 maskFields（null/空数组）时行为与旧版一致，不加额外打码。 */
+    @Test
+    void toMaskedJsonWithoutExtraFieldsKeepsPriorBehavior() {
+        Payload payload = new Payload("admin", "plain-password", "real@example.com", "13800138000",
+                Map.of("content", "公告正文", "target", "全员"));
+
+        String json = LogMaskUtils.toMaskedJson(payload, objectMapper, new String[0]);
+
+        assertTrue(json.contains("\"content\":\"公告正文\""));
+        assertTrue(json.contains("\"target\":\"全员\""));
+    }
+
     @Data
     @AllArgsConstructor
     private static class Payload {
