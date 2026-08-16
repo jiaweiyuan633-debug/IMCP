@@ -1,6 +1,6 @@
 # 数据库设计
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V52。
+Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V60。
 
 ## 版本记录
 
@@ -58,6 +58,14 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 | V50 | 表单引擎：`form_definition`、`form_instance` |
 | V51 | 批次4 菜单权限种子补齐（报表/设备/导入导出/表单） |
 | V52 | 导入导出任务查询字段与索引补充 |
+| V53 | 大屏模板：`screen_template` 与菜单权限 |
+| V54 | AI 任务错误类型字段 |
+| V55 | AI 任务重试字段 |
+| V56 | 共享字典菜单父级修复 |
+| V57 | OAuth 密钥加密存储（`SecretCipher` 对称加密列迁移） |
+| V58 | 可靠投递发件箱处理状态字段 |
+| V59 | 审计日志数据权限注册：`sys_audit_log`/`sys_field_audit_log` → `sys_data_permission` |
+| V60 | 菜单 id 动态化：`uk_sys_menu_perm` 唯一索引，菜单业务定位键由「数字 id 区间」改为「perm 唯一键」 |
 
 ## 表清单
 
@@ -148,3 +156,4 @@ Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migra
 - 上传文件通过签名 Token 访问，TOTP 密钥加密存储。
 - 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
 - 高频查询字段采用组合索引，索引命名统一为 `idx_表名_字段名`。
+- 菜单迁移规范（R4-1.36 起）：`sys_menu.id` 一律由数据库自增分配，**禁止**在迁移脚本中硬编码 id 区间；新增菜单的守卫用 `WHERE perm='...'`、给角色授权用 `INSERT INTO sys_role_menu (role_id, menu_id) SELECT 角色id, id FROM sys_menu WHERE perm='...'` 动态解析。`perm` 是菜单业务定位键（`uk_sys_menu_perm` 唯一索引约束），目录/菜单行（perm 为 NULL）不受唯一约束。

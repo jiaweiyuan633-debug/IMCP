@@ -40,4 +40,4 @@
 
 - Service 业务核心必须有单元测试，外部依赖用 Mockito 隔离
 - 覆盖阈值由 JaCoCo / Vitest Coverage 在 CI 中强制校验
-- 不引入代码生成器，脚手架面向企业生产管理和 Vibe Coding 迭代
+- 标准 CRUD 用轻量代码生成器（`scripts/crud-gen/`，零依赖 Python）快速产出骨架，复杂业务在生成后手写扩展；脚手架面向企业生产管理和 Vibe Coding 迭代

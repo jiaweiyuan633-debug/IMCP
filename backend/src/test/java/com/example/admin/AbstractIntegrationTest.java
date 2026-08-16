@@ -1,6 +1,7 @@
 package com.example.admin;
 
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -21,7 +22,9 @@ import org.testcontainers.containers.MySQLContainer;
  * 端口不变使 8 个 IT 类共享同一 Spring 上下文（Spring TestContext 按属性值缓存），提速约 8 倍。
  * 测试间共享库，用例须自建自清数据或使用不同唯一键。
  *
- * <p>无 Docker 环境自动跳过（{@link Assumptions}），不阻塞纯单元测试运行。
+ * <p>无 Docker 环境自动跳过（R4-1.36 起由 {@link DockerExecutionCondition} 在收集阶段整体
+ * disabled，Docker 可用但容器启动失败时再由 {@code @DynamicPropertySource} 的 assumption
+ * 兜底跳过），不阻塞纯单元测试运行，也不阻塞 {@code mvn verify} 的 JaCoCo 门禁。
  *
  * <p>环境适配（2026-08 修复）：
  * <ol>
@@ -37,6 +40,7 @@ import org.testcontainers.containers.MySQLContainer;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("dev")
+@ExtendWith(DockerExecutionCondition.class)
 public abstract class AbstractIntegrationTest {
 
     // 容器为 JVM 级单例，生命周期由 JVM 退出时的 ryuk 清理，非方法内资源，压制 Resource leak 警告

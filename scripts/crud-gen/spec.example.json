@@ -1,0 +1,14 @@
+{
+  "module": "device",
+  "entity": "AlarmRule",
+  "table": "device_alarm_rule",
+  "comment": "设备告警规则",
+  "permPrefix": "device:alarm-rule",
+  "fields": [
+    { "name": "name", "type": "String", "comment": "规则名称", "queryLike": true, "required": true, "max": 50 },
+    { "name": "threshold", "type": "BigDecimal", "comment": "触发阈值", "queryEq": true },
+    { "name": "severity", "type": "Integer", "comment": "级别 0INFO 1WARN 2CRITICAL", "queryEq": true, "required": true },
+    { "name": "webhook", "type": "String", "comment": "通知地址" },
+    { "name": "description", "type": "String", "comment": "规则说明", "max": 500 }
+  ]
+}

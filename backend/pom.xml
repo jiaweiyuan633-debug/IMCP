@@ -263,23 +263,24 @@
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
-                                        <!-- 脚手架基线门槛：P1-9 补安全核心测试后实测 LINE≈14.7%/BRANCH≈13.6%/METHOD≈13.7%。
+                                        <!-- 脚手架基线门槛：批8（R4-1.35）补审计/脱敏/缓存抖动测试后实测
+                                             LINE≈42.7%/BRANCH≈38.7%/METHOD≈39.9%，门槛随之上调至 0.40/0.36/0.37。
                                              门槛略低于实测以留抖动余量、保证门禁真实生效（新增未测试代码即拦截）。
                                              后续批次补测试后应随覆盖提升继续上调。 -->
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.13</minimum>
+                                            <minimum>0.40</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.12</minimum>
+                                            <minimum>0.36</minimum>
                                         </limit>
                                         <limit>
                                             <counter>METHOD</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.12</minimum>
+                                            <minimum>0.37</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -289,7 +290,8 @@
                 </executions>
             </plugin>
             <!-- 集成测试（Testcontainers，*IT 后缀）绑定 verify 阶段：mvn test 只跑单测，
-                 mvn verify 全量（CI 用 verify）。无 Docker 时 @Testcontainers 自动跳过。 -->
+                 mvn verify 全量（CI 用 verify）。无 Docker 时由 DockerExecutionCondition 整体
+                 disabled（R4-1.36 起），不再报 context 加载失败。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>

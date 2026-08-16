@@ -37,6 +37,10 @@ public class SystemMenuService {
 
     public Long create(MenuSaveRequest request) {
         SysMenuDO menu = toEntity(request);
+        // R4-1.36 菜单 id 动态化：id 由数据库自增统一分配，不接受前端/迁移脚本指定。
+        // 此前迁移靠手工维护 id 区间（如 V51 注释「当前最大 165，新增 166~175」），
+        // 区间错位/并发插入易冲突覆盖；改用 perm 唯一键定位后，创建方无 id 语义。
+        menu.setId(null);
         menuMapper.insert(menu);
         return menu.getId();
     }

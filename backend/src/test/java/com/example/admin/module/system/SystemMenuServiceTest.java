@@ -11,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.mockito.ArgumentCaptor;
+
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -66,6 +69,23 @@ class SystemMenuServiceTest {
 
         verify(menuMapper).deleteById(2L);
         verify(tokenService).evictAllPermissionsAfterCommit();
+    }
+
+    @Test
+    void createIgnoresClientSuppliedIdAndReliesOnAutoIncrement() {
+        // R4-1.36 菜单 id 动态化：id 由数据库自增分配，前端传 id 亦被忽略，
+        // 避免各批次迁移手工 id 区间错位/覆盖。
+        MenuSaveRequest request = new MenuSaveRequest();
+        request.setId(999L);
+        request.setName("动态菜单");
+        request.setType("menu");
+        request.setPerm("system:dynamic:list");
+        ArgumentCaptor<SysMenuDO> captor = ArgumentCaptor.forClass(SysMenuDO.class);
+
+        menuService.create(request);
+
+        verify(menuMapper).insert(captor.capture());
+        assertNull(captor.getValue().getId());
     }
 
     private static SysMenuDO menu(String perm) {
