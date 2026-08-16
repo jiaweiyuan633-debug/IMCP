@@ -4,7 +4,8 @@
 # 后端在此显式注入 dev 配置层（application.yml 默认 prod，本文件必须覆盖为 dev）：
 # swagger 开、dev 明文密钥兜底、Flyway 自动迁移 V1-V41。
 # 前端容器镜像内的 nginx 不代理 /api（K8s 由 Ingress 直达后端），本地无 Ingress，
-# 故挂载 docker/nginx.conf 覆盖代理配置，把 /api 与 /uploads 反代到 backend 容器。
+# 故挂载 docker/nginx.conf 覆盖代理配置，把 /api、/uploads、/files 反代到 backend 容器
+# （/files 为受令牌保护的文件内容，与 K8s Ingress 路径集合对齐）。
 name: admin-scaffold
 
 services:

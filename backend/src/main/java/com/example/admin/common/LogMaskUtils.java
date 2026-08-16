@@ -41,6 +41,8 @@ public final class LogMaskUtils {
             "password", "oldPassword", "newPassword",
             "totpCode", "totpSecret", "secret", "secretKey",
             "apiKey", "api_key", "appSecret", "clientSecret",
+            // R4-1.41：MCP Server authToken 此前漏入清单，@OperLog 新增/编辑服务会把明文令牌落操作日志
+            "authToken", "auth_token",
             "accessKeyId", "accessKeySecret",
             "accessToken", "access_token", "refreshToken", "refresh_token",
             "authorization", "authCode", "token",

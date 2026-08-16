@@ -47,11 +47,13 @@ class LogMaskUtilsTest {
         assertTrue(detail.contains("\"webhook\":\"https://x.com/hook\""));
     }
 
-    /** 新增黑名单键（OAuth 凭据、通知渠道密钥）整值打码。 */
+    /** 新增黑名单键（OAuth 凭据、通知渠道密钥、MCP 令牌）整值打码。 */
     @Test
     void masksNewlyAddedSensitiveFields() {
         Payload payload = new Payload("admin", "plain-password", "real@example.com", "13800138000",
-                Map.of("appSecret", "s1", "clientSecret", "s2", "secretKey", "s3", "configValue", "s4"));
+                Map.of("appSecret", "s1", "clientSecret", "s2", "secretKey", "s3", "configValue", "s4",
+                        // R4-1.41：MCP Server authToken（批13 加密落库的凭据）操作日志回显必须打码
+                        "authToken", "mcp-bearer-token"));
 
         String json = LogMaskUtils.toMaskedJson(payload, objectMapper);
 
@@ -59,10 +61,12 @@ class LogMaskUtilsTest {
         assertTrue(json.contains("\"clientSecret\":\"******\""));
         assertTrue(json.contains("\"secretKey\":\"******\""));
         assertTrue(json.contains("\"configValue\":\"******\""));
+        assertTrue(json.contains("\"authToken\":\"******\""));
         assertFalse(json.contains("s1"));
         assertFalse(json.contains("s2"));
         assertFalse(json.contains("s3"));
         assertFalse(json.contains("s4"));
+        assertFalse(json.contains("mcp-bearer-token"));
     }
 
     /** 结构化配置脱敏：保留地址/账号字段供回显编辑，仅对密钥键打码。 */
@@ -133,6 +137,7 @@ class LogMaskUtilsTest {
         assertTrue(LogMaskUtils.isSensitiveField("password"));
         assertTrue(LogMaskUtils.isSensitiveField("secret"));
         assertTrue(LogMaskUtils.isSensitiveField("apiKey"));
+        assertTrue(LogMaskUtils.isSensitiveField("authToken"));
         assertTrue(LogMaskUtils.isSensitiveField("Authorization"));
         assertFalse(LogMaskUtils.isSensitiveField("host"));
         assertFalse(LogMaskUtils.isSensitiveField("webhook"));
