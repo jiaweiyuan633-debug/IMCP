@@ -90,8 +90,8 @@ export function chatAi(data: AiChatRequest): Promise<AiChatVo> {
 
 // ---------- Prompt 模板 ----------
 
-export function getPromptPage(params: Record<string, unknown>): Promise<PageResult<PromptVo>> {
-  return request.get('/ai/prompt', { params })
+export function getPromptPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<PromptVo>> {
+  return request.get('/ai/prompt', { params, signal })
 }
 
 export function createPrompt(data: PromptSaveRequest): Promise<number> {
@@ -108,8 +108,8 @@ export function deletePrompt(id: number): Promise<void> {
 
 // ---------- 知识库 ----------
 
-export function getKnowledgePage(params: Record<string, unknown>): Promise<PageResult<KnowledgeBaseVo>> {
-  return request.get('/ai/knowledge', { params })
+export function getKnowledgePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<KnowledgeBaseVo>> {
+  return request.get('/ai/knowledge', { params, signal })
 }
 
 export function createKnowledge(data: KnowledgeBaseSaveRequest): Promise<number> {
@@ -126,8 +126,8 @@ export function deleteKnowledge(id: number): Promise<void> {
 
 // ---------- 知识库文档 ----------
 
-export function getKnowledgeDocPage(params: Record<string, unknown>): Promise<PageResult<KnowledgeDocVo>> {
-  return request.get('/ai/knowledge-doc', { params })
+export function getKnowledgeDocPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<KnowledgeDocVo>> {
+  return request.get('/ai/knowledge-doc', { params, signal })
 }
 
 export function createKnowledgeDoc(data: KnowledgeDocSaveRequest): Promise<number> {

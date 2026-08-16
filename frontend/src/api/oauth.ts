@@ -95,8 +95,8 @@ export function unbindOauth(provider: string): Promise<void> {
 
 // ---------- 第三方登录配置管理 ----------
 
-export function getOauthConfigPage(params: Record<string, unknown>): Promise<PageResult<OauthConfigVo>> {
-  return request.get('/auth/oauth/config', { params })
+export function getOauthConfigPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<OauthConfigVo>> {
+  return request.get('/auth/oauth/config', { params, signal })
 }
 
 export function createOauthConfig(data: OauthConfigSaveRequest): Promise<number> {
@@ -117,8 +117,8 @@ export function deleteOauthConfig(id: number): Promise<void> {
 
 // ---------- SSO 应用管理 ----------
 
-export function getOauthClientPage(params: Record<string, unknown>): Promise<PageResult<OauthClientVo>> {
-  return request.get('/auth/oauth/client', { params })
+export function getOauthClientPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<OauthClientVo>> {
+  return request.get('/auth/oauth/client', { params, signal })
 }
 
 export function createOauthClient(data: OauthClientSaveRequest): Promise<number> {

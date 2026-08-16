@@ -47,8 +47,8 @@ export interface FormSchemaVo {
   layout: string
 }
 
-export function getFormDefinitionPage(params: Record<string, unknown>): Promise<PageResult<FormDefinitionVo>> {
-  return request.get('/form/definition/page', { params })
+export function getFormDefinitionPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<FormDefinitionVo>> {
+  return request.get('/form/definition/page', { params, signal })
 }
 
 export function getFormDefinitionDetail(id: number): Promise<FormDefinitionVo> {
@@ -103,8 +103,8 @@ export function submitFormInstance(data: FormInstanceSubmitRequest): Promise<num
   return request.post('/form/instance/submit', data)
 }
 
-export function getFormInstancePage(params: Record<string, unknown>): Promise<PageResult<FormInstanceVo>> {
-  return request.get('/form/instance/page', { params })
+export function getFormInstancePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<FormInstanceVo>> {
+  return request.get('/form/instance/page', { params, signal })
 }
 
 export function getFormInstanceDetail(id: number): Promise<FormInstanceVo> {

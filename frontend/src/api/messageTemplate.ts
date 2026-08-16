@@ -36,8 +36,8 @@ export interface MessageTemplateSendRequest {
   receiverIds?: number[]
 }
 
-export function getMessageTemplatePage(params: Record<string, unknown>): Promise<PageResult<MessageTemplateVo>> {
-  return request.get('/notice/message-template', { params })
+export function getMessageTemplatePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<MessageTemplateVo>> {
+  return request.get('/notice/message-template', { params, signal })
 }
 
 export function createMessageTemplate(data: MessageTemplateSaveRequest): Promise<number> {

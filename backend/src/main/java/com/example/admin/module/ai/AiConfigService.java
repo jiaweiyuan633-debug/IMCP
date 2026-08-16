@@ -3,6 +3,7 @@ package com.example.admin.module.ai;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.common.SecretCipher;
 import com.example.admin.module.ai.dto.AiConfigSaveRequest;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
@@ -41,6 +42,13 @@ public class AiConfigService {
         config.setName(request.getName());
         config.setProvider(request.getProvider());
         config.setModel(request.getModel());
+        // R4-1.44：AI 服务地址与告警 Webhook/通用渠道/MCP Server 对齐，保存时静态 SSRF 校验
+        // （协议/主机/IP 字面量）——此前 baseUrl 无任何校验，管理员可配内网/云元数据地址，
+        // 任务提交时服务端被打成内网探测跳板；投递前还有 DNS 复核（AiPythonClient）兜底
+        String ssrfError = SsrfUrlValidator.validateOutboundHttpUrl(request.getBaseUrl());
+        if (ssrfError != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "AI 服务地址不合法：" + ssrfError);
+        }
         config.setBaseUrl(request.getBaseUrl());
         // R4-1.40：apiKey 落库加密（SecretCipher，"enc:" 前缀幂等跳过）——此前明文落库，
         // 与批10 渠道敏感字段加密标准不一致，数据库泄露即模型凭据泄露。回显仅 hasApiKey

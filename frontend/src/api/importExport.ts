@@ -31,8 +31,8 @@ export interface ImportExportTemplateSaveRequest {
   version?: number
 }
 
-export function getImportTemplatePage(params: Record<string, unknown>): Promise<PageResult<ImportExportTemplateVo>> {
-  return request.get('/import-export/template/page', { params })
+export function getImportTemplatePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ImportExportTemplateVo>> {
+  return request.get('/import-export/template/page', { params, signal })
 }
 
 export function createImportTemplate(data: ImportExportTemplateSaveRequest): Promise<number> {
@@ -83,8 +83,8 @@ export interface DownloadVo {
   fileName: string
 }
 
-export function getImportJobPage(params: Record<string, unknown>): Promise<PageResult<ImportExportJobVo>> {
-  return request.get('/import-export/job/page', { params })
+export function getImportJobPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ImportExportJobVo>> {
+  return request.get('/import-export/job/page', { params, signal })
 }
 
 export function createImportJob(data: JobCreateRequest): Promise<number> {

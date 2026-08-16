@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -187,7 +188,8 @@ class AuthServiceLoginTest {
         when(claims.getSubject()).thenReturn("10");
         when(claims.get("tenantId")).thenReturn(2L);
         when(jwtUtil.parse("refresh-token")).thenReturn(claims);
-        when(tokenService.hasRefreshToken("rt-1")).thenReturn(true);
+        // R4-1.44：refresh 改为原子消费（GETDEL），stub 返回签发时存入的 userId
+        when(tokenService.consumeRefreshToken("rt-1")).thenReturn("10");
         AtomicLong tenantAtUserQuery = new AtomicLong();
         SysUserDO user = tenantUser(10L, 2L, "zhangsan");
         when(userMapper.selectById(10L)).thenAnswer(invocation -> {
@@ -206,6 +208,25 @@ class AuthServiceLoginTest {
         // selectById 执行时租户上下文已按 token 声明就位（而非默认 1）
         assertThat(tenantAtUserQuery.get()).isEqualTo(2L);
         verify(jwtUtil).createAccessToken("jti-2", 10L, "zhangsan", 2L, List.of(), List.of());
+    }
+
+    @Test
+    void refreshRejectsWhenRefreshTokenAlreadyConsumed() {
+        // R4-1.44：原子消费（GETDEL）下，已被并发请求消费/已过期的 refresh token 返回 null，
+        // 必须拒绝而非继续签发——原 hasKey+delete 两步会让并发双请求都通过检查各自换新
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn("rt-1");
+        when(jwtUtil.parse("refresh-token")).thenReturn(claims);
+        when(tokenService.consumeRefreshToken("rt-1")).thenReturn(null);
+
+        RefreshRequest request = new RefreshRequest();
+        request.setRefreshToken("refresh-token");
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getCode())
+                .isEqualTo(ResultCode.UNAUTHORIZED.getCode());
+        verify(userMapper, never()).selectById(any());
     }
 
     // ---------- R4-1.39：登录失败锁定键带租户维度 + 超过阈值指数退避 ----------

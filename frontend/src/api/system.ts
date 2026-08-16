@@ -143,8 +143,8 @@ export interface ConfigVo {
   createdAt?: string
 }
 
-export function getUserPage(params: UserQuery): Promise<PageResult<UserVo>> {
-  return request.get('/system/user', { params })
+export function getUserPage(params: UserQuery, signal?: AbortSignal): Promise<PageResult<UserVo>> {
+  return request.get('/system/user', { params, signal })
 }
 
 export function createUser(data: UserSaveRequest): Promise<number> {
@@ -171,8 +171,8 @@ export function assignUserPosts(id: number, postIds: number[]): Promise<void> {
   return request.put(`/system/user/${id}/posts`, { postIds })
 }
 
-export function getRolePage(params: RoleQuery): Promise<PageResult<RoleVo>> {
-  return request.get('/system/role', { params })
+export function getRolePage(params: RoleQuery, signal?: AbortSignal): Promise<PageResult<RoleVo>> {
+  return request.get('/system/role', { params, signal })
 }
 
 export function getRoleOptions(): Promise<RoleOptionVo[]> {
@@ -227,8 +227,8 @@ export function deleteDept(id: number): Promise<void> {
   return request.delete(`/system/dept/${id}`)
 }
 
-export function getPostPage(params: Record<string, unknown>): Promise<PageResult<PostVo>> {
-  return request.get('/system/post', { params })
+export function getPostPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<PostVo>> {
+  return request.get('/system/post', { params, signal })
 }
 
 export function getPostOptions(): Promise<PostOptionVo[]> {
@@ -247,8 +247,8 @@ export function deletePost(id: number): Promise<void> {
   return request.delete(`/system/post/${id}`)
 }
 
-export function getDictTypePage(params: Record<string, unknown>): Promise<PageResult<DictTypeVo>> {
-  return request.get('/system/dict/type', { params })
+export function getDictTypePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<DictTypeVo>> {
+  return request.get('/system/dict/type', { params, signal })
 }
 
 export function createDictType(data: Record<string, unknown>): Promise<number> {
@@ -263,8 +263,8 @@ export function deleteDictType(id: number): Promise<void> {
   return request.delete(`/system/dict/type/${id}`)
 }
 
-export function getDictDataPage(params: Record<string, unknown>): Promise<PageResult<DictDataVo>> {
-  return request.get('/system/dict/data', { params })
+export function getDictDataPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<DictDataVo>> {
+  return request.get('/system/dict/data', { params, signal })
 }
 
 export function createDictData(data: Record<string, unknown>): Promise<number> {
@@ -287,8 +287,8 @@ export interface SharedDictTypeQuery {
   status?: number
 }
 
-export function getSharedDictTypePage(params: SharedDictTypeQuery): Promise<PageResult<DictTypeVo>> {
-  return request.get('/system/dict/shared', { params })
+export function getSharedDictTypePage(params: SharedDictTypeQuery, signal?: AbortSignal): Promise<PageResult<DictTypeVo>> {
+  return request.get('/system/dict/shared', { params, signal })
 }
 
 export function createSharedDictType(data: Record<string, unknown>): Promise<number> {
@@ -318,8 +318,8 @@ export interface ApiPermSaveRequest {
   remark?: string
 }
 
-export function getApiPermPage(params: Record<string, unknown>): Promise<PageResult<ApiPermVo>> {
-  return request.get('/system/api-perm', { params })
+export function getApiPermPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ApiPermVo>> {
+  return request.get('/system/api-perm', { params, signal })
 }
 
 export function createApiPerm(data: ApiPermSaveRequest): Promise<number> {
@@ -338,8 +338,8 @@ export function reloadApiPerm(): Promise<void> {
   return request.post('/system/api-perm/reload')
 }
 
-export function getConfigPage(params: Record<string, unknown>): Promise<PageResult<ConfigVo>> {
-  return request.get('/system/config', { params })
+export function getConfigPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ConfigVo>> {
+  return request.get('/system/config', { params, signal })
 }
 
 export function createConfig(data: Record<string, unknown>): Promise<number> {
@@ -384,8 +384,8 @@ export interface NoticeVo {
   updatedAt?: string
 }
 
-export function getNoticePage(params: Record<string, unknown>): Promise<PageResult<NoticeVo>> {
-  return request.get('/system/notice', { params })
+export function getNoticePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<NoticeVo>> {
+  return request.get('/system/notice', { params, signal })
 }
 
 export function getLatestNotices(limit = 5): Promise<NoticeVo[]> {
@@ -439,8 +439,8 @@ export function getNotificationFeed(limit = 8): Promise<NotificationFeedItem[]> 
   return request.get('/system/message/feed', { params: { limit } })
 }
 
-export function getMessagePage(params: Record<string, unknown>): Promise<PageResult<MessageVo>> {
-  return request.get('/system/message', { params })
+export function getMessagePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<MessageVo>> {
+  return request.get('/system/message', { params, signal })
 }
 
 export function getLatestMessages(limit = 5): Promise<MessageVo[]> {
@@ -467,8 +467,8 @@ export function sendMessage(data: Record<string, unknown>): Promise<number> {
   return request.post('/system/message', data)
 }
 
-export function getMessageTodos(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
-  return request.get('/system/message/todos', { params })
+export function getMessageTodos(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/message/todos', { params, signal })
 }
 
 export function createNotice(data: Record<string, unknown>): Promise<number> {
@@ -504,8 +504,8 @@ export interface TenantAdminCandidateVo {
   tenantName: string
 }
 
-export function getTenantPage(params: Record<string, unknown>): Promise<PageResult<TenantVo>> {
-  return request.get('/system/tenant', { params })
+export function getTenantPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<TenantVo>> {
+  return request.get('/system/tenant', { params, signal })
 }
 
 export function createTenant(data: Record<string, unknown>): Promise<number> {
@@ -548,12 +548,12 @@ export interface WorkflowVo {
   createdAt?: string
 }
 
-export function getWorkflowPage(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
-  return request.get('/system/workflow-engine', { params })
+export function getWorkflowPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/workflow-engine', { params, signal })
 }
 
-export function getWorkflowTasks(params: Record<string, unknown>): Promise<PageResult<WorkflowVo>> {
-  return request.get('/system/workflow-engine/tasks', { params })
+export function getWorkflowTasks(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<WorkflowVo>> {
+  return request.get('/system/workflow-engine/tasks', { params, signal })
 }
 
 export function createWorkflow(data: Record<string, unknown>): Promise<number> {
@@ -646,8 +646,8 @@ export function getWorkflowCurrentNodes(id: number): Promise<ProcessNodeVo[]> {
   return request.get(`/system/workflow-engine/${id}/nodes`)
 }
 
-export function getProcessDefPage(params: Record<string, unknown>): Promise<PageResult<ProcessDefVo>> {
-  return request.get('/system/workflow-engine/def', { params })
+export function getProcessDefPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ProcessDefVo>> {
+  return request.get('/system/workflow-engine/def', { params, signal })
 }
 
 export function getProcessDefOptions(): Promise<ProcessDefVo[]> {
@@ -693,8 +693,8 @@ export interface FileVo {
   createdAt?: string
 }
 
-export function getFilePage(params: Record<string, unknown>): Promise<PageResult<FileVo>> {
-  return request.get('/system/file', { params })
+export function getFilePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<FileVo>> {
+  return request.get('/system/file', { params, signal })
 }
 
 export function deleteFile(id: number): Promise<void> {

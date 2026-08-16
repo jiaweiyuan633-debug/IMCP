@@ -34,8 +34,8 @@ export interface ThingModelSchemaVo {
   services: Record<string, unknown>[]
 }
 
-export function getThingModelPage(params: Record<string, unknown>): Promise<PageResult<ThingModelVo>> {
-  return request.get('/device/thing-model/page', { params })
+export function getThingModelPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ThingModelVo>> {
+  return request.get('/device/thing-model/page', { params, signal })
 }
 
 export function getThingModelDetail(id: number): Promise<ThingModelVo> {

@@ -34,8 +34,8 @@ export interface ReportExecuteResultVo {
   rows: Record<string, unknown>[]
 }
 
-export function getReportDefinitionPage(params: Record<string, unknown>): Promise<PageResult<ReportDefinitionVo>> {
-  return request.get('/report/definition/page', { params })
+export function getReportDefinitionPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ReportDefinitionVo>> {
+  return request.get('/report/definition/page', { params, signal })
 }
 
 export function getReportDefinitionDetail(id: number): Promise<ReportDefinitionVo> {

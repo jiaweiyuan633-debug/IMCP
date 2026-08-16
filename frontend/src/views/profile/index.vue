@@ -227,9 +227,18 @@ async function onTotpSubmit() {
 }
 
 onMounted(async () => {
-  const status = await getTotpStatus()
-  totpStatus.enabled = status.enabled
-  loadOauth()
+  try {
+    const status = await getTotpStatus()
+    totpStatus.enabled = status.enabled
+  } catch {
+    // R4-1.44：TOTP 状态加载失败保持默认关闭态（请求层已 toast），避免未捕获 rejection
+    totpStatus.enabled = false
+  }
+  try {
+    await loadOauth()
+  } catch {
+    // R4-1.44：OAuth 绑定加载失败保持空列表（请求层已 toast），避免未捕获 rejection
+  }
 })
 </script>
 

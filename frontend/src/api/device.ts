@@ -24,8 +24,8 @@ export interface DeviceSaveRequest {
   description?: string
 }
 
-export function getDevicePage(params: Record<string, unknown>): Promise<PageResult<DeviceVo>> {
-  return request.get('/device', { params })
+export function getDevicePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<DeviceVo>> {
+  return request.get('/device', { params, signal })
 }
 
 export function createDevice(data: DeviceSaveRequest): Promise<number> {

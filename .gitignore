@@ -41,6 +41,7 @@ Thumbs.db
 .runtime/
 logs/
 uploads/
+backups/
 
 # 测试覆盖率产物
 frontend/coverage/

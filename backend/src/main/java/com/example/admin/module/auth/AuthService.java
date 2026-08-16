@@ -163,7 +163,12 @@ public class AuthService {
     public LoginResponse refresh(RefreshRequest request) {
         Claims claims = jwtUtil.parse(request.getRefreshToken());
         String refreshJti = claims.getId();
-        if (!tokenService.hasRefreshToken(refreshJti)) {
+        // R4-1.44：原子消费（GETDEL）替代 hasKey+delete 两步——并发用同一被窃 refresh token
+        // 刷新时，原实现两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设；消费返回
+        // null 即拒绝（不存在/已被并发消费）。消费先行也使「用户被禁用/删除后用旧 token 反复
+        // 刷新探测」不再成立：首次失败即作废该令牌。
+        String storedUserId = tokenService.consumeRefreshToken(refreshJti);
+        if (storedUserId == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
 
@@ -183,7 +188,7 @@ public class AuthService {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
 
-        tokenService.revokeRefreshToken(refreshJti);
+        // refresh token 已在最前原子消费，此处不再二次删除
         List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
         List<String> perms = menuMapper.selectPermsByUserId(userId);
         List<MenuVo> menus = buildMenuTree(menuMapper.selectMenusByUserId(userId));

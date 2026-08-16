@@ -34,8 +34,8 @@ export interface McpCallResultVo {
   structuredContent?: Record<string, unknown>
 }
 
-export function getMcpServerPage(params: Record<string, unknown>): Promise<PageResult<McpServerVo>> {
-  return request.get('/mcp/server', { params })
+export function getMcpServerPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<McpServerVo>> {
+  return request.get('/mcp/server', { params, signal })
 }
 
 export function createMcpServer(data: McpServerSaveRequest): Promise<number> {

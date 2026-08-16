@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -15,6 +16,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -72,8 +74,27 @@ public class TokenService {
         return Boolean.TRUE.equals(exists) && !Boolean.TRUE.equals(blacklisted);
     }
 
-    public boolean hasRefreshToken(String refreshJti) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(REFRESH_KEY + refreshJti));
+    /**
+     * 原子消费 refresh token：GETDEL 删除并返回旧值（即签发时存入的 userId）。
+     *
+     * <p>返回 null 说明 token 不存在或已被并发消费，调用方应拒绝本次刷新。原
+     * {@code hasRefreshToken + revokeRefreshToken} 两步存在 check-then-act 竞态：并发用同一
+     * 被窃 refresh token 刷新时，两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设
+     * （R4-1.44）。GETDEL 需要 Redis ≥ 6.2（部署基线为 Redis 7）。
+     */
+    public String consumeRefreshToken(String refreshJti) {
+        String key = REFRESH_KEY + refreshJti;
+        // StringRedisTemplate 默认序列化器即 UTF-8 StringRedisSerializer，直接编码等价。
+        // 显式声明 RedisCallback<byte[]> 消解 execute(RedisCallback) / execute(SessionCallback)
+        // 双重重载歧义；同时避免 getKeySerializer()/getValueSerializer() 泛型推断在部分
+        // IDE 编译器（ECJ）下误报编译错误并产出错误类污染 target/classes。
+        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+        byte[] raw = redisTemplate.execute((RedisCallback<byte[]>) connection ->
+                connection.stringCommands().getDel(keyBytes));
+        if (raw == null) {
+            return null;
+        }
+        return new String(raw, StandardCharsets.UTF_8);
     }
 
     public void revokeAccessToken(String accessJti) {
@@ -87,10 +108,6 @@ public class TokenService {
                 "1",
                 Duration.ofMinutes(properties.getAccessTokenExpireMinutes()));
         removeOnlineUser(accessJti);
-    }
-
-    public void revokeRefreshToken(String refreshJti) {
-        redisTemplate.delete(REFRESH_KEY + refreshJti);
     }
 
     public void saveOnlineUser(String accessJti, OnlineUserVo onlineUser) {

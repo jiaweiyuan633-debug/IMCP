@@ -41,8 +41,8 @@ export interface ChannelLogVo {
   createdAt?: string
 }
 
-export function getChannelPage(params: Record<string, unknown>): Promise<PageResult<ChannelConfigVo>> {
-  return request.get('/notice/channel', { params })
+export function getChannelPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ChannelConfigVo>> {
+  return request.get('/notice/channel', { params, signal })
 }
 
 export function createChannel(data: ChannelConfigSaveRequest): Promise<number> {
@@ -65,6 +65,6 @@ export function sendChannelMessage(data: ChannelSendRequest): Promise<number> {
   return request.post('/notice/channel/send', data)
 }
 
-export function getChannelLogPage(params: Record<string, unknown>): Promise<PageResult<ChannelLogVo>> {
-  return request.get('/notice/channel/log', { params })
+export function getChannelLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<ChannelLogVo>> {
+  return request.get('/notice/channel/log', { params, signal })
 }

@@ -122,8 +122,12 @@ export function useTableQuery<T, P extends Record<string, unknown> = Record<stri
     onMounted(loadData)
   }
 
-  // 组件卸载时中断仍在途的请求，避免「页面已离开、请求还在飞」的资源浪费
+  // 组件卸载时中断仍在途的请求，避免「页面已离开、请求还在飞」的资源浪费。
+  // R4-1.44：先递增 requestSeq——此前仅 abort（且 signal 尚未在 api 层透传时 abort 不中断
+  // 网络），卸载后迟到的成功响应仍会写回已销毁组件的 refs，迟到的失败还会在已离开的页面
+  // 弹请求层错误 toast；递增后任何在途请求的 seq !== requestSeq，成功/失败/loading 全被拦截。
   onUnmounted(() => {
+    requestSeq++
     controller?.abort()
     controller = null
   })

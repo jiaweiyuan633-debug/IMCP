@@ -59,12 +59,12 @@ export interface DashboardStatsVo {
   aiTaskFailedByErrorType?: NameValueVo[]
 }
 
-export function getLoginLogPage(params: Record<string, unknown>): Promise<PageResult<LoginLogVo>> {
-  return request.get('/monitor/login-log', { params })
+export function getLoginLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<LoginLogVo>> {
+  return request.get('/monitor/login-log', { params, signal })
 }
 
-export function getOperLogPage(params: Record<string, unknown>): Promise<PageResult<OperLogVo>> {
-  return request.get('/monitor/oper-log', { params })
+export function getOperLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<OperLogVo>> {
+  return request.get('/monitor/oper-log', { params, signal })
 }
 
 export function getOnlineUsers(): Promise<OnlineUserVo[]> {
@@ -97,8 +97,8 @@ export interface JobVo {
   updatedAt?: string
 }
 
-export function getJobPage(params: Record<string, unknown>): Promise<PageResult<JobVo>> {
-  return request.get('/monitor/job', { params })
+export function getJobPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<JobVo>> {
+  return request.get('/monitor/job', { params, signal })
 }
 
 export function createJob(data: Record<string, unknown>): Promise<number> {
@@ -133,8 +133,8 @@ export interface JobLogVo {
   endTime?: string
 }
 
-export function getJobLogPage(params: Record<string, unknown>): Promise<PageResult<JobLogVo>> {
-  return request.get('/monitor/job/log', { params })
+export function getJobLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<JobLogVo>> {
+  return request.get('/monitor/job/log', { params, signal })
 }
 
 export interface SchedulerStatusVo {
@@ -185,8 +185,8 @@ export interface SqlLogVo {
   createdAt?: string
 }
 
-export function getSqlLogPage(params: Record<string, unknown>): Promise<PageResult<SqlLogVo>> {
-  return request.get('/monitor/sql-log', { params })
+export function getSqlLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<SqlLogVo>> {
+  return request.get('/monitor/sql-log', { params, signal })
 }
 
 export interface AlertRuleVo {
@@ -204,8 +204,8 @@ export interface AlertRuleVo {
   updatedAt?: string
 }
 
-export function getAlertRulePage(params: Record<string, unknown>): Promise<PageResult<AlertRuleVo>> {
-  return request.get('/monitor/alert-rule', { params })
+export function getAlertRulePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<AlertRuleVo>> {
+  return request.get('/monitor/alert-rule', { params, signal })
 }
 
 export function createAlertRule(data: Record<string, unknown>): Promise<number> {
@@ -235,8 +235,8 @@ export interface AuditLogVo {
   createdAt?: string
 }
 
-export function getAuditLogPage(params: Record<string, unknown>): Promise<PageResult<AuditLogVo>> {
-  return request.get('/monitor/audit-log', { params })
+export function getAuditLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<AuditLogVo>> {
+  return request.get('/monitor/audit-log', { params, signal })
 }
 
 export async function exportAuditLogs(): Promise<void> {
@@ -271,8 +271,8 @@ export interface FieldChange {
   after: string | null
 }
 
-export function getFieldAuditPage(params: Record<string, unknown>): Promise<PageResult<FieldAuditLogVo>> {
-  return request.get('/monitor/field-audit', { params })
+export function getFieldAuditPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<FieldAuditLogVo>> {
+  return request.get('/monitor/field-audit', { params, signal })
 }
 
 

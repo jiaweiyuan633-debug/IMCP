@@ -96,6 +96,12 @@ public class PresignedFileService {
         if (!TenantContext.getTenantId().equals(pending.tenantId())) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "直传任务不存在或已过期");
         }
+        // R4-1.44：confirm 必须由签发用户本人执行——此前仅校验租户，同租户他人拿到 objectKey
+        // （出现在 PUT 直传 URL 中）可抢先 confirm，把未上传对象登记到自己名下，绕过配额与归属
+        Long currentUserId = SecurityUtils.tryGetUserId();
+        if (pending.userId() == null || !pending.userId().equals(currentUserId)) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "直传任务不存在或已过期");
+        }
         try {
             return fileStorageManager.registerObject(request.getObjectKey(), request.getFileName(),
                     request.getContentType(), request.getCategory());

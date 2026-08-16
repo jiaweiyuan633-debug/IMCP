@@ -349,9 +349,16 @@ function onDelete(record: UserVo) {
 }
 
 onMounted(async () => {
-  roleOptions.value = await getRoleOptions()
-  postOptions.value = await getPostOptions()
-  deptTree.value = await getDeptTree()
+  try {
+    roleOptions.value = await getRoleOptions()
+    postOptions.value = await getPostOptions()
+    deptTree.value = await getDeptTree()
+  } catch {
+    // R4-1.44：选项/树加载失败保持空下拉（请求层已 toast），避免未捕获 rejection
+    roleOptions.value = []
+    postOptions.value = []
+    deptTree.value = []
+  }
 })
 </script>
 

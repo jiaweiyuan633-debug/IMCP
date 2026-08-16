@@ -16,13 +16,13 @@ scripts/load-test-multi.ps1
 ## 后端测试
 
 - 单元测试（surefire）：`cd backend && mvn test`，约 300 用例，无外部依赖。
-- 全量验证（failsafe + jacoco）：`cd backend && mvn verify`，执行 Testcontainers 集成测试（`*IT`，MySQL + Redis 容器 + Flyway 迁移）并通过覆盖率门槛（LINE≥13% / BRANCH≥12% / METHOD≥12%）。
+- 全量验证（failsafe + jacoco）：`cd backend && mvn verify`，执行 Testcontainers 集成测试（`*IT`，MySQL + Redis 容器 + Flyway 迁移）并通过覆盖率门槛（LINE≥40% / BRANCH≥36% / METHOD≥37%，随 R4-1.36 门禁上调同步）。
 - 集成测试基类 `AbstractIntegrationTest` 使用 JVM 级单例 MySQL + Redis 容器（整个测试 JVM 只启动一次，规避 Windows Docker 反复建/删容器时端口映射偶发 `Connection refused`），8 个 `*IT` 类共享同一 Spring 上下文，全量约 2 分钟；无有效 Docker 环境时自动跳过 IT，不阻塞构建。
 - Windows + Docker Desktop 29.x 注意：named pipe 实现 bootstrap redirect 且要求 Docker API ≥ v1.44，而 docker-java 默认协商 v1.32 且不跟随重定向，导致 IT 全部 Skipped（`BadRequest 400`）。修复：在用户目录 `~/.docker-java.properties` 写入 `api.version=1.44`（docker-java 全局配置，仅本机生效，不影响 CI）。
 
 ## 数据库
 
-- Flyway 自动迁移，当前版本 V1-V52。
+- Flyway 自动迁移，当前版本 V1-V62。
 - 禁止直接修改已执行的迁移脚本；变更必须新增 V 系列脚本。
 - 定期执行 `scripts/backup-drill.ps1` 验证备份可恢复。
 

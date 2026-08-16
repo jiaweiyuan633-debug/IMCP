@@ -39,6 +39,6 @@ export function getTelemetryLatest(deviceId: number): Promise<TelemetryLatestVo[
   return request.get('/device/telemetry/latest', { params: { deviceId } })
 }
 
-export function getTelemetryHistory(params: Record<string, unknown>): Promise<PageResult<TelemetryPointVo>> {
-  return request.get('/device/telemetry/history', { params })
+export function getTelemetryHistory(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<TelemetryPointVo>> {
+  return request.get('/device/telemetry/history', { params, signal })
 }

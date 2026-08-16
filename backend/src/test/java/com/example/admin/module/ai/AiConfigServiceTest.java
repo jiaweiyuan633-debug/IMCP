@@ -95,6 +95,25 @@ class AiConfigServiceTest {
                 .isEqualTo(ResultCode.DATA_NOT_FOUND.getCode());
     }
 
+    @Test
+    void updateRejectsInternalBaseUrlOnSave() {
+        // R4-1.44：AI 服务 baseUrl 保存时静态 SSRF 校验（对齐 webhook/MCP）——
+        // 管理员配置内网/元数据地址会在任务提交时把服务端打成内网探测跳板
+        AiServiceConfigDO config = new AiServiceConfigDO();
+        config.setId(1L);
+        when(configMapper.selectById(1L)).thenReturn(config);
+
+        AiConfigSaveRequest request = baseRequest(1L, "sk-plain");
+        request.setBaseUrl("http://127.0.0.1:8000");
+
+        assertThatThrownBy(() -> aiConfigService.update(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("不合法");
+        // R4-1.44：updateById(T) 与 updateById(Collection<T>) 双重重载下 any() 歧义，
+        // 须显式限定参数类型
+        verify(configMapper, never()).updateById(any(AiServiceConfigDO.class));
+    }
+
     private AiConfigSaveRequest baseRequest(Long id, String apiKey) {
         AiConfigSaveRequest request = new AiConfigSaveRequest();
         request.setId(id);

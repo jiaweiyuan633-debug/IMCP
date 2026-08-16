@@ -3,6 +3,7 @@ package com.example.admin.module.ai;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.RequestIdHolder;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.SsrfUrlValidator;
 import com.example.admin.module.ai.entity.AiServiceConfigDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
@@ -44,6 +45,9 @@ public class AiPythonClient {
         if (RequestIdHolder.get() != null) {
             headers.set("X-Request-Id", RequestIdHolder.get());
         }
+        // R4-1.44：投递前 DNS 复核（对齐告警 Webhook/通用渠道/MCP）——保存时静态校验
+        // 兜不住"主机名指向内网 IP"与"保存后 DNS 变更"，解析复核任一地址落内部网段即拒
+        assertSafeOutboundUrl(config);
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(
                     config.getBaseUrl() + "/api/v1/tasks",
@@ -69,6 +73,8 @@ public class AiPythonClient {
         if (RequestIdHolder.get() != null) {
             headers.set("X-Request-Id", RequestIdHolder.get());
         }
+        // R4-1.44：投递前 DNS 复核，同 createTask
+        assertSafeOutboundUrl(config);
         try {
             restTemplate.postForEntity(
                     config.getBaseUrl() + "/api/v1/tasks/" + taskNo + "/retry",
@@ -76,6 +82,14 @@ public class AiPythonClient {
                     Map.class);
         } catch (RestClientException exception) {
             throw new BusinessException(ResultCode.AI_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /** 出站 AI 服务地址投递前 DNS 复核（R4-1.44，对齐告警 Webhook/通用渠道/MCP Server）。 */
+    private void assertSafeOutboundUrl(AiServiceConfigDO config) {
+        String ssrfError = SsrfUrlValidator.validateOutboundHttpUrlWithDns(config.getBaseUrl());
+        if (ssrfError != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "AI 服务地址校验失败：" + ssrfError);
         }
     }
 }

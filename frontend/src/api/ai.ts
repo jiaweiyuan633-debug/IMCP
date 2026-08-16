@@ -76,8 +76,8 @@ export function createAiTask(data: {
   return request.post('/ai/tasks', data)
 }
 
-export function getAiTaskPage(params: Record<string, unknown>): Promise<PageResult<AiTaskVo>> {
-  return request.get('/ai/tasks', { params })
+export function getAiTaskPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<AiTaskVo>> {
+  return request.get('/ai/tasks', { params, signal })
 }
 
 export function getAiTaskDetail(id: number): Promise<AiTaskVo> {
