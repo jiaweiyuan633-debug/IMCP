@@ -1,5 +1,7 @@
 package com.example.admin.module.system;
 
+import com.example.admin.common.BusinessException;
+import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.dto.UserSaveRequest;
 import com.example.admin.module.system.entity.SysTenantDO;
@@ -23,10 +25,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,6 +107,11 @@ class SystemUserServiceTest {
 
     @Test
     void assignRolesEvictsUserPermissions() {
+        SysUserDO user = new SysUserDO();
+        user.setId(7L);
+        when(userMapper.selectById(7L)).thenReturn(user);
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+
         userService.assignRoles(7L, List.of(2L, 3L));
 
         verify(userRoleMapper).deleteByUserId(7L);
@@ -113,6 +122,11 @@ class SystemUserServiceTest {
 
     @Test
     void assignRolesClearAlsoEvicts() {
+        SysUserDO user = new SysUserDO();
+        user.setId(7L);
+        when(userMapper.selectById(7L)).thenReturn(user);
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+
         // 清空角色必须失效权限缓存，否则用户仍持旧权限直到 TTL
         userService.assignRoles(7L, List.of());
 
@@ -123,6 +137,11 @@ class SystemUserServiceTest {
     @Test
     void deleteUserEvictsPermissions() {
         // R4-1.31：删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
+        SysUserDO user = new SysUserDO();
+        user.setId(7L);
+        when(userMapper.selectById(7L)).thenReturn(user);
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+
         userService.delete(7L);
 
         verify(userMapper).deleteById(7L);
@@ -137,10 +156,80 @@ class SystemUserServiceTest {
         SysUserDO user = new SysUserDO();
         user.setId(7L);
         when(userMapper.selectById(7L)).thenReturn(user);
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
 
         userService.updateStatus(7L, 0);
 
         verify(userMapper).updateById(user);
         verify(tokenService).evictUserPermissionsAfterCommit(7L);
+    }
+
+    // ---------- R4-1.39：写路径数据范围校验 ----------
+
+    /** 非 admin 编辑数据范围外的用户：按 id 直查绕过 page 过滤的路径必须被归属校验拦下。 */
+    @Test
+    void updateRejectsOtherUserForNonAdmin() {
+        SysUserDO other = new SysUserDO();
+        other.setId(8L);
+        when(userMapper.selectById(8L)).thenReturn(other);
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(7L));
+
+        UserSaveRequest request = new UserSaveRequest();
+        request.setId(8L);
+        request.setUsername("alice");
+
+        assertThatThrownBy(() -> userService.update(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.FORBIDDEN.getMessage());
+        verify(userMapper, never()).updateById(any(SysUserDO.class));
+    }
+
+    /** 非 admin 删除数据范围外的用户被拒，且不触碰删除链路。 */
+    @Test
+    void deleteRejectsOtherUserForNonAdmin() {
+        SysUserDO other = new SysUserDO();
+        other.setId(8L);
+        when(userMapper.selectById(8L)).thenReturn(other);
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(7L));
+
+        assertThatThrownBy(() -> userService.delete(8L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.FORBIDDEN.getMessage());
+        verify(userMapper, never()).deleteById(8L);
+    }
+
+    /** 非 admin 给数据范围外的用户提权（分配角色）被拒——防越权提权。 */
+    @Test
+    void assignRolesRejectsOtherUserForNonAdmin() {
+        SysUserDO other = new SysUserDO();
+        other.setId(8L);
+        when(userMapper.selectById(8L)).thenReturn(other);
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(7L));
+
+        assertThatThrownBy(() -> userService.assignRoles(8L, List.of(2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.FORBIDDEN.getMessage());
+        verify(userRoleMapper, never()).insert(eq(8L), eq(2L));
+    }
+
+    /** 非 admin 编辑自己数据范围内的用户正常放行。 */
+    @Test
+    void updateAllowsOwnUserForNonAdmin() {
+        SysUserDO own = new SysUserDO();
+        own.setId(8L);
+        when(userMapper.selectById(8L)).thenReturn(own);
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(7L, 8L));
+
+        UserSaveRequest request = new UserSaveRequest();
+        request.setId(8L);
+        request.setUsername("alice");
+
+        userService.update(request);
+
+        verify(userMapper).updateById(own);
     }
 }

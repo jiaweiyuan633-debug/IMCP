@@ -55,6 +55,8 @@ public class AuthService {
     private static final int MAX_LOGIN_FAILURES = 5;
     private static final long RATE_LIMIT_WINDOW_MINUTES = 1;
     private static final long FAILURE_LOCK_MINUTES = 10;
+    /** 失败锁定指数退避封顶（分钟）：超过阈值后每次继续失败 10→20→40→80 封顶。 */
+    private static final long MAX_LOCK_MINUTES = 80;
     private static final int LOGIN_SUCCESS = 1;
     private static final int LOGIN_FAILURE = 0;
 
@@ -76,7 +78,7 @@ public class AuthService {
         if (isRateLimited(ip)) {
             throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
         }
-        checkLoginLockout(request.getUsername());
+        checkLoginLockout(request.getUsername(), request.getTenantId());
         if (captchaEnabled() && !captchaService.verify(request.getCaptchaId(), request.getCaptchaCode())) {
             throw new BusinessException(ResultCode.CAPTCHA_ERROR);
         }
@@ -87,14 +89,14 @@ public class AuthService {
         if (candidates.size() > 1) {
             // 跨租户同名且未指定租户，无法唯一定位登录账号
             saveLoginLog(httpRequest, username, false, "存在同名账号，需指定租户");
-            recordLoginFailure(username);
+            recordLoginFailure(username, request.getTenantId());
             throw new BusinessException(ResultCode.USERNAME_AMBIGUOUS);
         }
         SysUserDO user = candidates.isEmpty() ? null : candidates.get(0);
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             saveLoginLog(httpRequest, username, false, "用户名或密码错误");
-            recordLoginFailure(username);
+            recordLoginFailure(username, request.getTenantId());
             throw new BusinessException(ResultCode.BAD_CREDENTIALS);
         }
         TenantContext.setTenantId(user.getTenantId());
@@ -106,10 +108,11 @@ public class AuthService {
                 && !totpService.verify(totpService.decrypt(user.getTotpSecret()), request.getTotpCode())) {
             // TOTP 校验失败计入失败锁定，防止对 6 位动态码实施分布式暴力破解
             saveLoginLog(httpRequest, username, false, "动态验证码错误");
-            recordLoginFailure(username);
+            recordLoginFailure(username, request.getTenantId());
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
-        redisTemplate.delete(LOGIN_FAIL_KEY_PREFIX + username);
+        // R4-1.39：失败计数按租户维度落键，成功登录须同时清空请求租户键与用户实际租户键
+        clearLoginFailures(username, request.getTenantId(), user.getTenantId());
         return completeLogin(user, httpRequest);
     }
 
@@ -367,19 +370,41 @@ public class AuthService {
         return count != null && count > RATE_LIMIT_PER_MINUTE;
     }
 
-    private void checkLoginLockout(String username) {
-        String value = redisTemplate.opsForValue().get(LOGIN_FAIL_KEY_PREFIX + username);
+    /**
+     * 登录失败锁定检查。R4-1.39 键带租户维度：此前只按用户名（login:fail:&lt;username&gt;），
+     * 匿名攻击者 5 次错密码即可锁定任意真实账号 10 分钟（账号级 DoS），且租户 A 被锁会
+     * 连带锁掉租户 B 同名账号。未指定租户的失败归 "*" 桶，只影响未指定租户的登录探测。
+     */
+    private void checkLoginLockout(String username, Long tenantId) {
+        String value = redisTemplate.opsForValue().get(failKey(username, tenantId));
         if (value != null && Integer.parseInt(value) >= MAX_LOGIN_FAILURES) {
             throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
         }
     }
 
-    private void recordLoginFailure(String username) {
-        String key = LOGIN_FAIL_KEY_PREFIX + username;
+    private void recordLoginFailure(String username, Long tenantId) {
+        String key = failKey(username, tenantId);
         Long count = redisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1) {
-            redisTemplate.expire(key, Duration.ofMinutes(FAILURE_LOCK_MINUTES));
+        if (count == null) {
+            return;
         }
+        // 达到阈值后每次继续失败按 2 的幂延长锁定（10→20→40→80 封顶）并刷新 TTL，
+        // 防止攻击者卡在 10 分钟窗口末尾反复刷 5 次仅维持短锁。
+        long lockMinutes = count <= MAX_LOGIN_FAILURES
+                ? FAILURE_LOCK_MINUTES
+                : Math.min(FAILURE_LOCK_MINUTES * (1L << (int) Math.min(count - MAX_LOGIN_FAILURES, 3L)), MAX_LOCK_MINUTES);
+        redisTemplate.expire(key, Duration.ofMinutes(lockMinutes));
+    }
+
+    /** 失败锁定键：带租户维度，未指定租户归 "*" 桶，避免跨租户同名账号互锁。 */
+    private static String failKey(String username, Long tenantId) {
+        return LOGIN_FAIL_KEY_PREFIX + (tenantId == null ? "*" : tenantId) + ":" + username;
+    }
+
+    /** 登录成功清空失败计数：请求可能未指定租户，须同时清用户实际租户对应的键。 */
+    private void clearLoginFailures(String username, Long requestedTenantId, Long actualTenantId) {
+        redisTemplate.delete(failKey(username, requestedTenantId));
+        redisTemplate.delete(failKey(username, actualTenantId));
     }
 
     private boolean captchaEnabled() {

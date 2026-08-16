@@ -43,4 +43,34 @@ class FileAccessFilterTest {
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isNull();
     }
+
+    // ---------- R4-1.39：; 矩阵参数绕过 IDOR 修复 ----------
+
+    /** /files/{id};x 经矩阵参数变体绕过旧正则（不命中 /files/\d+），规范化后必须校验 token，匿名无 token 拒绝。 */
+    @Test
+    void matrixParamVariantRejectsMissingToken() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/files/5;x");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    /** 带针对 /files/5 的有效 token：/files/5;x 规范化后校验通过，正常放行（缓存头生效）。 */
+    @Test
+    void matrixParamVariantWithValidTokenPasses() throws Exception {
+        String path = "/files/5";
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/files/5;x");
+        request.addParameter("token", fileAccessService.issue(path, null));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL))
+                .isEqualTo("private, max-age=" + fileAccessService.getTokenTtlSeconds());
+    }
 }

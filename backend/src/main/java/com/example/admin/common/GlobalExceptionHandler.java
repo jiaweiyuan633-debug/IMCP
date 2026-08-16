@@ -22,6 +22,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.dromara.warm.flow.core.exception.FlowException;
+import io.jsonwebtoken.JwtException;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -111,6 +112,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public Result<Void> handleBadCredentials(BadCredentialsException exception) {
         return Result.error(ResultCode.BAD_CREDENTIALS);
+    }
+
+    /** JWT 过期/签名非法（refresh/logout 重放过期或伪造 token）：认证失败语义应为 401（修复前落入兜底 500）。 */
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<Result<Void>> handleJwtException(JwtException exception) {
+        return httpError(HttpStatus.UNAUTHORIZED, ResultCode.UNAUTHORIZED);
     }
 
     /** 认证失败：HTTP 401（前端 axios 错误分支据此触发 token 刷新/重登）。 */

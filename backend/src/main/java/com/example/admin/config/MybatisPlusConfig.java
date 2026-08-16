@@ -109,6 +109,9 @@ public class MybatisPlusConfig {
     /** 租户列名：租户拦截器注入条件与字段审计直查过滤共用同源，避免硬编码两处分叉。 */
     public static final String TENANT_ID_COLUMN = "tenant_id";
 
+    /** 分页 pageSize 全局硬上限：客户端可传任意 pageSize 直达 SQL LIMIT，封顶防全表分页/OOM（R4-1.39）。 */
+    public static final long MAX_PAGE_SIZE = 200L;
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
@@ -134,7 +137,12 @@ public class MybatisPlusConfig {
             }
         }));
         interceptor.addInnerInterceptor(new DataScopeInnerInterceptor(dataPermissionRuleResolver::getObject));
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+        // R4-1.39：分页 pageSize 全局封顶 200——此前客户端可传任意 pageSize 直达 SQL LIMIT，
+        // 全部 37 处分页入口无上界，?pageSize=100000000 可触发全表扫描拖垮 DB。
+        // 3.5.7 setMaxLimit 返回 void，先建分页拦截器再封顶
+        PaginationInnerInterceptor pagination = new PaginationInnerInterceptor(DbType.MYSQL);
+        pagination.setMaxLimit(MAX_PAGE_SIZE);
+        interceptor.addInnerInterceptor(pagination);
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
         return interceptor;
     }

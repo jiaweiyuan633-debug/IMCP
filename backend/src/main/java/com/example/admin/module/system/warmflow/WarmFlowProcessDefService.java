@@ -2,6 +2,7 @@ package com.example.admin.module.system.warmflow;
 
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.PageUtil;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.dto.ProcessDefSaveRequest;
@@ -291,8 +292,9 @@ public class WarmFlowProcessDefService {
     }
 
     private PageResult<WarmFlowProcessDefVO> pageOf(List<WarmFlowProcessDefVO> all, long pageNum, long pageSize) {
-        int from = (int) Math.min((pageNum - 1) * pageSize, all.size());
-        int to = (int) Math.min(from + pageSize, all.size());
+        // R4-1.39：pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
+        int from = PageUtil.fromIndex(pageNum, pageSize, all.size());
+        int to = PageUtil.toIndex(pageNum, pageSize, all.size());
         long total = all.size();
         Page<WarmFlowProcessDefVO> page = new Page<>(pageNum, pageSize, total);
         page.setRecords(all.subList(from, to));

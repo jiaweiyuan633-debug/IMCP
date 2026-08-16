@@ -130,11 +130,12 @@ public class SystemUserService {
         user.setStatus(request.getStatus() == null ? ENABLED : request.getStatus());
         user.setDeptId(request.getDeptId());
         userMapper.insert(user);
+        // 新建用户归创建者管理，不走公开入口的归属校验（新用户 id 不在创建者可见集合内）
         if (request.getRoleIds() != null) {
-            assignRoles(user.getId(), request.getRoleIds());
+            assignRolesInternal(user.getId(), request.getRoleIds());
         }
         if (request.getPostIds() != null) {
-            assignPosts(user.getId(), request.getPostIds());
+            assignPostsInternal(user.getId(), request.getPostIds());
         }
         return user.getId();
     }
@@ -145,10 +146,9 @@ public class SystemUserService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户 ID 不能为空");
         }
-        SysUserDO user = userMapper.selectById(request.getId());
-        if (user == null) {
-            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
-        }
+        // R4-1.39：page 按数据范围过滤但按 id 直查可绕过，编辑前先做归属校验
+        SysUserDO user = loadUserOrThrow(request.getId());
+        checkUserDataScope(user);
         SysUserDO sameName = userMapper.selectOne(
                 new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, request.getUsername().trim()));
         if (sameName != null && !sameName.getId().equals(request.getId())) {
@@ -167,15 +167,16 @@ public class SystemUserService {
         }
         userMapper.updateById(user);
         if (request.getRoleIds() != null) {
-            assignRoles(user.getId(), request.getRoleIds());
+            assignRolesInternal(user.getId(), request.getRoleIds());
         }
         if (request.getPostIds() != null) {
-            assignPosts(user.getId(), request.getPostIds());
+            assignPostsInternal(user.getId(), request.getPostIds());
         }
     }
 
     @Transactional
     public void delete(Long id) {
+        checkUserDataScope(loadUserOrThrow(id));
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
         userPostMapper.deleteByUserId(id);
@@ -184,10 +185,9 @@ public class SystemUserService {
     }
 
     public void updateStatus(Long id, Integer status) {
-        SysUserDO user = userMapper.selectById(id);
-        if (user == null) {
-            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
-        }
+        // R4-1.39：page 受控但按 id 直查可绕过，禁用/启用前先做归属校验
+        SysUserDO user = loadUserOrThrow(id);
+        checkUserDataScope(user);
         user.setStatus(status);
         userMapper.updateById(user);
         // R4-1.31：禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照（期间角色
@@ -195,8 +195,21 @@ public class SystemUserService {
         tokenService.evictUserPermissionsAfterCommit(id);
     }
 
+    /** 公开入口（Controller 调用）：R4-1.39 分配角色前先校验目标用户归属，防按 id 越权提权。 */
     @Transactional
     public void assignRoles(Long userId, List<Long> roleIds) {
+        checkUserDataScope(loadUserOrThrow(userId));
+        assignRolesInternal(userId, roleIds);
+    }
+
+    /** 公开入口（Controller 调用）：R4-1.39 分配岗位前先校验目标用户归属。 */
+    public void assignPosts(Long userId, List<Long> postIds) {
+        checkUserDataScope(loadUserOrThrow(userId));
+        assignPostsInternal(userId, postIds);
+    }
+
+    /** 无归属校验的分配实现：仅供 create/update 内部复用（目标用户已在调用方完成存在性与归属校验）。 */
+    private void assignRolesInternal(Long userId, List<Long> roleIds) {
         userRoleMapper.deleteByUserId(userId);
         // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效该用户，避免全局 KEYS 全扫与缓存雪崩。
         // R4-1.12：提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧角色）会重新缓存
@@ -210,7 +223,7 @@ public class SystemUserService {
         }
     }
 
-    public void assignPosts(Long userId, List<Long> postIds) {
+    private void assignPostsInternal(Long userId, List<Long> postIds) {
         userPostMapper.deleteByUserId(userId);
         if (postIds == null || postIds.isEmpty()) {
             return;
@@ -218,6 +231,33 @@ public class SystemUserService {
         for (Long postId : postIds) {
             userPostMapper.insert(userId, postId);
         }
+    }
+
+    /**
+     * 单条归属校验（R4-1.39）：sys_user page/export 已按数据范围过滤，但 update/delete/updateStatus/
+     * assignRoles/assignPosts 按 id 直查后直接操作，非 admin 可猜测/遍历 id 越权改密/删号/提权。
+     * 与 FormInstanceService.checkDataScope 同一语义：admin 短路，allowedUserIds 为 null 放行，
+     * 否则目标用户 id 必须命中当前用户可见集合，越权抛 FORBIDDEN。
+     */
+    private void checkUserDataScope(SysUserDO user) {
+        if (dataScopeHelper.isAdmin()) {
+            return;
+        }
+        List<Long> allowedUserIds = dataScopeHelper.allowedUserIds();
+        if (allowedUserIds == null) {
+            return;
+        }
+        if (user.getId() == null || !allowedUserIds.contains(user.getId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+    }
+
+    private SysUserDO loadUserOrThrow(Long id) {
+        SysUserDO user = userMapper.selectById(id);
+        if (user == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        return user;
     }
 
     private UserVo toVo(

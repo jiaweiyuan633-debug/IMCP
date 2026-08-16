@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.PageUtil;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.common.annotation.FieldAudit;
@@ -82,8 +83,9 @@ public class SystemDictService {
                 .filter(t -> matchesTypeQuery(t, query))
                 .toList();
         long total = all.size();
-        int from = (int) Math.min((query.getPageNum() - 1) * query.getPageSize(), total);
-        int to = (int) Math.min(query.getPageNum() * query.getPageSize(), total);
+        // R4-1.39：pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
+        int from = PageUtil.fromIndex(query.getPageNum(), query.getPageSize(), all.size());
+        int to = PageUtil.toIndex(query.getPageNum(), query.getPageSize(), all.size());
         List<DictTypeVo> records = all.subList(from, to).stream().map(this::toTypeVo).toList();
         return new PageResult<>(records, total, query.getPageNum(), query.getPageSize());
     }

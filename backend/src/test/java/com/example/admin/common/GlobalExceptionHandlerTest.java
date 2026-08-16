@@ -14,6 +14,10 @@ import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwsHeader;
+import io.jsonwebtoken.JwtException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -112,5 +116,17 @@ class GlobalExceptionHandlerTest {
         Result<Void> result = handler.handleBadCredentials(new BadCredentialsException("bad"));
 
         assertEquals(ResultCode.BAD_CREDENTIALS.getCode(), result.getCode());
+    }
+
+    @Test
+    void jwtExceptionMapsTo401() {
+        // R4-1.39：refresh/logout 重放过期或伪造 JWT 此前落入兜底 500，语义应为 401
+        @SuppressWarnings("unchecked")
+        JwtException expired = new ExpiredJwtException(mock(JwsHeader.class), mock(Claims.class), "expired");
+
+        ResponseEntity<Result<Void>> response = handler.handleJwtException(expired);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(ResultCode.UNAUTHORIZED.getCode(), response.getBody().getCode());
     }
 }

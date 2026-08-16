@@ -32,6 +32,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -205,5 +206,40 @@ class AuthServiceLoginTest {
         // selectById 执行时租户上下文已按 token 声明就位（而非默认 1）
         assertThat(tenantAtUserQuery.get()).isEqualTo(2L);
         verify(jwtUtil).createAccessToken("jti-2", 10L, "zhangsan", 2L, List.of(), List.of());
+    }
+
+    // ---------- R4-1.39：登录失败锁定键带租户维度 + 超过阈值指数退避 ----------
+
+    /** 锁定键按请求租户维度落键：租户 2 的 victim 被锁，不再连带锁掉租户 1 同名账号。 */
+    @Test
+    void loginLockoutKeyScopedByRequestTenant() {
+        ValueOperations<String, String> valueOps = stubRedis();
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(valueOps.get("login:fail:2:victim")).thenReturn("5");
+
+        assertThatThrownBy(() -> authService.login(loginRequest("victim", "wrong", 2L), httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.LOGIN_TOO_MANY.getMessage());
+        verify(valueOps).get("login:fail:2:victim");
+    }
+
+    /** 超过阈值后每次继续失败锁定按 2 的幂延长（第 6 次 20 分钟）并刷新 TTL，防反复短锁维持 DoS。 */
+    @Test
+    void loginFailureEscalatesLockDurationPastThreshold() {
+        ValueOperations<String, String> valueOps = stubRedis();
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(configMapper.selectOne(any())).thenReturn(null);
+        when(userMapper.selectByUsername("victim", 1L)).thenReturn(List.of());
+        // 严格模式下 isRateLimited 会以 login:rate:... 键调 increment，须按 key 分流：失败键返回 6，限流键返回 null
+        when(valueOps.increment(anyString())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            return key.startsWith("login:fail:") ? 6L : null;
+        });
+
+        assertThatThrownBy(() -> authService.login(loginRequest("victim", "wrong", 1L), httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.BAD_CREDENTIALS.getMessage());
+        // 生产代码在模板上 expire（ValueOperations 无此方法），刷新 TTL 至退避后的 20 分钟
+        verify(redisTemplate).expire("login:fail:1:victim", Duration.ofMinutes(20));
     }
 }

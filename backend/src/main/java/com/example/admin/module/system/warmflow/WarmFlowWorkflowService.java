@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.MessageBizType;
 import com.example.admin.common.PageResult;
+import com.example.admin.common.PageUtil;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
 import com.example.admin.module.system.SystemMessageService;
@@ -84,8 +85,9 @@ public class WarmFlowWorkflowService {
                 .sorted(Comparator.comparing(SysWorkflowDO::getCreatedAt,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-        int from = (int) Math.min((pageNum - 1) * pageSize, all.size());
-        int to = (int) Math.min(from + pageSize, all.size());
+        // R4-1.39：pageNum/pageSize 客户端可控，pageNum=0/负数会产生负下标 subList 越界 500，统一钳制
+        int from = PageUtil.fromIndex(pageNum, pageSize, all.size());
+        int to = PageUtil.toIndex(pageNum, pageSize, all.size());
         return new PageResult<>(all.subList(from, to), all.size(), pageNum, pageSize);
     }
 
@@ -125,8 +127,8 @@ public class WarmFlowWorkflowService {
                 })
                 .sorted(Comparator.comparing(Task::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-        int from = (int) Math.min((pageNum - 1) * pageSize, filtered.size());
-        int to = (int) Math.min(from + pageSize, filtered.size());
+        int from = PageUtil.fromIndex(pageNum, pageSize, filtered.size());
+        int to = PageUtil.toIndex(pageNum, pageSize, filtered.size());
         List<SysWorkflowDO> records = filtered.subList(from, to).stream()
                 .map(task -> {
                     SysWorkflowDO vo = toWorkflowVO(instanceMap.get(task.getInstanceId()), workflowMap, userMap);

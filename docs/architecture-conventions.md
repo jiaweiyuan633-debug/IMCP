@@ -37,6 +37,14 @@
 - 多租户数据必须带上 `tenant_id` 条件，配合数据权限注解使用
 - 高频查询字段建立组合索引，索引命名使用 `idx_表名_字段名`
 - 每次结构变更通过 Flyway 迁移，禁止手工改库
+- 分页 pageSize 全局封顶 200（`MybatisPlusConfig.MAX_PAGE_SIZE` + `PaginationInnerInterceptor.setMaxLimit`），新增分页入口不得绕过；内存分页统一走 `PageUtil.fromIndex/toIndex` 钳制 pageNum≤0/pageSize≤0，禁止手写 `(pageNum-1)*pageSize` 下标
+
+## 安全与访问控制
+
+- 受保护文件路径（`/files/**`、`/uploads/**`）校验令牌前必须与 Spring MVC 同序规范化（剥 `;` 矩阵参数 → URL 解码 → `StringUtils.cleanPath`），防止 `;`/编码变体绕过 `FileAccessFilter` 正则匹配造成 IDOR
+- 登录失败锁定键带租户维度（`login:fail:{tenantId}:{username}`），锁定超阈值按 2 的幂指数退避（10→80 分钟封顶），禁止全局单键——否则未认证者可对任一租户账号制造跨租户 DoS
+- 数据权限 `@DataScope` 只约束列表查询，按 id 直查的写路径（update/delete/updateStatus/assignRoles/assignPosts 等）必须单独做单条归属校验：`loadUserOrThrow` + `checkUserDataScope`（admin 短路 → `allowedUserIds()` 为 null 放行 → 目标 id 命中集合否则 403）
+- JWT 过期/签名非法（refresh/logout 重放）应映射 401（`GlobalExceptionHandler` 兜底 JwtException），不得落入兜底 500
 
 ## 工程与测试
 
