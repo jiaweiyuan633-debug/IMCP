@@ -48,7 +48,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (tenantClaim instanceof Number tenantNumber) {
                         TenantContext.setTenantId(tenantNumber.longValue());
                     }
-                    List<String> roles = roleMapper.selectRoleCodesByUserId(userId);
+                    // 批次2（R4-1.48）：角色随权限一并走 Redis 缓存（同 TTL 抖动、同 after-commit 失效），
+                    // 消除此前每请求 2 次 DB 往返（selectRoleCodesByUserId + selectById）对 sys_user 热表的压力
+                    List<String> roles = tokenService.getCachedRoles(userId);
+                    if (roles == null) {
+                        roles = roleMapper.selectRoleCodesByUserId(userId);
+                        tokenService.cacheRoles(userId, roles);
+                    }
                     List<String> perms = tokenService.getCachedPermissions(userId);
                     if (perms == null) {
                         perms = menuMapper.selectPermsByUserId(userId);

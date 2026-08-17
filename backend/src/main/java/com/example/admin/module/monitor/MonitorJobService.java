@@ -10,6 +10,7 @@ import com.example.admin.module.monitor.dto.JobQuery;
 import com.example.admin.module.monitor.dto.JobSaveRequest;
 import com.example.admin.module.monitor.entity.SysJobDO;
 import com.example.admin.module.monitor.entity.SysJobLogDO;
+import com.example.admin.module.monitor.job.JobInvokeUtil;
 import com.example.admin.module.monitor.job.SysJobSchedulerService;
 import com.example.admin.module.monitor.mapper.SysJobLogMapper;
 import com.example.admin.module.monitor.mapper.SysJobMapper;
@@ -17,6 +18,7 @@ import com.example.admin.module.monitor.vo.JobLogVo;
 import com.example.admin.module.monitor.vo.SchedulerStatusVo;
 import com.example.admin.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.quartz.CronExpression;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SchedulerMetaData;
@@ -53,6 +55,7 @@ public class MonitorJobService {
         return PageResult.of(result, result.getRecords());
     }
 
+    @Transactional
     public Long create(JobSaveRequest request) {
         SysJobDO job = toEntity(request);
         job.setCreatedBy(SecurityUtils.tryGetUserId());
@@ -63,6 +66,7 @@ public class MonitorJobService {
         return job.getId();
     }
 
+    @Transactional
     public void update(JobSaveRequest request) {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "任务 ID 不能为空");
@@ -165,6 +169,16 @@ public class MonitorJobService {
     }
 
     private SysJobDO toEntity(JobSaveRequest request) {
+        // 批次2（R4-1.48）：保存前先过 Quartz 安全边界——invokeTarget 格式+白名单校验、
+        // cron 语法校验，非法即拒绝入库（配合 create/update @Transactional，scheduleJob 失败回滚，
+        // 杜绝"库里有任务、Quartz 没调度"的幽灵任务）
+        if (StringUtils.hasText(request.getInvokeTarget())) {
+            JobInvokeUtil.validate(request.getInvokeTarget());
+        }
+        if (StringUtils.hasText(request.getCronExpression())
+                && !CronExpression.isValidExpression(request.getCronExpression())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "cron 表达式无效");
+        }
         SysJobDO job = new SysJobDO();
         job.setId(request.getId());
         job.setJobName(request.getJobName());

@@ -84,6 +84,10 @@ Java 后端统一响应结构：
 > 2. 登录响应新增 `mustChangePassword` 标记：默认口令首登或密码过期时返回 `true`，前端强制跳转 `/change-password` 改密后才可进入系统（仅生产 profile 开启，本地 dev/test 保持默认口令可直接登录）。
 > 3. 密码过期策略：`password_changed_at` 距今超过 `app.security.password-expire-days`（默认 90 天）即进入强制改密流程。
 
+> **认证性能与调度安全（批次2）**：
+> 1. 角色编码随权限一并缓存（Redis `auth:roles:{userId}`，30min±抖动 TTL），认证链路由每请求 2 次 DB 查询降为 0（用户行仍每请求校验以保证禁用即时生效）；角色变更/删除经事务提交后双失效。
+> 2. Quartz 任务 `invokeTarget` 增加格式白名单（`\A[a-zA-Z0-9_.]+\z`）与**可调用方法注册表**（仅 `JobInvokeUtil.register` 显式登记的方法可被调度触发），未登记即拒绝——修复任意 Bean 无参方法可被触发的越权面；cron 表达式保存前校验，非法拒绝入库（create/update 已事务化，scheduleJob 失败回滚）。
+
 ## 系统管理
 
 | 模块 | 方法/路径 | 说明 |

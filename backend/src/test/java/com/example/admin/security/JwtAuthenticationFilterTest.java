@@ -89,6 +89,8 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer abc");
         when(jwtUtil.parse("abc")).thenReturn(claims);
         when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
+        // 批次2：角色走 Redis 缓存（未命中才查库并回填）
+        when(tokenService.getCachedRoles(1L)).thenReturn(null);
         when(roleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("admin"));
         when(tokenService.getCachedPermissions(1L)).thenReturn(null);
         when(menuMapper.selectPermsByUserId(1L)).thenReturn(List.of("system:user:list"));
@@ -103,8 +105,26 @@ class JwtAuthenticationFilterTest {
         assertEquals(List.of("admin"), principal.getRoles());
         assertEquals(List.of("system:user:list"), principal.getPerms());
         assertEquals(2L, TenantContext.getTenantId());
+        verify(tokenService).cacheRoles(1L, List.of("admin"));
         verify(tokenService).cachePermissions(1L, List.of("system:user:list"));
         verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void cachedRolesAvoidDbQuery() throws Exception {
+        // 批次2：角色缓存命中时不再直查 sys_user_role
+        Claims claims = validClaims();
+        when(request.getHeader("Authorization")).thenReturn("Bearer abc");
+        when(jwtUtil.parse("abc")).thenReturn(claims);
+        when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
+        when(tokenService.getCachedRoles(1L)).thenReturn(List.of("admin"));
+        when(tokenService.getCachedPermissions(1L)).thenReturn(List.of("system:user:list"));
+        when(userMapper.selectById(1L)).thenReturn(activeUser());
+
+        filter.doFilter(request, response, chain);
+
+        verify(roleMapper, never()).selectRoleCodesByUserId(anyLong());
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
     @Test
@@ -113,7 +133,7 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer abc");
         when(jwtUtil.parse("abc")).thenReturn(claims);
         when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
-        when(roleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of());
+        when(tokenService.getCachedRoles(1L)).thenReturn(List.of());
         when(tokenService.getCachedPermissions(1L)).thenReturn(List.of());
         SysUserDO user = activeUser();
         user.setStatus(0);
@@ -160,6 +180,7 @@ class JwtAuthenticationFilterTest {
         when(jwtUtil.parse("abc")).thenReturn(claims);
         when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
         AtomicLong tenantAtRoleQuery = new AtomicLong();
+        when(tokenService.getCachedRoles(1L)).thenReturn(null);
         when(roleMapper.selectRoleCodesByUserId(1L)).thenAnswer(invocation -> {
             tenantAtRoleQuery.set(TenantContext.getTenantId());
             return List.of("admin");

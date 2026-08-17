@@ -72,7 +72,7 @@ class SystemRoleServiceTest {
 
     @Test
     void deleteRoleEvictsBoundUsers() {
-        // R4-1.31：删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——须失效绑定用户权限缓存
+        // R4-1.31：删除角色后拥有者仍持旧角色/旧权限（缓存 TTL 30 分钟）是缺陷——须失效绑定用户角色+权限缓存
         when(userRoleMapper.selectUserIdsByRoleIds(List.of(3L))).thenReturn(List.of(4L, 5L));
 
         roleService.delete(3L);
@@ -80,7 +80,7 @@ class SystemRoleServiceTest {
         verify(roleMapper).deleteById(3L);
         verify(roleMenuMapper).deleteByRoleId(3L);
         verify(roleDeptMapper).deleteByRoleId(3L);
-        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of(4L, 5L));
+        verify(tokenService).evictRolesAndPermissionsByUserIdsAfterCommit(List.of(4L, 5L));
     }
 
     @Test
@@ -89,6 +89,6 @@ class SystemRoleServiceTest {
 
         roleService.delete(3L);
 
-        verify(tokenService).evictPermissionsByUserIdsAfterCommit(List.of());
+        verify(tokenService).evictRolesAndPermissionsByUserIdsAfterCommit(List.of());
     }
 }

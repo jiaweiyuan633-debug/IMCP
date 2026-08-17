@@ -142,7 +142,8 @@ class SystemUserServiceTest {
         verify(userRoleMapper).deleteByUserId(7L);
         verify(userRoleMapper).insert(eq(7L), eq(2L));
         verify(userRoleMapper).insert(eq(7L), eq(3L));
-        verify(tokenService).evictUserPermissionsAfterCommit(7L);
+        // 批次2：角色变更同时失效角色+权限缓存（否则旧角色编码残留）
+        verify(tokenService).evictUserRolesAndPermissionsAfterCommit(7L);
     }
 
     @Test
@@ -152,11 +153,11 @@ class SystemUserServiceTest {
         when(userMapper.selectById(7L)).thenReturn(user);
         when(dataScopeHelper.isAdmin()).thenReturn(true);
 
-        // 清空角色必须失效权限缓存，否则用户仍持旧权限直到 TTL
+        // 清空角色必须失效角色+权限缓存，否则用户仍持旧角色/旧权限直到 TTL
         userService.assignRoles(7L, List.of());
 
         verify(userRoleMapper).deleteByUserId(7L);
-        verify(tokenService).evictUserPermissionsAfterCommit(7L);
+        verify(tokenService).evictUserRolesAndPermissionsAfterCommit(7L);
     }
 
     @Test

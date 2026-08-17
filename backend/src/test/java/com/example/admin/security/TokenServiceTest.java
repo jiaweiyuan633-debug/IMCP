@@ -56,4 +56,28 @@ class TokenServiceTest {
 
         assertThat(tokenService.consumeRefreshToken("rt-2")).isNull();
     }
+
+    // ---------- 批次2（R4-1.48）：角色缓存（与权限缓存同 TTL 抖动、同失效时机） ----------
+
+    @Test
+    void cacheRolesThenGetReturnsCommaJoinedRoles() {
+        @SuppressWarnings("unchecked")
+        org.springframework.data.redis.core.ValueOperations<String, String> valueOps =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("auth:roles:1")).thenReturn("admin,ops");
+
+        assertThat(tokenService.getCachedRoles(1L)).containsExactly("admin", "ops");
+    }
+
+    @Test
+    void getCachedRolesMissReturnsNull() {
+        @SuppressWarnings("unchecked")
+        org.springframework.data.redis.core.ValueOperations<String, String> valueOps =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("auth:roles:2")).thenReturn(null);
+
+        assertThat(tokenService.getCachedRoles(2L)).isNull();
+    }
 }

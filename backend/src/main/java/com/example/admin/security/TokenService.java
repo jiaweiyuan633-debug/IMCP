@@ -188,6 +188,51 @@ public class TokenService {
                 Duration.ofMinutes(PERMS_TTL_BASE_MINUTES).plusMillis(jitterMillis));
     }
 
+    // ---------- 批次2（R4-1.48）：角色缓存（与 perms 同 TTL 抖动、同失效时机）----------
+    // 此前 JwtAuthenticationFilter 每请求直查 sys_user_role 取角色编码——sys_user 是全库最热表，
+    // 高 QPS 下每个请求 2 次 DB 往返（角色 + 用户行）。角色随权限一并进 Redis 缓存，
+    // 角色变更走既有 evictUserPermissions/evictPermissionsByUserIds 失效点（同一 key 前缀）。
+
+    private static final String ROLES_KEY = "auth:roles:";
+
+    public List<String> getCachedRoles(Long userId) {
+        String value = redisTemplate.opsForValue().get(ROLES_KEY + userId);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return List.of(value.split(","));
+    }
+
+    public void cacheRoles(Long userId, List<String> roles) {
+        long jitterMillis = ThreadLocalRandom.current().nextLong(0, PERMS_TTL_JITTER_MAX_MINUTES * 60_000 + 1);
+        redisTemplate.opsForValue().set(
+                ROLES_KEY + userId,
+                String.join(",", roles),
+                Duration.ofMinutes(PERMS_TTL_BASE_MINUTES).plusMillis(jitterMillis));
+    }
+
+    /** 事务提交后失效单个用户角色+权限缓存（角色变更主路径）。 */
+    public void evictUserRolesAndPermissionsAfterCommit(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        evictAfterCommit(() -> {
+            redisTemplate.delete(ROLES_KEY + userId);
+            redisTemplate.delete(PERMS_KEY + userId);
+        });
+    }
+
+    /** 事务提交后批量失效角色+权限缓存（角色删除/批量授权）。 */
+    public void evictRolesAndPermissionsByUserIdsAfterCommit(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        List<String> keys = userIds.stream()
+                .flatMap(id -> java.util.stream.Stream.of(ROLES_KEY + id, PERMS_KEY + id))
+                .toList();
+        evictAfterCommit(() -> redisTemplate.delete(keys));
+    }
+
     public void evictAllPermissions() {
         Set<String> keys = redisTemplate.keys(PERMS_KEY + "*");
         if (keys != null && !keys.isEmpty()) {
