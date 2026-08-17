@@ -78,8 +78,11 @@ config:
   redisHost: redis
   redisPort: "6379"
   redisUrl: redis://redis:6379/0
-  callbackBaseUrl: http://admin-backend:8080
-  aiBaseUrl: http://ai-service:8000
+  # 内部服务主机名：留空由模板按 {{ .Release.Name }} 推导（release 名为 admin 时即
+  # admin-backend / admin-ai / admin-frontend），与模板 Service 命名保持一致；非默认
+  # release 名或自定义 Service 名时须显式覆盖为实际地址（R4-1.45）。
+  callbackBaseUrl: ""
+  aiBaseUrl: ""
   # RAG 向量检索（可选）：false 走 MySQL ngram 全文检索（零依赖）；true 需先部署 k8s/milvus
   milvusEnabled: false
   milvusHost: milvus
@@ -89,8 +92,9 @@ config:
   milvusEmbeddingEndpoint: ""
   milvusEmbeddingApiKey: ""
   milvusEmbeddingModel: text-embedding-3-small
-  # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）
-  frontendUrl: http://admin-frontend:8080
+  # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）；
+  # 留空由模板按 {{ .Release.Name }}-frontend 推导（见上注释）
+  frontendUrl: ""
   corsAllowedOriginPatterns: https://admin.example.com
   # 可选：Redis 主从哨兵高可用。不设（留空）则后端走 redisHost/redisPort 单实例；
   # 设置 master 时后端自动切换为哨兵拓扑（application-prod.yml on-property 激活）。

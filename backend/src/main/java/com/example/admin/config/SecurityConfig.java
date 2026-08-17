@@ -26,6 +26,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
 import java.util.List;
@@ -40,7 +41,9 @@ public class SecurityConfig {
     private final ApiPermAuthorizationFilter apiPermAuthorizationFilter;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.cors.allowed-origin-patterns:*}")
+    // 兜底为空串而非 "*"：未配置（含 application.yml 缺省段被移除）时拒绝全部跨域来源，
+    // 与 application-prod.yml 的"缺省拒绝"对齐，避免凭据跨域意外全开（R4-1.45）。
+    @Value("${app.cors.allowed-origin-patterns:}")
     private String allowedOriginPatterns;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
@@ -117,8 +120,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // split 后过滤空段（配置含 "a,,b" 或整体为空串时不产生空 pattern 参与匹配）
         configuration.setAllowedOriginPatterns(
-                Arrays.stream(allowedOriginPatterns.split(",")).map(String::trim).toList());
+                Arrays.stream(allowedOriginPatterns.split(","))
+                        .map(String::trim)
+                        .filter(StringUtils::hasText)
+                        .toList());
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

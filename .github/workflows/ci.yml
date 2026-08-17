@@ -58,18 +58,26 @@ jobs:
         run: uv run ruff check .
 
   website:
+    # website 与 frontend 同为 pnpm 项目（pnpm-lock.yaml），此前用 npm install 安装会
+    # 绕过 pnpm 依赖解析导致锁文件与解析结果漂移；改为与 frontend job 一致的 pnpm 安装
+    # （R4-1.45）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: website
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
       - name: Website build
         working-directory: website
-        run: npm run build
+        run: pnpm build
 
   security-scan:
     runs-on: ubuntu-latest
@@ -115,6 +123,46 @@ jobs:
         uses: github/codeql-action/autobuild@v3
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+
+  e2e:
+    # Playwright E2E 冒烟（R4-1.45 补进 CI）：docker compose 起 mysql/redis/backend/
+    # ai-service/frontend/website 全栈，跑 admin 登录→看板 与 官网预约两条链路。
+    # backend 无 healthcheck，--wait 只等 mysql/redis healthy，故额外轮询登录配置接口
+    # 确认应用就绪（Flyway 迁移完成）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: e2e/pnpm-lock.yaml
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Start stack
+        run: docker compose up -d --build --wait --wait-timeout 360
+      - name: Wait for backend API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/auth/login-config >/dev/null 2>&1; then
+              echo "backend ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "backend not ready in time; dumping logs:"
+          docker compose logs backend mysql --tail 100
+          exit 1
+      - name: Run E2E tests
+        working-directory: e2e
+        run: ADMIN_URL=http://localhost:8088 WEBSITE_URL=http://localhost:8081 pnpm exec playwright test
 
   docker-build:
     # 构建四端镜像；registry 未配置（DOCKER_REGISTRY secret 为空）时仅构建不推送，

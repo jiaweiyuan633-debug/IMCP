@@ -2,6 +2,15 @@
 {{- if or (not .Values.secret.dbPassword) (not .Values.secret.jwtSecret) (not .Values.secret.totpEncryptionKey) (not .Values.secret.aiAuthToken) (not .Values.secret.mcpAuthToken) }}
 {{ fail "secret.dbPassword / secret.jwtSecret / secret.totpEncryptionKey / secret.aiAuthToken / secret.mcpAuthToken 必须通过 --set 显式注入（例如 --set secret.dbPassword=xxx --set secret.jwtSecret=xxx --set secret.totpEncryptionKey=xxx --set secret.aiAuthToken=xxx --set secret.mcpAuthToken=xxx）" }}
 {{- end }}
+{{- /*
+    内部服务主机名：values.config.{callbackBaseUrl,aiBaseUrl,frontendUrl} 留空时按
+    .Release.Name 推导（{release}-backend / -ai / -frontend），与下方各 Service
+    命名保持一致。values.yaml 不再硬编码 admin-* 默认值，避免非默认 release 名下回调/出站
+    AI/前端地址漂移指向不存在的服务（R4-1.45）。
+*/ -}}
+{{- $callbackBaseUrl := .Values.config.callbackBaseUrl | default (printf "http://%s-backend:8080" .Release.Name) -}}
+{{- $aiBaseUrl := .Values.config.aiBaseUrl | default (printf "http://%s-ai:8000" .Release.Name) -}}
+{{- $frontendUrl := .Values.config.frontendUrl | default (printf "http://%s-frontend:8080" .Release.Name) -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,11 +23,11 @@ data:
   REDIS_HOST: {{ .Values.config.redisHost }}
   REDIS_PORT: {{ .Values.config.redisPort }}
   REDIS_URL: {{ .Values.config.redisUrl }}
-  CALLBACK_BASE_URL: {{ .Values.config.callbackBaseUrl }}
+  CALLBACK_BASE_URL: {{ $callbackBaseUrl }}
   # AI 回调 SSRF 防护白名单：由 callbackBaseUrl 推导（避免手工同步漂移）。
   # AI 服务出站任务回调仅允许打回后端回调 origin；如需多 origin 改此模板为静态 JSON 数组。
-  CALLBACK_ALLOWED_ORIGINS: {{ list .Values.config.callbackBaseUrl | toJson | quote }}
-  AI_BASE_URL: {{ .Values.config.aiBaseUrl }}
+  CALLBACK_ALLOWED_ORIGINS: {{ list $callbackBaseUrl | toJson | quote }}
+  AI_BASE_URL: {{ $aiBaseUrl }}
 {{- if .Values.config.milvusEnabled }}
   # RAG 向量检索（可选）：Milvus 接入，需先部署 k8s/milvus
   MILVUS_ENABLED: "true"
@@ -30,7 +39,7 @@ data:
   MILVUS_EMBEDDING_MODEL: {{ .Values.config.milvusEmbeddingModel }}
 {{- end }}
   # 生产配置层必需项：缺失会导致后端启动失败（fail-fast）
-  FRONTEND_URL: {{ .Values.config.frontendUrl }}
+  FRONTEND_URL: {{ $frontendUrl }}
   CORS_ALLOWED_ORIGIN_PATTERNS: {{ .Values.config.corsAllowedOriginPatterns }}
   # 上传持久化挂载点：本地存储 root + /uploads 静态资源根（P2-15 高可用）
   UPLOAD_PATH: {{ .Values.storage.uploadPath }}
