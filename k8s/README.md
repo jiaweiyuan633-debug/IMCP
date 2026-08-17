@@ -28,6 +28,18 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 
 先决条件：先部署 MySQL / Redis（可选用云托管或自建）。
 
+## 集群前置四件套（批次6·R4-1.52，缺一即静默降级或功能失败）
+
+| 组件 | 用途 | 安装示例 |
+| --- | --- | --- |
+| metrics-server | HPA（CPU 指标）依赖；缺失时 HPA 指标未知、静默不伸缩 | `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml` |
+| ingress-controller | Ingress 路由（/api、/files、/uploads、/ws）；建议 ingress-nginx | `helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --create-namespace` |
+| RWX 存储类 | 多副本上传卷（backend 共享 /data/uploads）；如 EFS/NFS/CephFS 的动态供给 | 按云厂商配置 StorageClass（accessModes=ReadWriteMany），Chart `--set storage.className=...` |
+| cert-manager | Ingress TLS 自动签发（`ingress.tls.enabled=true` 时必配） | `helm upgrade --install cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set installCRDs=true` |
+
+> 生产强烈建议同时安装 **External Secrets Operator**（密钥经 SecretStore 从 KMS/Vault 同步，见 `gitops/argocd/eso-example/README.md`）与 **Prometheus/Grafana**（`k8s/monitoring/`）。
+
+
 主要 `values.yaml` 参数：
 
 | 参数 | 默认值 | 说明 |

@@ -24,11 +24,16 @@ if (-not (Test-Path $BackupFile)) {
     throw "Backup file not found: $BackupFile"
 }
 $mysql = Join-Path $MySqlBin 'mysql.exe'
-$passwordArg = if ($DbPassword) { "-p$DbPassword" } else { '' }
+# 批次6（R4-1.52）：口令改经 MYSQL_PWD 环境变量注入，避免进程命令行明文
+$env:MYSQL_PWD = $DbPassword
 
 # ---- 1. MySQL 恢复 ----
-Get-Content -Path $BackupFile -Raw |
-    & $mysql --host $DbHost --port $DbPort --user $DbUser $passwordArg $DbName
+try {
+    Get-Content -Path $BackupFile -Raw |
+        & $mysql --host $DbHost --port $DbPort --user $DbUser $DbName
+} finally {
+    Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
+}
 if ($LASTEXITCODE -ne 0) {
     throw "MySQL restore failed: $BackupFile"
 }
@@ -36,14 +41,19 @@ Write-Host "MySQL restored from: $BackupFile"
 
 # ---- 2. 恢复校验（默认开启，-SkipVerify 可关闭）----
 if (-not $SkipVerify) {
-    $tableCount = & $mysql --host $DbHost --port $DbPort --user $DbUser $passwordArg `
-        -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DbName';"
-    if ($LASTEXITCODE -ne 0 -or [int]$tableCount -le 0) {
-        throw "Restore verify FAILED: restored schema '$DbName' 中未发现任何表"
+    $env:MYSQL_PWD = $DbPassword
+    try {
+        $tableCount = & $mysql --host $DbHost --port $DbPort --user $DbUser `
+            -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DbName';"
+        if ($LASTEXITCODE -ne 0 -or [int]$tableCount -le 0) {
+            throw "Restore verify FAILED: restored schema '$DbName' 中未发现任何表"
+        }
+        # 关键表抽查：业务核心表应存在且有数据
+        $userCount = & $mysql --host $DbHost --port $DbPort --user $DbUser `
+            -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DbName' AND table_name = 'sys_user';"
+    } finally {
+        Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
     }
-    # 关键表抽查：业务核心表应存在且有数据
-    $userCount = & $mysql --host $DbHost --port $DbPort --user $DbUser $passwordArg `
-        -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DbName' AND table_name = 'sys_user';"
     $hasSysUser = ($userCount -eq 1)
     $detail = if ($hasSysUser) { '关键表 sys_user 存在' } else { '警告：sys_user 缺失，请核对备份完整性' }
     Write-Host "Restore verify PASS: $tableCount 张表，$detail"

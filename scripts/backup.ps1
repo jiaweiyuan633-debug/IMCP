@@ -30,11 +30,18 @@ New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 
 # ---- 1. MySQL 逻辑备份 ----
 $file = Join-Path $backupRoot "$DbName.sql"
-$passwordArg = if ($DbPassword) { "-p$DbPassword" } else { '' }
-& (Join-Path $MySqlBin 'mysqldump.exe') `
-    --host $DbHost --port $DbPort --user $DbUser $passwordArg `
-    --single-transaction --routines --triggers $DbName |
-    Set-Content -Path $file -Encoding UTF8
+# 批次6（R4-1.52）：口令改经 MYSQL_PWD 环境变量注入（原 -p$DbPassword 出现在进程
+# 命令行，ps/进程列表可见）；dump 用 --result-file 直接落盘，避开 PowerShell 管道
+# 重编码（PS5.1 UTF8 带 BOM 会污染 SQL 首行，恢复时解析异常）
+$env:MYSQL_PWD = $DbPassword
+try {
+    & (Join-Path $MySqlBin 'mysqldump.exe') `
+        --host $DbHost --port $DbPort --user $DbUser `
+        --single-transaction --routines --triggers `
+        --result-file="$file" $DbName
+} finally {
+    Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
+}
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $file)) {
     throw "MySQL backup failed"
 }

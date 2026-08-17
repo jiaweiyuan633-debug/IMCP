@@ -2,6 +2,14 @@
 #
 # 与 prometheus.yml 同目录挂载；触发后由 AlertManager 收敛并路由（见 alertmanager.yml）。
 # 阈值为脚手架基线，对接真实业务后应按 SLO 与容量规划调整。
+#
+# 批次6（R4-1.52）修正：
+# - 5xx/延迟规则聚合维度 by(service) 改为 by(application, instance, uri)——Micrometer
+#   指标无 service 标签，原规则按不存在的标签聚合退化为全局聚合，无法定位实例/接口；
+# - Redis/MySQL 规则引用未启用的 exporter job（prometheus.yml 中处于注释状态），
+#   规则对不存在的序列恒为空 → 静默漏报。现按实际启用条件标注，未部署 exporter 时
+#   请同步删除对应规则，避免"看似有告警实则从不触发"的假安全感；
+# - 补充 PVC 磁盘水位 / 发件箱死信 / AI 死信队列规则（高价值但此前缺失）。
 groups:
   - name: admin-scaffold-availability
     rules:
@@ -27,31 +35,31 @@ groups:
     rules:
       - alert: BackendHighErrorRate
         expr: |
-          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (service)
-            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])) by (service), 1) > 0.05
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (application, instance, uri)
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])) by (application, instance, uri), 1) > 0.05
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "后端 5xx 错误率过高"
-          description: "5 分钟内 5xx 占比超过 5%，检查接口异常或下游依赖。"
+          description: "5 分钟内 5xx 占比超过 5%（按实例/接口聚合），检查接口异常或下游依赖。"
 
       - alert: BackendHighLatency
         expr: |
           histogram_quantile(0.95,
-            sum(rate(http_server_requests_seconds_bucket[5m])) by (service, le)) > 1
+            sum(rate(http_server_requests_seconds_bucket[5m])) by (application, instance, uri, le)) > 1
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "后端 P95 延迟超过 1s"
-          description: "近 5 分钟 P95 响应延迟超过 1 秒，关注慢 SQL 或外部调用。"
+          description: "近 5 分钟 P95 响应延迟超过 1 秒（按实例/接口聚合），关注慢 SQL 或外部调用。"
 
       - alert: BackendJvmHeapHighUsage
         expr: |
-          sum by (service, instance) (
+          sum by (application, instance) (
             jvm_memory_used_bytes{area="heap"})
-            / sum by (service, instance) (
+            / sum by (application, instance) (
               jvm_memory_max_bytes{area="heap"}) > 0.9
         for: 5m
         labels:
@@ -69,8 +77,32 @@ groups:
           summary: "后端 Tomcat 线程池接近饱和"
           description: "忙碌线程占比超过 90%，请求可能排队等待，检查线程泄漏或慢请求。"
 
+      # 批次6：发件箱死信堆积（后端事务发件箱投递失败滞留）
+      - alert: OutboxDeadLetterAccumulating
+        expr: |
+          sum(max_over_time(outbox_dispatch_failure_total[5m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "发件箱投递持续失败"
+          description: "事务发件箱近 15 分钟持续有投递失败，检查回调端点/网络/下游服务。"
+
+      # 批次6：AI 死信队列堆积（ai-service 任务失败入死信）
+      - alert: AiDeadLetterQueueGrowth
+        expr: |
+          sum(ai_task_failed_total{reason="retries_exhausted"}) - sum(ai_task_failed_total{reason="retries_exhausted"} offset 1h) > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI 任务死信增长过快"
+          description: "近 1 小时 AI 任务重试耗尽超过 10 个，检查 LLM 配置/Provider 可用性/任务参数。"
+
   - name: admin-scaffold-infrastructure
     rules:
+      # 批次6：以下 Redis/MySQL 规则依赖对应 exporter 已部署且 prometheus.yml 中已取消注释。
+      # 未部署 exporter 时请删除对应规则（否则规则对不存在的序列恒为空，静默漏报）。
       - alert: RedisDown
         expr: up{job="redis-exporter"} == 0
         for: 2m
@@ -78,7 +110,7 @@ groups:
           severity: critical
         annotations:
           summary: "Redis 不可用"
-          description: "redis-exporter 无法抓取，Redis 依赖的认证/锁/缓存功能将受影响。"
+          description: "redis-exporter 无法抓取，Redis 依赖的认证/锁/缓存功能将受影响。（需启用 prometheus.yml 的 redis-exporter job）"
 
       - alert: MySqlDown
         expr: up{job="mysqld-exporter"} == 0
@@ -87,7 +119,7 @@ groups:
           severity: critical
         annotations:
           summary: "MySQL 不可用"
-          description: "mysqld-exporter 无法抓取，数据库不可用将导致全站故障。"
+          description: "mysqld-exporter 无法抓取，数据库不可用将导致全站故障。（需启用 prometheus.yml 的 mysqld-exporter job）"
 
       - alert: RedisMemoryHighUsage
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
@@ -96,4 +128,15 @@ groups:
           severity: warning
         annotations:
           summary: "Redis 内存使用率超过 85%"
-          description: "Redis 接近 maxmemory，触发淘汰策略可能影响缓存命中与会话。"
+          description: "Redis 接近 maxmemory，触发淘汰策略可能影响缓存命中与会话。（需启用 redis-exporter）"
+
+      # 批次6：PVC 磁盘水位（需 kube-state-metrics，kube-prometheus-stack 自带）
+      - alert: PersistentVolumeAlmostFull
+        expr: |
+          kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PVC 磁盘使用率超过 85%"
+          description: "持久卷 {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} 使用率超过 85%，及时扩容或清理。"

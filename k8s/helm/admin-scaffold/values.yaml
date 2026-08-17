@@ -136,6 +136,9 @@ storage:
 
 # 密钥一律不留默认值：部署时必须通过 --set secret.*=... 显式注入，
 # 留空或未注入时 all.yaml 顶部 fail 校验将终止渲染，杜绝明文默认密钥上生产。
+# 批次6（R4-1.52）：externalSecret 指定已存在的 Secret 名称（如 External Secrets Operator
+# 或手工创建的 Secret），设置后跳过内部 Secret 创建与 fail 校验，envFrom 直接引用外部
+# Secret——GitOps 场景用 ESO/Vault 注入密钥时无需在 values 里填任何明文。
 secret:
   dbPassword: ""
   jwtSecret: ""
@@ -144,6 +147,9 @@ secret:
   aiAuthToken: ""
   # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端连接 /mcp 时以 Authorization: Bearer 携带
   mcpAuthToken: ""
+  # 外部 Secret 名称（可选）：设置后本 Chart 不创建 Secret、不校验空值，
+  # 引用该 Secret 的 DB_PASSWORD/JWT_SECRET/TOTP_ENCRYPTION_KEY/AUTH_TOKEN/MCP_AUTH_TOKEN 键
+  existingSecret: ""
 
 ingress:
   host: admin.example.com

@@ -28,16 +28,28 @@ scripts/load-test-multi.ps1
 
 ## 备份与恢复
 
-- `scripts/backup.ps1` 输出到 `backups/<db>_<时间戳>/` 目录：MySQL SQL 全量 + Redis RDB 快照（`redis-cli --rdb`，密码经 `REDISCLI_AUTH` 注入）+ MinIO 桶镜像（`mc mirror`，提供 `-MinioEndpoint/-MinioAccessKey/-MinioSecretKey/-MinioBucket` 后启用）。
+- `scripts/backup.ps1` 输出到 `backups/<db>_<时间戳>/` 目录：MySQL SQL 全量（批次6·R4-1.52 起口令经 `MYSQL_PWD` 注入、`--result-file` 直落盘，避免命令行明文与管道 BOM）+ Redis RDB 快照（`redis-cli --rdb`，密码经 `REDISCLI_AUTH` 注入）+ MinIO 桶镜像（`mc mirror`，提供 `-MinioEndpoint/-MinioAccessKey/-MinioSecretKey/-MinioBucket` 后启用）。
 - `scripts/restore.ps1` 恢复 MySQL 后默认执行校验（表数量 + 关键表 `sys_user` 抽查），`-SkipVerify` 可关闭；Redis RDB 恢复需停机替换 dump.rdb（脚本给出手动步骤，不自动执行）；MinIO 恢复通过 `mc mirror` 反向回写。
 - Redis 恢复注意：RDB 恢复会覆盖当前实例全量数据，执行前务必确认目标实例与备份来源一致。
 - 备份文件含业务数据与文件对象，归档与传输需按敏感数据处理。
 
+### 定时与异地（批次6·R4-1.52，生产必配）
+
+- **定时执行**：Windows 计划任务 / Linux cron 每日执行 `backup.ps1`。示例（Linux cron，每日 02:00）：
+  ```bash
+  0 2 * * * /opt/admin-scaffold/scripts/backup.ps1 -DbHost <db> -DbUser <user> -DbPassword "$(cat /run/secrets/db_pwd)" -OutputDir /backups -SkipRedis 2>> /var/log/backup.log
+  ```
+- **异地/对象存储**：备份目录定期同步到异地对象存储（MinIO/S3），`mc mirror /backups s3/bucket/admin-scaffold-backups`；或直接把 `OutputDir` 指向挂载的对象存储目录。同机同盘备份在磁盘故障时与主库同毁。
+- **时间点恢复（PITR）**：`mysqldump --single-transaction` 仅提供"最近一次全量"恢复点。要求 PITR 时：① 开启 MySQL `binlog`（`log_bin=ON`），全量备份后定期 `mysqlbinlog --start-datetime=... binlog.* > incr.sql` 归档增量；② 或使用云 RDS 自动备份（自带 PITR）。恢复 = 最近全量 + 增量重放至目标时刻。
+- **RPO/RTO 目标**：建议全量每日（RPO≤24h）+ binlog 增量（RPO≤分钟级）；RTO 以最近一次 backup-drill 实测为准。
+- **演练**：每季度执行 `backup-drill.ps1` 在独立环境恢复验证，记录恢复耗时。
+
 ## 日志与监控
 
 - 后端指标：`/actuator/prometheus`
-- 健康检查：`/actuator/health`
-- AI 指标：`/api/v1/metrics`
+- 健康检查：`/actuator/health`（K8s 探针：readiness 用 `/actuator/health/readiness`、liveness 用 `/actuator/health/liveness`）
+- AI 指标：`/metrics`（根路径；批次5·R4-1.51 修正，此前文档误述为 `/api/v1/metrics`）
+- AI 探针：liveness `/livez`、readiness `/readyz`（批次3·R4-1.49，原共用 `/health` 依赖 Redis 会误杀）
 - Prometheus/Grafana 按部署环境配置，Grafana 默认地址：`http://localhost:3000`
 
 ## 常见问题
