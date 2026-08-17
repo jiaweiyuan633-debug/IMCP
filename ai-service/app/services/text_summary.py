@@ -1,18 +1,14 @@
-import asyncio
 import re
 
 
 class TextSummaryService:
 
     async def run(self, params: dict) -> dict:
-        delay = float(params.get("delay_seconds", 0))
-        if delay > 0:
-            await asyncio.sleep(delay)
+        # 批次3（R4-1.49）：移除 force_fail/delay_seconds 演示后门——任意持令牌者可
+        # 强制任务失败刷死信、用大 delay 占满 worker 池造成排队 DoS
         content = str(params.get("content", "")).strip()
         if not content:
             raise ValueError("content is required")
-        if params.get("force_fail"):
-            raise RuntimeError("forced failure for demo")
 
         max_length = max(int(params.get("max_length", 200)), 20)
         sentences = re.split(r"(?<=[。！？!?；;])", content)

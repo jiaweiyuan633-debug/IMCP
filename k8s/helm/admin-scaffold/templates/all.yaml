@@ -57,6 +57,14 @@ data:
   # Zipkin 上报端点，与 MANAGEMENT_TRACING_ENABLED 配套（application.yml management.zipkin.tracing.endpoint）
   ZIPKIN_ENDPOINT: {{ .Values.config.zipkinEndpoint }}
   {{- end }}
+  # AI 服务生产配置（批次3·R4-1.49）：此前无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
+  # K8s 下 AI 服务永远以 mock 提供方运行（16 维 mock 向量、检索失真且无报错）。
+  # llmProviders 留空时注入空串 → ai-service 保持 mock 默认（dev 语义）；配置时
+  # LLM_PROVIDERS 由模板注入（含 API Key，仅经 Secret 透出更安全，见 aiLlmApiKeys）
+  LLM_PROVIDERS: {{ .Values.config.aiLlmProviders | quote }}
+  WORKER_COUNT: {{ .Values.config.aiWorkerCount }}
+  OCR_PROVIDER: {{ .Values.config.aiOcrProvider }}
+  OCR_FAIL_FAST: {{ .Values.config.aiOcrFailFast }}
 ---
 apiVersion: v1
 kind: Secret
@@ -69,6 +77,11 @@ stringData:
   TOTP_ENCRYPTION_KEY: {{ .Values.secret.totpEncryptionKey }}
   AUTH_TOKEN: {{ .Values.secret.aiAuthToken }}
   MCP_AUTH_TOKEN: {{ .Values.secret.mcpAuthToken }}
+  {{- if .Values.secret.aiLlmApiKeys }}
+  # AI 服务 LLM 供应商 API Key（批次3）：模板将 LLM_PROVIDERS 拆分为「provider 配置 + api_key
+  # 占位符」时经 Secret 注入；简单场景可直接把 key 内联进 config.aiLlmProviders JSON
+  AI_LLM_API_KEYS: {{ .Values.secret.aiLlmApiKeys }}
+  {{- end }}
 {{- if .Values.storage.enabled }}
 ---
 apiVersion: v1
@@ -189,13 +202,16 @@ spec:
             {{- toYaml .Values.resources.ai | nindent 12 }}
           readinessProbe:
             httpGet:
-              path: /health
+              # 批次3：readiness 打 /readyz（依赖 Redis，就绪语义）
+              path: /readyz
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              # 批次3：liveness 打 /livez（纯进程存活，恒 200）——原共用 /health 依赖
+              # Redis，Redis 抖动时所有副本 CrashLoopBackOff
+              path: /livez
               port: 8000
             initialDelaySeconds: 20
             periodSeconds: 15

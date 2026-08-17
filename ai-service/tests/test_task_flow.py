@@ -37,12 +37,14 @@ async def test_task_failure_retries_then_failed() -> None:
     manager = TaskManager(redis, Settings())
     await manager.create_task(TaskCreateRequest(
         task_no="task-fail",
-        biz_type="keyword_extract",
-        params={"content": "测试", "force_fail": True},
+        # 批次3（R4-1.49）：force_fail 演示后门已移除——改用 content 缺失触发
+        # ValueError（可重试异常），重试耗尽后 FAILED
+        biz_type="text_summary",
+        params={},
     ))
 
-    # 重试带 0.5s 退避（3 次退避 ≈ 1.5s），放大轮询窗口
-    current = await _wait_for_terminal(manager, "task-fail", attempts=200)
+    # 重试带指数退避（0.5s→1s→2s，3 次退避 ≈ 3.5s），放大轮询窗口
+    current = await _wait_for_terminal(manager, "task-fail", attempts=400)
     assert current is not None
     assert current.status == "FAILED"
     assert current.retry_count == 3
@@ -63,8 +65,9 @@ async def test_dead_letter_list_and_purge() -> None:
     manager = TaskManager(redis, Settings())
     await manager.create_task(TaskCreateRequest(
         task_no="task-dl",
-        biz_type="keyword_extract",
-        params={"content": "测试", "force_fail": True},
+        # 批次3（R4-1.49）：同 test_task_failure_retries_then_failed，content 缺失触发可重试失败
+        biz_type="text_summary",
+        params={},
     ))
 
     current = await _wait_for_terminal(manager, "task-dl", attempts=200)
@@ -75,7 +78,7 @@ async def test_dead_letter_list_and_purge() -> None:
     latest = entries[0]
     assert latest.task_no == "task-dl"
     assert latest.reason == "retries_exhausted"
-    assert latest.biz_type == "keyword_extract"
+    assert latest.biz_type == "text_summary"
     assert latest.retry_count == 3
     assert latest.failed_at is not None
 

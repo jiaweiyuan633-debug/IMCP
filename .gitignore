@@ -45,6 +45,8 @@ backups/
 
 # 测试覆盖率产物
 frontend/coverage/
+ai-service/.coverage
+ai-service/htmlcov/
 # Storybook 构建产物
 frontend/storybook-static/
 

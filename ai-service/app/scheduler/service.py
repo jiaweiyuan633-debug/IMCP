@@ -174,8 +174,20 @@ class Scheduler:
         params: dict,
         enabled: bool = True,
     ) -> dict:
-        """注册一个调度：写 spec hash 并加入到期队列，返回调度信息。"""
+        """注册一个调度：写 spec hash 并加入到期队列，返回调度信息。
+
+        批次3（R4-1.49）：注册期校验 biz_type 已注册（否则该调度每次触发都因
+        未知任务类型入队失败、且因调度器不重排而永久停摆）。
+        """
         _parse_schedule(schedule)  # 非法表达式在此抛 ValueError
+        # 批次3：biz_type 校验——任务管理器支持时校验（鸭子类型：有 _service_names 即校验），
+        # 测试的 FakeTaskManager 无该方法时跳过
+        if (
+            self._task_manager is not None
+            and hasattr(self._task_manager, "_service_names")
+            and biz_type not in self._task_manager._service_names()
+        ):
+            raise ValueError(f"未知任务类型: {biz_type}，请先注册对应服务")
         id_ = uuid4().hex[:8]
         now = time.time()
         next_ts = _next_run_after(schedule, now)
@@ -187,6 +199,8 @@ class Scheduler:
             "params": params,
             "enabled": enabled,
             "run_count": 0,
+            # 批次3：失败退避状态——入队失败后按指数退避重排，避免瞬时故障导致调度永久停摆
+            "fail_count": 0,
         }
         await self.redis.hset(
             self.settings.scheduler_spec_key,
@@ -218,7 +232,12 @@ class Scheduler:
     async def _process_due(self, id_: str, now: float) -> None:
         """处理单个到期调度：读 spec → 入队 → 推进 run_count → 重排下次触发。
 
-        任一步失败都只记日志，不影响后台循环。
+        批次3（R4-1.49）修复「单次瞬时失败即永久停摆」：原实现入队失败直接 return——
+        due 条目已被 run_loop 移除、run_count 未推进、下次触发时间从未写回，该调度
+        从此静默死亡。现在失败按指数退避重排 due（fail_count 递增，退避 2^n 秒封顶
+        60s），恢复后自然继续；409（同名任务已存在）视为幂等成功——调度器周期触发
+        天然幂等，同名任务存在即说明本轮已入队，不应按失败重排。未知 biz_type 在
+        register 期已校验，此处兜底按不可恢复失败告警并重排（避免死循环）。
         """
         raw = await self.redis.hget(self.settings.scheduler_spec_key, id_)
         if raw is None:
@@ -237,9 +256,25 @@ class Scheduler:
             )
             await self._task_manager.create_task(request, request_id=None)
         except Exception as exc:  # noqa: BLE001 - 单条失败不应中断循环
-            logger.error("调度 %s 入队失败: %s", id_, exc)
+            if getattr(exc, "status_code", None) == 409:
+                # 幂等成功：同名任务已存在（含上次触发遗留），本轮已入队——推进 run_count
+                # 使下次触发使用新 task_no，并清零失败计数（批次3）
+                spec["run_count"] += 1
+                spec["fail_count"] = 0
+            else:
+                spec["fail_count"] = int(spec.get("fail_count", 0)) + 1
+                logger.error(
+                    "调度 %s 入队失败（第 %s 次），按指数退避重排: %s",
+                    id_, spec["fail_count"], exc,
+                )
+            await self.redis.hset(
+                self.settings.scheduler_spec_key, id_, json.dumps(spec, ensure_ascii=False)
+            )
+            backoff = min(2 ** min(spec["fail_count"], 6), 60.0)
+            await self.redis.zadd(self.settings.scheduler_due_key, {id_: now + backoff})
             return
         spec["run_count"] += 1
+        spec["fail_count"] = 0
         await self.redis.hset(
             self.settings.scheduler_spec_key, id_, json.dumps(spec, ensure_ascii=False)
         )

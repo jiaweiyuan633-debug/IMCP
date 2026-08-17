@@ -61,6 +61,9 @@ class Settings(BaseSettings):
 
     # ---------- OCR（可插拔：mock / tesseract） ----------
     ocr_provider: str = "mock"
+    # 批次3（R4-1.49）：OCR_PROVIDER=tesseract 但探测/构造失败时，默认回退 Mock 并告警；
+    # 置 true 则直接抛错（生产期望真实 OCR、杜绝"无声数据造假"时开启）
+    ocr_fail_fast: bool = False
 
     # ---------- PII 脱敏 ----------
     pii_mask_char: str = "*"

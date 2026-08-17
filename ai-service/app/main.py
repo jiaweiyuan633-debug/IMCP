@@ -86,12 +86,35 @@ app.include_router(api_router)
 
 @app.get("/health", tags=["core"])
 async def health(response: Response) -> dict[str, str]:
-    # 探活检查依赖的 Redis；不可用时返回 503，供 k8s readiness/liveness 探针正确判定
+    # 探活检查依赖的 Redis；不可用时返回 503，供 k8s readiness 探针正确判定
     redis = getattr(app.state, "redis", None)
     if redis is not None:
         try:
             await redis.ping()
         except Exception:  # noqa: BLE001 - Redis 探活失败统一按不健康处理
+            response.status_code = 503
+            return {"status": "error", "service": settings.app_name, "detail": "redis unreachable"}
+    return {"status": "ok", "service": settings.app_name}
+
+
+@app.get("/livez", tags=["core"])
+async def livez() -> dict[str, str]:
+    """批次3（R4-1.49）：纯进程存活探针——恒 200，供 k8s liveness 使用。
+
+    原实现 liveness 打 /health（依赖 Redis），Redis 抖动时所有副本 CrashLoopBackOff；
+    /livez 只反映进程本身，避免探针重启循环。
+    """
+    return {"status": "ok", "service": settings.app_name}
+
+
+@app.get("/readyz", tags=["core"])
+async def readyz(response: Response) -> dict[str, str]:
+    """批次3（R4-1.49）：就绪探针——依赖 Redis，供 k8s readiness 使用。"""
+    redis = getattr(app.state, "redis", None)
+    if redis is not None:
+        try:
+            await redis.ping()
+        except Exception:  # noqa: BLE001
             response.status_code = 503
             return {"status": "error", "service": settings.app_name, "detail": "redis unreachable"}
     return {"status": "ok", "service": settings.app_name}

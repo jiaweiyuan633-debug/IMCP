@@ -112,6 +112,15 @@ config:
   # 实例化 Zipkin Sender/AsyncZipkinSpanHandler（zipkin auto-config 无端点非空条件），每次 flush 构造
   # 非法 URI 失败丢 span，故必须显式关闭而非仅"不注入"。配置端点时注入 true + ZIPKIN_ENDPOINT 开启上报。
   zipkinEndpoint: ""
+  # AI 服务生产配置（批次3·R4-1.49）：此前 Helm 无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
+  # K8s 下 ai-service 永远以 mock 提供方运行（16 维 mock 向量），检索结果失真且无报错。
+  # llmProviders 为 JSON 字符串（含 API Key），如：
+  #   '{"deepseek": {"base_url": "https://api.deepseek.com", "api_key": "sk-xxx", "model": "deepseek-chat"}}'
+  # 推荐把 API Key 拆到 secret.aiLlmApiKeys 经模板注入（避免明文进 ConfigMap）
+  aiLlmProviders: ""
+  aiWorkerCount: "2"
+  aiOcrProvider: "mock"
+  aiOcrFailFast: "false"
 
 # 上传文件持久化：本地存储（app.storage.type=local，默认）多副本必须共享同一存储卷，
 # 否则文件散落在各 Pod 本地盘且 Pod 重建即丢。多副本需 ReadWriteMany（RWX）存储类。

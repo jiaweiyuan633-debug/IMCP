@@ -24,7 +24,7 @@ spec:
       ports:
         - port: 8080
 ---
-# AI 服务入站：仅允许 backend 调用（提交/查询任务），
+# AI 服务入站：仅允许 backend 调用（提交/查询任务）+ Prometheus 抓取 /metrics，
 # 避免 default-deny 策略误杀 AI 的入站流量
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -41,6 +41,16 @@ spec:
         - podSelector:
             matchLabels:
               app: {{ .Release.Name }}-backend
+      ports:
+        - port: 8000
+    # 批次3（R4-1.49）：Prometheus 抓取 /metrics——此前 policy 只放行 backend 入站，
+    # monitoring 命名空间的 Prometheus 访问 ai:8000/metrics 被 default-deny 拒绝，
+    # 与 main.py 精心设计的 /metrics 端点矛盾（指标必抓不到）。按 namespace 放行
+    # monitoring 命名空间（prometheus.yml 部署位置），可按实际命名空间调整。
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
       ports:
         - port: 8000
 ---

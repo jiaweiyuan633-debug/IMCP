@@ -59,3 +59,28 @@ def test_registry_tesseract_available_returns_tesseract(monkeypatch) -> None:
     )
     provider = get_ocr_provider(Settings(ocr_provider="tesseract"))
     assert isinstance(provider, TesseractOCRProvider)
+
+
+def test_registry_tesseract_fail_fast_raises_when_unavailable(monkeypatch) -> None:
+    """批次3：ocr_fail_fast=True 且 tesseract 不可用时直接抛错（不静默回退 Mock）。"""
+    from app.ocr import registry as registry_module
+
+    monkeypatch.setattr(registry_module.TesseractOCRProvider, "is_available", lambda: False)
+    with pytest.raises(RuntimeError):
+        get_ocr_provider(Settings(ocr_provider="tesseract", ocr_fail_fast=True))
+
+
+def test_registry_tesseract_fail_fast_raises_on_construct_failure(monkeypatch) -> None:
+    """批次3：ocr_fail_fast=True 且构造失败时抛错。"""
+    from app.ocr import registry as registry_module
+
+    monkeypatch.setattr(
+        registry_module.TesseractOCRProvider, "is_available", classmethod(lambda cls: True)
+    )
+    monkeypatch.setattr(
+        registry_module.TesseractOCRProvider,
+        "__init__",
+        lambda self: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    with pytest.raises(RuntimeError):
+        get_ocr_provider(Settings(ocr_provider="tesseract", ocr_fail_fast=True))

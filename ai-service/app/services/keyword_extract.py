@@ -1,4 +1,3 @@
-import asyncio
 import re
 from collections import Counter
 
@@ -6,14 +5,10 @@ from collections import Counter
 class KeywordExtractService:
 
     async def run(self, params: dict) -> dict:
-        delay = float(params.get("delay_seconds", 0))
-        if delay > 0:
-            await asyncio.sleep(delay)
+        # 批次3（R4-1.49）：移除 force_fail/delay_seconds 演示后门（同 text_summary）
         content = str(params.get("content", "")).strip()
         if not content:
             raise ValueError("content is required")
-        if params.get("force_fail"):
-            raise RuntimeError("forced failure for demo")
 
         top_n = max(int(params.get("top_n", 10)), 1)
         words = re.findall(r"[a-zA-Z0-9_]+", content.lower())

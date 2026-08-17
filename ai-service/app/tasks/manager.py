@@ -154,7 +154,13 @@ class TaskManager:
             ai_worker_count.set(len(self._workers))
 
     async def close(self) -> None:
-        """优雅停机：停止拉取并取消工作线程（运行中的任务被取消并记录为失败）。"""
+        """优雅停机：停止拉取并取消工作线程（运行中的任务被取消并记录为失败）。
+
+        批次3（R4-1.49）：取消前先把在途 RUNNING 任务标记为 requeue——原实现直接
+        cancel，在途任务保持 RUNNING、租约仍在未来，新 Pod 启动扫描只回收已过期租约，
+        且宽限过后仍无周期回收，滚动发布后任务可卡死近 1 小时。现在停机即回收，
+        新实例启动后立即可重跑。
+        """
         self._closing = True
         for task in list(self._workers):
             task.cancel()
@@ -162,6 +168,8 @@ class TaskManager:
             await asyncio.gather(*list(self._workers), return_exceptions=True)
         self._workers.clear()
         ai_worker_count.set(0)
+        # 回收在途任务：cancel 后 RUNNING 任务重新入队，避免跨实例重启期间永久停滞
+        await self.recover_stale_tasks(force=True)
 
     async def _worker_loop(self) -> None:
         """消费循环：瞬时错误指数退避后继续，不因单个异常杀死消费线程。
@@ -175,18 +183,30 @@ class TaskManager:
         ready_key = self.settings.queue_ready_key
         delayed_key = self.settings.queue_delayed_key
         failure_backoff = 0.0
+        empty_backoff = 0.0
+        last_recovery = time.monotonic()
         while not self._closing:
             # 工作协程由首个提交任务的请求上下文派生（create_task 复制上下文），
             # 逐轮清空 request_id，避免无关任务日志错误携带建队请求的 ID
             request_id_var.set("")
             task_no: str | None = None
             try:
+                # 批次3（R4-1.49）：周期租约回收——原实现仅在启动时扫描一次，
+                # 滚动发布/重启后租约过期的 RUNNING 任务会卡死直到下次 Pod 重启；
+                # 这里每 60s 由任一 worker 触发一次全局扫描（scan 幂等，多实例安全）
+                if time.monotonic() - last_recovery >= 60.0:
+                    await self.recover_stale_tasks()
+                    last_recovery = time.monotonic()
                 await self._promote_due(delayed_key, ready_key)
                 popped = await self.redis.zpopmin(ready_key)
                 if not popped:
                     failure_backoff = 0.0
-                    await asyncio.sleep(0.02)
+                    # 批次3：空队列退避指数化（0.02→0.05→0.1→…封顶 0.5s），
+                    # 原固定 20ms 忙轮询在扩副本后每秒产生大量无谓 Redis 命令
+                    empty_backoff = min(empty_backoff * 2 + 0.02, 0.5)
+                    await asyncio.sleep(empty_backoff)
                     continue
+                empty_backoff = 0.0
                 task_no = popped[0][0]
                 await self._execute(task_no)
                 failure_backoff = 0.0
@@ -207,7 +227,11 @@ class TaskManager:
         due = await self.redis.zrangebyscore(delayed_key, 0, now)
         if not due:
             return
-        await self.redis.zrem(delayed_key, *due)
+        # 批次3（R4-1.49）：检查 zrem 返回值——多实例同时读到同一批 due 时，
+        # 仅实际删除（>0）的实例拥有处置权，另一实例跳过，语义与 run_loop 对齐
+        removed = await self.redis.zrem(delayed_key, *due)
+        if not removed:
+            return
         for task_no in due:
             data = await self._get(task_no)
             if data is None:
@@ -276,8 +300,15 @@ class TaskManager:
 
     async def _schedule_retry(self, task_no: str, data: dict[str, Any]) -> None:
         ai_task_retried_total.inc()
-        backoff = float(self.settings.retry_backoff_seconds)
-        await self.redis.zadd(self.settings.queue_delayed_key, {task_no: time.time() + backoff})
+        # 批次3（R4-1.49）：指数退避 + 抖动——原固定 0.5s 重入队，LLM provider 限流时
+        # 3 次重试在 1s 内打完直接加剧上游过载；现按 retry_count 指数退避（0.5*2^n，
+        # 封顶 60s）+ 随机 ±20% 抖动防惊群
+        import random
+
+        retry_count = int(data.get("retry_count", 1))
+        backoff = min(float(self.settings.retry_backoff_seconds) * (2 ** (retry_count - 1)), 60.0)
+        jitter = backoff * 0.2 * (random.random() * 2 - 1)
+        await self.redis.zadd(self.settings.queue_delayed_key, {task_no: time.time() + backoff + jitter})
 
     async def _fail(self, task_no: str, data: dict[str, Any], reason: str = "unknown") -> None:
         data["status"] = "FAILED"
@@ -365,7 +396,7 @@ class TaskManager:
                 task_no, exception,
             )
 
-    async def recover_stale_tasks(self) -> int:
+    async def recover_stale_tasks(self, force: bool = False) -> int:
         """启动自愈：回收租约已过期的 RUNNING 任务为 QUEUED 重新入队。
 
         工作线程崩溃 / 进程被杀（OOM、滚动发布、k8s 重启）会让任务永久停留在
@@ -376,6 +407,9 @@ class TaskManager:
         lease_until（= 超时 + 宽限）前离开 RUNNING，故租约过期是确凿的崩溃遗留，
         多实例下也不会误回收其它实例正在执行的任务。无 lease_until 字段的记录
         （本特性上线前遗留）同样按遗留回收。返回回收数量。
+
+        force=True（批次3·R4-1.49）：忽略租约直接回收——仅用于本实例优雅停机
+        （close 已取消全部 worker，在途 RUNNING 均属本实例且不会再推进）。返回回收数量。
         """
         now = time.time()
         recovered = 0
@@ -387,9 +421,10 @@ class TaskManager:
                 data = await self._get(task_no)
                 if data is None or data.get("status") != "RUNNING":
                     continue
-                lease_until = data.get("lease_until")
-                if lease_until is not None and float(lease_until) > now:
-                    continue  # 租约未过期：可能仍被其它实例执行
+                if not force:
+                    lease_until = data.get("lease_until")
+                    if lease_until is not None and float(lease_until) > now:
+                        continue  # 租约未过期：可能仍被其它实例执行
                 data["status"] = "QUEUED"
                 data["error"] = "recovered after worker interruption"
                 data["updated_at"] = _now()

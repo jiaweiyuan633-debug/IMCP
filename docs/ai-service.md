@@ -58,8 +58,10 @@ backend (Spring Boot)                 ai-service (FastAPI)
 | POST | `/api/v1/schedules` | 注册定时管道（`interval:N` 或 `cron:* * * * *`） |
 | GET | `/api/v1/schedules` | 列出定时管道 |
 | DELETE | `/api/v1/schedules/{id}` | 删除定时管道 |
-| GET | `/health` | 探活（Redis 不可用返回 503） |
-| GET | `/api/v1/metrics` | Prometheus 指标 |
+| GET | `/health` | 探活（Redis 不可用返回 503，兼容旧客户端） |
+| GET | `/livez` | 纯进程存活探针（恒 200，供 k8s liveness；批次3） |
+| GET | `/readyz` | 就绪探针（依赖 Redis，供 k8s readiness；批次3） |
+| GET | `/metrics` | Prometheus 指标（根路径，见 main.py 注释） |
 
 ## 设计要点
 
@@ -89,10 +91,13 @@ AUTH_TOKEN=dev-ai-service-token        # 必填：与后端 AiServiceConfig.apiK
 LLM_DEFAULT_PROVIDER=mock              # 默认提供方
 LLM_PROVIDERS='{"deepseek":{"base_url":"https://api.deepseek.com","api_key":"sk-...","model":"deepseek-chat","embedding_model":"text-embedding-v3"}}'
 WORKER_COUNT=2                         # 工作线程数
-RETRY_BACKOFF_SECONDS=0.5              # 重试退避
+RETRY_BACKOFF_SECONDS=0.5              # 重试退避基数（指数退避：0.5*2^n 封顶 60s，批次3）
 TASK_MAX_RETRY=3                       # 最大重试次数
-OCR_PROVIDER=mock                      # mock / tesseract
+OCR_PROVIDER=mock                      # mock / tesseract（tesseract 不可用时回退 mock 并告警）
+OCR_FAIL_FAST=false                    # true 时 OCR 探测失败直接抛错（不静默降级，批次3）
 PII_MASK_CHAR=*                        # 脱敏字符
+MAX_TIMEOUT_SECONDS=3600               # 单任务超时上限（默认 1h，超限 clamp）
+CALLBACK_ALLOWED_ORIGINS=[]            # 回调 SSRF 白名单（JSON 数组，生产必配）
 ```
 
 ## 测试

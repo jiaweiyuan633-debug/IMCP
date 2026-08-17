@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import json
 from typing import Annotated, Any
@@ -132,9 +133,15 @@ async def retry_task(request: Request, task_id: str) -> TaskStatusResponse:
 async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     # R4-1.31：非任务路径（同步调用）无 TaskManager 重试，LLM 可重试异常（网络/5xx）须退避重试
     provider = _resolve_provider(request, payload.provider)
+    messages = [m.model_dump() for m in payload.messages]
+    # 批次3（R4-1.49）：出站 PII 脱敏——mask_pii=True 时 user 消息中的手机号/身份证等
+    # 先脱敏再发往外部 LLM（PIPL/等保对敏感数据出域的控制）；detect/mask 为 CPU 密集，
+    # 移入线程池避免阻塞事件循环
+    if payload.mask_pii:
+        messages = await asyncio.to_thread(_mask_outbound_messages, messages, settings.pii_mask_char)
     content = await retry_llm_call(
         provider.chat,
-        [m.model_dump() for m in payload.messages],
+        messages,
         model=payload.model,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
@@ -144,9 +151,9 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     # R4-1.34：PII 强制——模型输出默认脱敏，复述的敏感信息不出站；命中数随响应透出
     pii_count = 0
     if payload.mask_pii:
-        detected = detect(content)
+        detected = await asyncio.to_thread(detect, content)
         if detected:
-            content = mask(content, settings.pii_mask_char)
+            content = await asyncio.to_thread(mask, content, settings.pii_mask_char)
             pii_count = len(detected)
     return ChatResponse(
         content=content,
@@ -154,6 +161,18 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
         provider=getattr(provider, "name", None),
         pii_count=pii_count,
     )
+
+
+def _mask_outbound_messages(messages: list[dict], mask_char: str) -> list[dict]:
+    """对出站消息中的 user 内容执行 PII 脱敏（同步函数，供 asyncio.to_thread 调用）。"""
+    from app.pii import mask as mask_pii
+
+    result: list[dict] = []
+    for message in messages:
+        if message.get("role") == "user" and message.get("content"):
+            message = {**message, "content": mask_pii(str(message["content"]), mask_char)}
+        result.append(message)
+    return result
 
 
 @router.post(

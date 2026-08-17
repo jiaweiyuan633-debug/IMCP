@@ -67,6 +67,19 @@ class RedisVectorStore:
         threshold: float = 0.0,
     ) -> list[dict[str, Any]]:
         raw = await self.redis.hgetall(self._key(namespace))
+        # 批次3（R4-1.49）：余弦扫描是 CPU 密集（全量 hgetall + Python 循环逐条算），
+        # 在事件循环上执行会冻结同进程所有请求/worker——移入线程池执行
+        import asyncio
+
+        return await asyncio.to_thread(self._score_all, raw, query_vector, top_k, threshold)
+
+    def _score_all(
+        self,
+        raw: dict[bytes | str, bytes | str],
+        query_vector: list[float],
+        top_k: int,
+        threshold: float,
+    ) -> list[dict[str, Any]]:
         scored: list[tuple[float, dict[str, Any]]] = []
         for doc_id, entry_json in raw.items():
             entry = json.loads(entry_json)

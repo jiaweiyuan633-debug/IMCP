@@ -6,10 +6,16 @@ WORKDIR /app
 ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
     UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 COPY pyproject.toml uv.lock ./
-RUN pip install --no-cache-dir uv && uv sync --no-dev
+RUN pip install --no-cache-dir uv && uv sync --no-dev --extra parsing
 
 FROM python:3.11-slim
 WORKDIR /app
+# 批次3（R4-1.49）：安装 tesseract-ocr（OCR 提供方依赖系统二进制）与解析所需
+# 系统库（openpyxl 写 xlsx 不需额外系统包；python-docx/pypdf 为纯 Python）。
+# 安装后清理 apt 缓存控制镜像体积；固定路径供非 root 用户访问。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1

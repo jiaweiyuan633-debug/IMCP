@@ -50,9 +50,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: AI tests
+      - name: AI tests (with coverage gate)
         working-directory: ai-service
-        run: uv run pytest -q
+        # 批次3（R4-1.49）：--locked 防锁文件漂移；pytest 覆盖率门禁由 pyproject addopts 生效
+        run: uv run pytest -q --locked
       - name: AI lint
         working-directory: ai-service
         run: uv run ruff check .

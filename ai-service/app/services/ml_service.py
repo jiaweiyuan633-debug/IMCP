@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from app.ml import KMeansTextClusterer, load_model, train_model
@@ -30,7 +31,8 @@ class MlClassifyService(BaseTaskService):
                 raise ValueError("训练需要非空 labels 与 docs")
             if len(labels) != len(docs):
                 raise ValueError("labels 与 docs 长度必须一致")
-            return await train_model(self.context.redis, name, labels, docs)
+            # 批次3（R4-1.49）：TF-IDF 训练是 CPU 密集，移入线程池
+            return await asyncio.to_thread(train_model, self.context.redis, name, labels, docs)
         model = await load_model(self.context.redis, name)
         if model is None:
             raise NonRetryableError(f"模型不存在: {name}")
@@ -48,7 +50,11 @@ class MlClusterService(BaseTaskService):
         k = int(params.get("k", 2))
         if k < 2 or k > len(docs):
             raise ValueError(f"k 必须在 [2, {len(docs)}] 之间")
-        result = KMeansTextClusterer().cluster(
-            docs, k=k, max_iter=int(params.get("max_iter", 20))
+        # 批次3（R4-1.49）：KMeans 迭代是 CPU 密集，移入线程池
+        result = await asyncio.to_thread(
+            KMeansTextClusterer().cluster,
+            docs,
+            k=k,
+            max_iter=int(params.get("max_iter", 20)),
         )
         return result

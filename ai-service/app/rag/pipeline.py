@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from app.llm.base import Embedder
 from app.rag.chunker import chunk_document
 from app.vectors.store import RedisVectorStore
@@ -41,7 +43,10 @@ class RagPipeline:
         total_chunks = 0
         for doc in docs:
             doc_id = str(doc.get("doc_id", ""))
-            chunks = chunk_document(
+            # 批次3（R4-1.49）：分块是 CPU 密集（长文本正则切割），移入线程池避免
+            # 阻塞事件循环（大文档入库时冻结同进程所有请求）
+            chunks = await asyncio.to_thread(
+                chunk_document,
                 str(doc.get("title", "")),
                 str(doc.get("content", "")),
                 max_chars,

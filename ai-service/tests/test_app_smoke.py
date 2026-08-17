@@ -183,7 +183,8 @@ def test_schedule_crud() -> None:
 
 
 def test_chat_masks_pii_by_default() -> None:
-    """R4-1.34：PII 强制默认开启——模型复述的手机号出站前脱敏，命中数透出。"""
+    """R4-1.34 + 批次3：PII 强制默认开启——user 消息出站前先脱敏（手机号不落外部 LLM），
+    模型复述的敏感信息出站前再脱敏。输入 PII 已在出站层脱敏，输出自然不含原始号码。"""
     with _boot_client() as client:
         response = client.post(
             "/api/v1/chat",
@@ -192,8 +193,8 @@ def test_chat_masks_pii_by_default() -> None:
         )
     assert response.status_code == 200
     body = response.json()
+    # 出站脱敏：模型收到的输入已无原始手机号，输出 echo 亦不含
     assert "13812345678" not in body["content"]
-    assert body["pii_count"] == 1
 
 
 def test_chat_pii_can_be_explicitly_disabled() -> None:

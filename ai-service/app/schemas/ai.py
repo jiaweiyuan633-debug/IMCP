@@ -7,18 +7,22 @@ from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
     role: str = Field(pattern="^(system|user|assistant|tool)$")
-    content: str
+    # 批次3（R4-1.49）：单条消息长度上限 32k 字符——无界入参可撑爆 LLM 上下文
+    # 与出站带宽，且放大成本；超限由 Pydantic 422 直接拒绝
+    content: str = Field(max_length=32_000)
     name: str | None = None
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage] = Field(min_length=1)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=100)
     model: str | None = None
     temperature: float | None = Field(default=None, ge=0, le=2)
-    max_tokens: int | None = Field(default=None, ge=1)
+    max_tokens: int | None = Field(default=None, ge=1, le=32_000)
     provider: str | None = None
     # R4-1.34：PII 强制——默认对模型输出脱敏（可显式关停）。模型可能在回复中复述
-    # 输入里的手机号/身份证号等敏感信息，出站前统一脱敏，防止敏感数据外泄
+    # 输入里的手机号/身份证号等敏感信息，出站前统一脱敏，防止敏感数据外泄。
+    # 批次3：mask_pii=True 时同样对**出站 user 消息**脱敏（输入 PII 不落外部 LLM），
+    # 满足 PIPL/等保对敏感数据出域的控制要求
     mask_pii: bool = True
 
 

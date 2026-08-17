@@ -37,6 +37,40 @@ class SelectiveFailingTaskManager(FakeTaskManager):
         return SimpleNamespace(status="QUEUED")
 
 
+class ConflictTaskManager(FakeTaskManager):
+    """create_task 恒抛 409（同名任务已存在）——验证调度器按幂等成功处理（批次3）。"""
+
+    async def create_task(self, request, request_id=None):
+        self.calls.append((request, request_id))
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=409, detail="task already exists")
+
+
+@pytest.mark.asyncio
+async def test_run_loop_treats_409_as_idempotent_success() -> None:
+    """批次3：create_task 抛 409（同名任务已存在）按幂等成功处理——run_count 推进、
+    fail_count 清零、正常重排，而非按失败退避。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    conflict_tm = ConflictTaskManager()
+    scheduler = Scheduler(redis, settings)
+    scheduler.attach_task_manager(conflict_tm)
+    info = await scheduler.register("job", "interval:1", "text_summary", {})
+    await redis.zadd(settings.scheduler_due_key, {info["id"]: 0})
+
+    await scheduler.start()
+    await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, info["id"], 1)
+    await scheduler.stop()
+
+    spec = json.loads(await redis.hget(settings.scheduler_spec_key, info["id"]))
+    assert spec["run_count"] >= 1
+    assert spec["fail_count"] == 0
+    # 409 后仍重排（与成功路径一致），调度不淡出
+    due = dict(await redis.zrange(settings.scheduler_due_key, 0, -1, withscores=True))
+    assert info["id"] in due
+
+
 async def _wait_for_spec_run_count(
     redis, spec_key: str, id_: str, min_count: int = 1, timeout: float = 2.0
 ) -> None:
@@ -88,10 +122,12 @@ async def test_register_writes_spec_and_due() -> None:
     info = await scheduler.register(
         "job", "interval:1", "text_summary", {"content": "hi"}
     )
+    # 批次3：spec 新增 fail_count（失败退避状态）
     assert set(info) == {
-        "id", "name", "schedule", "biz_type", "params", "enabled", "next_run_at", "run_count",
+        "id", "name", "schedule", "biz_type", "params", "enabled", "next_run_at", "run_count", "fail_count",
     }
     assert info["run_count"] == 0
+    assert info["fail_count"] == 0
     assert info["enabled"] is True
 
     raw = await redis.hget(settings.scheduler_spec_key, info["id"])
@@ -164,7 +200,7 @@ async def test_unregister_stops_enqueue() -> None:
 
 @pytest.mark.asyncio
 async def test_run_loop_tolerates_enqueue_failure() -> None:
-    """入队失败只记日志：失败调度不推进，其他调度仍正常入队，循环不中断。"""
+    """入队失败只记日志：失败调度按指数退避重排（不永久停摆），其他调度仍正常入队，循环不中断。"""
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     settings = Settings(scheduler_poll_seconds=0.01)
     scheduler = Scheduler(redis, settings)
@@ -178,12 +214,17 @@ async def test_run_loop_tolerates_enqueue_failure() -> None:
     await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, ok_info["id"], 1)
     await scheduler.stop()
 
-    # 两个调度都尝试过入队，失败的未推进 run_count，成功的已推进
+    # 两个调度都尝试过入队，失败的未推进 run_count 但 fail_count 递增并重排（批次3）
     assert len(fake_tm.calls) == 2
     fail_spec = json.loads(await redis.hget(settings.scheduler_spec_key, fail_info["id"]))
     ok_spec = json.loads(await redis.hget(settings.scheduler_spec_key, ok_info["id"]))
     assert fail_spec["run_count"] == 0
+    assert fail_spec["fail_count"] >= 1
     assert ok_spec["run_count"] >= 1
+    # 失败调度已被重排（fail_count 退避 2s），不会自然淡出
+    due = dict(await redis.zrange(settings.scheduler_due_key, 0, -1, withscores=True))
+    assert fail_info["id"] in due
+    assert due[fail_info["id"]] > 0
 
 
 @pytest.mark.asyncio
