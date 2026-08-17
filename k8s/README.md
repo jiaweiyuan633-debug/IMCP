@@ -35,6 +35,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 | `images.*` | `*-latest` | 四个服务镜像（backend/ai/frontend/website） |
 | `replicas.*` | `2` | 各服务副本数 |
 | `config.*` | 本机环境 | DB/Redis/回调/AI/前端 URL 与 CORS |
+| `config.corsAllowedOriginPatterns` | `https://admin.example.com` | CORS 允许的前端域名（逗号分隔，可含 `*`），注入 `CORS_ALLOWED_ORIGIN_PATTERNS`；后端生产缺省为空串即拒绝全部跨域来源，未配置时后台前端 API 请求会 `403 Invalid CORS request`，须覆盖为实际前端域名 |
 | `config.redisSentinelMaster` | 空（可选） | 设置后后端切换 Redis 主从哨兵拓扑（须与 `redisSentinelNodes` 成对） |
 | `config.redisSentinelNodes` | 空（可选） | 逗号分隔哨兵节点，如 `host1:26379,host2:26379` |
 | `config.redisSentinelPassword` | 空（可选） | 哨兵节点认证口令 |

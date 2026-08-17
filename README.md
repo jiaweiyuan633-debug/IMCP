@@ -71,7 +71,8 @@
 | 15 | R4-1.42 | 环境与审计对齐（K8s Ingress 补 /uploads、上传审计统一、MultipartFile 元信息化） | 已完成 |
 | 16 | R4-1.43 | 文件访问令牌一致性收口（/uploads 归属校验、令牌现取统一、死字段清理） | 已完成 |
 | 17 | R4-1.44 | 安全纵深（AI 回调有界读、Refresh 原子消费、AI baseUrl SSRF、预签名归属）+ 前端取消接通 + onMounted 收敛 + 文档对齐 | 已完成 |
-| 18 | R4-1.45 | 工程与部署对齐（CORS 兜底收紧、Helm 内部主机名按 release 推导、CI website 改 pnpm、Playwright E2E 进 CI） | 进行中 |
+| 18 | R4-1.45 | 工程与部署对齐（CORS 兜底收紧、Helm 内部主机名按 release 推导、CI website 改 pnpm、Playwright E2E 进 CI） | 已完成 |
+| 19 | R4-1.46 | 部署文档与 E2E 门禁对齐（CORS 生产必配说明、e2e typecheck 门禁） | 进行中 |
 
 ## 技术栈
 

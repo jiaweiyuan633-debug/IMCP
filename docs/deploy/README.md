@@ -145,6 +145,7 @@ scripts/fetch-openapi.ps1
 
 - 修改 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、MySQL/Redis 密码、AI 服务鉴权 Token（`AUTH_TOKEN`，须与后端 `AiServiceConfig.apiKey` 保持一致）、MCP Server 鉴权令牌（`MCP_AUTH_TOKEN`）
 - `CALLBACK_BASE_URL` 配置为 AI 服务可访问的地址（默认 `127.0.0.1` 仅限本地联调），否则 AI 回调无法到达后端；Helm 部署时 `config.callbackBaseUrl` / `config.aiBaseUrl` / `config.frontendUrl` 留空由模板按 `.Release.Name` 推导（`{release}-backend` / `{release}-ai` / `{release}-frontend`），非默认 release 名或自定义 Service 名须显式覆盖（R4-1.45）
+- **CORS 生产必配**：`CORS_ALLOWED_ORIGIN_PATTERNS`（逗号分隔的前端域名模式，可含 `*` 通配）注入后端 CORS 允许来源。生产配置层（application-prod.yml）缺省为空串即**拒绝全部跨域来源**，未配置时后台前端经浏览器发起的 API 请求会返回 `403 Invalid CORS request`；Helm 部署经 `config.corsAllowedOriginPatterns` 注入（values 默认 `https://admin.example.com`），自定义域名或新增前端源须显式覆盖为实际域名列表（R4-1.45 起兜底收紧为缺省拒绝）
 - **AI 回调 SSRF 白名单**：AI 服务出站任务回调仅允许打到 `CALLBACK_ALLOWED_ORIGINS`（JSON 数组，Helm 已从 `config.callbackBaseUrl` 自动推导）列出的 origin，未配置时仅允许 localhost 回环（仅限后端与 AI 同机联调）；生产多机/容器部署必须显式注入后端可达的 origin，否则任务完成回调会被 AI 侧拒绝（任务仍终态，但后端收不到通知）。云元数据（169.254.169.254）与链路本地/保留地址无论白名单如何一律拒绝
 - 按需启用 MinIO 对象存储并配置生命周期策略
 - 开启 HTTPS 和 WAF

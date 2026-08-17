@@ -146,6 +146,11 @@ jobs:
       - name: Install Playwright browsers
         working-directory: e2e
         run: pnpm exec playwright install --with-deps chromium
+      # Playwright 运行时转译 TS 但不做类型检查；tsconfig 为 strict 无 typecheck script 时
+      # 类型错误不会被 CI 捕获，故在起栈前显式跑 tsc --noEmit 作为门禁（R4-1.46）
+      - name: E2E typecheck
+        working-directory: e2e
+        run: pnpm run typecheck
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 360
       - name: Wait for backend API
