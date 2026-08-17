@@ -107,13 +107,15 @@ public class DataScopeHelper {
         if (deptId == null) {
             return List.of();
         }
-        List<SysDeptDO> depts = deptMapper.selectList(null);
-        List<Long> result = new ArrayList<>();
+        // 批次4（R4-1.50）：单条 ancestors LIKE 查询替代全表载入内存扫描——原实现
+        // selectList(null) 每请求拉全量部门表再逐行 contains 匹配祖先串，部门表大时
+        // 每次数据权限计算都是一次全表扫描 + 内存遍历
+        List<SysDeptDO> children = deptMapper.selectList(new LambdaQueryWrapper<SysDeptDO>()
+                .like(SysDeptDO::getAncestors, "," + deptId + ","));
+        List<Long> result = new ArrayList<>(children.size() + 1);
         result.add(deptId);
-        for (SysDeptDO dept : depts) {
-            if (dept.getAncestors() != null && dept.getAncestors().contains("," + deptId + ",")) {
-                result.add(dept.getId());
-            }
+        for (SysDeptDO dept : children) {
+            result.add(dept.getId());
         }
         return result;
     }

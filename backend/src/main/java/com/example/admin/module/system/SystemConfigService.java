@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.UniqueKeyRelease;
 import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.ConfigQuery;
 import com.example.admin.module.system.dto.ConfigSaveRequest;
@@ -80,9 +81,17 @@ public class SystemConfigService {
 
     public void delete(Long id) {
         SysConfigDO existing = configMapper.selectById(id);
-        configMapper.deleteById(id);
-        if (existing != null && StringUtils.hasText(existing.getConfigKey())) {
-            evictConfig(existing.getConfigKey());
+        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, config_key) 唯一键冲突——删除前释放编码唯一键
+        if (existing != null) {
+            String originalKey = existing.getConfigKey();
+            existing.setConfigKey(UniqueKeyRelease.releaseCode(existing.getConfigKey()));
+            configMapper.updateById(existing);
+            configMapper.deleteById(id);
+            if (StringUtils.hasText(originalKey)) {
+                evictConfig(originalKey);
+            }
+        } else {
+            configMapper.deleteById(id);
         }
     }
 

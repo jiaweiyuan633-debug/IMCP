@@ -40,6 +40,7 @@
 - 多租户数据必须带上 `tenant_id` 条件，配合数据权限注解使用
 - 高频查询字段建立组合索引，索引命名使用 `idx_表名_字段名`
 - 每次结构变更通过 Flyway 迁移，禁止手工改库
+- **禁止「逻辑删除 + 业务编码唯一键」组合**：`@TableLogic` 表的业务编码（username/code/post_code/dict_type/config_key 等）若同时有 `(tenant_id, 编码)` 唯一键，删除后同名/同编码数据永远无法重建（exists 检查自动过滤 deleted=0 判定不存在、INSERT 却命中唯一键）。存量表（sys_user/sys_role/sys_post/sys_dict_type/sys_config/ai_prompt_template）删除路径已统一在删除前调用 `UniqueKeyRelease.releaseCode` 释放唯一键（批次4·R4-1.50）；**新增表禁止再出现该组合**，若确需逻辑删除+业务编码，唯一键必须包含 `deleted` 且 deleted 存删除时间戳
 - 分页 pageSize 全局封顶 200（`MybatisPlusConfig.MAX_PAGE_SIZE` + `PaginationInnerInterceptor.setMaxLimit`），新增分页入口不得绕过；内存分页统一走 `PageUtil.fromIndex/toIndex` 钳制 pageNum≤0/pageSize≤0，禁止手写 `(pageNum-1)*pageSize` 下标
 - 状态机字段（AI 任务 `ai_task.status` 等）的流转必须用条件 UPDATE：MyBatis-Plus `LambdaUpdateWrapper` 以 `.eq/in(status, 允许前置)` 限定 + `.set(...)`，禁止"check-then-act 读状态再无条件 updateById"——并发回调/扫描器/取消/重试会互相覆盖终态。影响 0 行视为已被并发抢先，静默返回不报错（`handleCallback`/`AiTaskScanner`/`retry`/`cancel`/`create` 提交后置 QUEUED 均为此模式）
 
@@ -51,6 +52,7 @@
 - 本地 Docker 栈 nginx 反代路径集合（`docker/nginx.conf`：`/api/`、`/uploads/`、`/files/`）必须与 K8s Ingress（`k8s/helm/admin-scaffold/templates/all.yaml`：`/api`、`/files`、`/uploads`）保持一致：上传文件 `contentUrl=/files/{id}` 带 `?token=` 访问，漏配会让对应部署的文件/头像/预览落入 SPA 回退返回 index.html 而全部失效（`/files` 曾漏配 docker nginx，R4-1.41 补齐；`/uploads` 曾漏配 K8s Ingress，导致历史 `/uploads/` URL 的存量文件/头像在 K8s 失效，R4-1.42 补齐）；新增受保护路径时两个入口必须同步
 - 登录失败锁定键带租户维度（`login:fail:{tenantId}:{username}`），锁定超阈值按 2 的幂指数退避（10→80 分钟封顶），禁止全局单键——否则未认证者可对任一租户账号制造跨租户 DoS
 - 数据权限 `@DataScope` 只约束列表查询，按 id 直查的写路径（update/delete/updateStatus/assignRoles/assignPosts 等）必须单独做单条归属校验：`loadUserOrThrow` + `checkUserDataScope`（admin 短路 → `allowedUserIds()` 为 null 放行 → 目标 id 命中集合否则 403）
+- 数据权限 SQL 改写 **fail-closed**（批次4·R4-1.50）：`DataScopeInnerInterceptor` 对受控表只出现在子查询/派生表内层、或语句类型非 PlainSelect（UNION 等）时直接拒绝执行，禁止静默放行——改写失败即抛 FORBIDDEN，杜绝复杂 SQL 绕过行级过滤；自写 SQL/复杂查询不要依赖拦截器，参考 `ReportSqlGuard` 自行加条件
 - JWT 过期/签名非法（refresh/logout 重放）应映射 401（`GlobalExceptionHandler` 兜底 JwtException），不得落入兜底 500
 - 出站外部地址（告警 Webhook、通用 Webhook 渠道、MCP Server 等）必须过 `SsrfUrlValidator` 双层校验：保存时静态校验（协议仅 http/https、禁 URL 用户信息、拒 localhost/回环/链路本地/站点本地/保留网段 IP 字面量，不发起 DNS）+ 投递/连接前 DNS 复核（任一解析地址落内部/保留网段即拒）——否则服务端可被当作探测内网/云元数据的跳板
 - 密码复杂度统一走 `PasswordPolicy.PATTERN`/`MESSAGE` 常量（8-32 位，须含大写/小写/数字/特殊字符四类），DTO `@Pattern` 与 Service 层显式校验共用，避免正则漂移；前端 `validation.ts` 的 `PASSWORD_PATTERN` 跨语言无法共享，需人工同步。批量导入（importUsers）默认密码有意豁免校验，避免破坏演示

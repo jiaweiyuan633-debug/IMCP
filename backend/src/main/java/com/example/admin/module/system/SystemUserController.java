@@ -92,7 +92,7 @@ public class SystemUserController {
     @PostMapping("/import")
     @PreAuthorize("hasAuthority('system:user:add')")
     @OperLog(module = "用户管理", action = "导入用户")
-    public Result<Integer> importUsers(@RequestParam("file") MultipartFile file) throws IOException {
+    public Result<SystemUserService.ImportResult> importUsers(@RequestParam("file") MultipartFile file) throws IOException {
         return Result.success(userService.importUsers(file));
     }
 }

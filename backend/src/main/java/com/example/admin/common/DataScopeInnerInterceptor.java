@@ -18,6 +18,7 @@ import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.util.TablesNamesFinder;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -26,6 +27,7 @@ import org.apache.ibatis.session.RowBounds;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -73,26 +75,50 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
         try {
             Select select = (Select) CCJSqlParserUtil.parse(sql);
             if (!(select.getSelectBody() instanceof PlainSelect plainSelect)) {
-                return null;
+                // 批次4（R4-1.50）：fail-closed——非 PlainSelect（UNION/集合查询等）无法安全
+                // 注入行级条件，直接拒绝执行，杜绝绕过数据权限
+                throw new IllegalStateException("data scope unsupported statement type: " + select.getClass().getSimpleName());
+            }
+            // 批次4（R4-1.50）：全树收集表（含子查询/派生表内层）——TablesNamesFinder 递归
+            // 遍历所有层级，修复此前仅顶层 FROM/JOIN 表被注入、受控表出现在子查询中被绕过的问题。
+            // Select 同时实现 Statement 与 Expression，需强转为 Statement 消解 getTables 重载歧义。
+            Set<String> tablesInQuery = new TablesNamesFinder().getTables((net.sf.jsqlparser.statement.Statement) select);
+            boolean touchesControlled = tablesInQuery.stream().anyMatch(filter.tables()::contains);
+            if (!touchesControlled) {
+                return null; // 查询不涉及受控表，无行级过滤需要
             }
             Expression where = plainSelect.getWhere();
+            boolean injected = false;
+            boolean controlledInTopLevel = false;
             for (Table table : tables(plainSelect)) {
                 String tableName = table.getName().toLowerCase();
                 if (filter.tables().contains(tableName)) {
+                    controlledInTopLevel = true;
                     Expression condition = buildCondition(table, tableName, filter);
                     if (condition != null) {
                         where = where == null ? condition : new AndExpression(where, condition);
+                        injected = true;
                     }
                 }
             }
-            if (where != null) {
+            if (injected && where != null) {
                 plainSelect.setWhere(where);
                 return select.toString();
             }
+            // 语义边界：受控表出现在「子查询/派生表内层」而顶层未直接引用（controlledInTopLevel=false）
+            // 时，行级条件无法在顶层注入——fail-closed 拒绝，杜绝内层受控表绕过（批次4）。
+            // 反之顶层涉及受控表但未注入条件，属正常无过滤语义（未配置规则/可见集合为 null），
+            // 保持原 SQL（与批次2b 之前行为一致）。
+            if (controlledInTopLevel) {
+                return null;
+            }
+            throw new IllegalStateException("data scope controlled table only in subquery, unsupported");
         } catch (JSQLParserException | RuntimeException exception) {
-            log.warn("Data scope rewrite failed for sql: {}", sql, exception);
+            // 批次4（R4-1.50）：fail-closed——解析/改写失败一律拒绝执行，而非静默放行
+            log.error("Data scope rewrite failed for sql (rejecting): {}", sql, exception);
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(),
+                    "数据权限改写失败，拒绝执行该查询");
         }
-        return null;
     }
 
     private List<Table> tables(PlainSelect plainSelect) {

@@ -8,6 +8,7 @@ import com.example.admin.common.PageResult;
 import com.example.admin.common.PageUtil;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.UniqueKeyRelease;
 import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.DictDataQuery;
 import com.example.admin.module.system.dto.DictDataSaveRequest;
@@ -140,6 +141,9 @@ public class SystemDictService {
     public void typeDelete(Long id) {
         SysDictTypeDO type = typeMapper.selectById(id);
         if (type != null) {
+            // 批次4（R4-1.50）：逻辑删除 + (tenant_id, dict_type) 唯一键冲突——删除前释放编码唯一键
+            type.setDictType(UniqueKeyRelease.releaseCode(type.getDictType()));
+            typeMapper.updateById(type);
             typeMapper.deleteById(id);
             dataMapper.delete(new LambdaQueryWrapper<SysDictDataDO>()
                     .eq(SysDictDataDO::getDictType, type.getDictType()));
@@ -151,8 +155,12 @@ public class SystemDictService {
         if (shared == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
+        // 批次4（R4-1.50）：共享类型同样释放 dict_type 唯一键（tenant_id=0 维度）
+        String originalType = shared.getDictType();
+        shared.setDictType(UniqueKeyRelease.releaseCode(originalType));
+        typeMapper.updateByIdIgnoreTenant(shared);
         typeMapper.deleteByIdIgnoreTenant(id);
-        dataMapper.deleteSharedByType(shared.getDictType());
+        dataMapper.deleteSharedByType(originalType);
         // 共享类型影响所有租户
         evictAllDictCache();
     }

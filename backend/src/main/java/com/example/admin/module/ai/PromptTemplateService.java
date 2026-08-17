@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.common.UniqueKeyRelease;
 import com.example.admin.module.ai.dto.PromptQuery;
 import com.example.admin.module.ai.dto.PromptSaveRequest;
 import com.example.admin.module.ai.entity.AiPromptTemplateDO;
@@ -61,6 +62,12 @@ public class PromptTemplateService {
     }
 
     public void delete(Long id) {
+        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, code) 唯一键冲突——删除前释放编码唯一键
+        AiPromptTemplateDO template = templateMapper.selectById(id);
+        if (template != null) {
+            template.setCode(UniqueKeyRelease.releaseCode(template.getCode()));
+            templateMapper.updateById(template);
+        }
         templateMapper.deleteById(id);
     }
 

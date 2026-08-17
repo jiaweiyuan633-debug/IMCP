@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.UniqueKeyRelease;
 import com.example.admin.common.annotation.FieldAudit;
 import com.example.admin.module.system.dto.RoleQuery;
 import com.example.admin.module.system.dto.RoleSaveRequest;
@@ -118,6 +119,12 @@ public class SystemRoleService {
         // R4-1.31：删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——删除前收集绑定用户，
         // 提交后失效其角色+权限缓存，使撤销的角色/权限立即生效（批次2：角色缓存一并失效）
         List<Long> userIds = userRoleMapper.selectUserIdsByRoleIds(List.of(id));
+        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, code) 唯一键冲突——删除前释放 code 唯一键
+        SysRoleDO role = roleMapper.selectById(id);
+        if (role != null) {
+            role.setCode(UniqueKeyRelease.releaseCode(role.getCode()));
+            roleMapper.updateById(role);
+        }
         roleMapper.deleteById(id);
         roleMenuMapper.deleteByRoleId(id);
         roleDeptMapper.deleteByRoleId(id);

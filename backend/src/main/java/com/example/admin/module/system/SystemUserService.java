@@ -7,6 +7,7 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.PageResult;
 import com.example.admin.common.PasswordPolicy;
 import com.example.admin.common.ResultCode;
+import com.example.admin.common.UniqueKeyRelease;
 import com.example.admin.module.system.dto.UserExcelDTO;
 import com.example.admin.module.system.dto.UserQuery;
 import com.example.admin.module.system.dto.UserSaveRequest;
@@ -37,9 +38,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.io.IOException;
@@ -187,7 +191,12 @@ public class SystemUserService {
 
     @Transactional
     public void delete(Long id) {
-        checkUserDataScope(loadUserOrThrow(id));
+        SysUserDO user = loadUserOrThrow(id);
+        checkUserDataScope(user);
+        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, username) 唯一键冲突——删除前释放 username
+        // 唯一键（改为 原username#del#时间戳），否则删除后同名账号永远无法重建
+        user.setUsername(UniqueKeyRelease.releaseCode(user.getUsername()));
+        userMapper.updateById(user);
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
         userPostMapper.deleteByUserId(id);
@@ -379,36 +388,107 @@ public class SystemUserService {
         EasyExcel.write(response.getOutputStream(), UserExcelDTO.class).sheet("用户").doWrite(rows);
     }
 
-    @Transactional
-    public int importUsers(MultipartFile file) throws IOException {
+    /**
+     * 导入用户：预检查重 → 分批事务插入 → 逐行错误收集。
+     *
+     * <p>批次4（R4-1.50）：原实现单事务 + 每行 exists+insert（2N 次 DB 往返、整批
+     * 一个事务、与并发 create 撞唯一键时整批回滚）。现改为：先一次性批量查重收集
+     * 重复行，再按 500 行/批插入（每批独立事务），失败行单独记录不整批回滚。
+     * 返回 {@link ImportResult}：成功数 + 失败行明细（行号/用户名/原因）。
+     */
+    public ImportResult importUsers(MultipartFile file) throws IOException {
         List<UserExcelDTO> rows = EasyExcel.read(file.getInputStream())
                 .head(UserExcelDTO.class)
                 .sheet()
                 .doReadSync();
         String defaultPassword = defaultPassword();
-        int count = 0;
-        for (UserExcelDTO row : rows) {
-            if (row.getUsername() == null || row.getUsername().isBlank()) {
+        // 1) 预检：收集无用户名行与重复用户名（批量查重，避免逐行 exists）
+        List<String> importedUsernames = new ArrayList<>();
+        List<RowError> errors = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < rows.size(); i++) {
+            UserExcelDTO row = rows.get(i);
+            String username = row.getUsername() == null ? null : row.getUsername().trim();
+            if (username == null || username.isBlank()) {
+                errors.add(new RowError(i + 1, null, "用户名为空"));
                 continue;
             }
-            boolean exists = userMapper.exists(new LambdaQueryWrapper<SysUserDO>()
-                    .eq(SysUserDO::getUsername, row.getUsername().trim()));
-            if (exists) {
-                throw new BusinessException(ResultCode.USERNAME_EXISTS.getCode(), "导入失败，用户名已存在：" + row.getUsername());
+            if (!seen.add(username)) {
+                errors.add(new RowError(i + 1, username, "文件内用户名重复"));
+                continue;
             }
+            importedUsernames.add(username);
+        }
+        // 批量查库中已存在的用户名（一次 IN 查询替代逐行 exists）
+        if (!importedUsernames.isEmpty()) {
+            List<SysUserDO> existing = userMapper.selectList(new LambdaQueryWrapper<SysUserDO>()
+                    .in(SysUserDO::getUsername, importedUsernames));
+            Set<String> existingNames = existing.stream()
+                    .map(u -> u.getUsername() == null ? "" : u.getUsername().trim())
+                    .collect(Collectors.toSet());
+            errors.addAll(rows.stream()
+                    .filter(r -> r.getUsername() != null && existingNames.contains(r.getUsername().trim()))
+                    .map(r -> new RowError(rows.indexOf(r) + 1, r.getUsername().trim(), "用户名已存在"))
+                    .toList());
+        }
+        // 2) 分批插入：每批 500 行独立事务，失败行单独记录
+        int success = 0;
+        List<SysUserDO> pending = new ArrayList<>();
+        for (UserExcelDTO row : rows) {
+            String username = row.getUsername() == null ? null : row.getUsername().trim();
+            if (username == null || username.isBlank()
+                    || errors.stream().anyMatch(e -> username.equals(e.username()))
+                    || !seen.contains(username)) {
+                continue; // 预检失败行跳过
+            }
+            // seen 保证文件内唯一；此处再排除库中已存在（预检已收集，直接跳过）
             SysUserDO user = new SysUserDO();
             checkTenantUserLimit();
             user.setTenantId(TenantContext.getTenantId());
-            user.setUsername(row.getUsername().trim());
+            user.setUsername(username);
             user.setPassword(passwordEncoder.encode(defaultPassword));
             user.setNickname(row.getNickname());
             user.setEmail(row.getEmail());
             user.setPhone(row.getPhone());
             user.setStatus(row.getStatus() == null ? ENABLED : row.getStatus());
-            userMapper.insert(user);
-            count++;
+            pending.add(user);
+            if (pending.size() >= BATCH_SIZE) {
+                success += insertBatch(pending, errors);
+                pending.clear();
+            }
         }
-        return count;
+        if (!pending.isEmpty()) {
+            success += insertBatch(pending, errors);
+        }
+        return new ImportResult(success, errors);
+    }
+
+    /** 单批插入（独立事务）：捕获逐行唯一键冲突等异常，失败行记录原因不整批回滚。 */
+    @Transactional
+    protected int insertBatch(List<SysUserDO> batch, List<RowError> errors) {
+        int success = 0;
+        for (SysUserDO user : batch) {
+            try {
+                userMapper.insert(user);
+                success++;
+            } catch (Exception exception) { // noqa - 单行失败记录后继续
+                String username = user.getUsername() == null ? "" : user.getUsername();
+                int rowNo = errors.size() + 1;
+                errors.add(new RowError(rowNo, username, exception.getMessage() == null
+                        ? "插入失败" : exception.getMessage()));
+            }
+        }
+        return success;
+    }
+
+    private static final int BATCH_SIZE = 500;
+
+    /** 导入结果：成功数 + 失败行明细。 */
+    public record ImportResult(int successCount, List<RowError> errors) {
+    }
+
+    /** 单行导入失败记录。 */
+    public record RowError(int rowNo, String username, String reason) {
     }
 
     private String defaultPassword() {

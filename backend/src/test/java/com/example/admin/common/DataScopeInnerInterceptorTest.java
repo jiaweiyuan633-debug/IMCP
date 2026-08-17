@@ -116,4 +116,46 @@ class DataScopeInnerInterceptorTest {
 
         assertThat(boundSql.getSql()).contains("sys_field_audit_log.user_id IN (3, 7)");
     }
+
+    // ---------- 批次4（R4-1.50）：子查询绕过 fail-closed + 非 PlainSelect 拒绝 ----------
+
+    @Test
+    void rejectsControlledTableOnlyInSubquery() {
+        // 受控表 sys_user 只出现在子查询内层、顶层未直接引用——行级条件无法注入，
+        // 必须拒绝而非静默放行（否则子查询绕过数据权限）；无需 stub resolver
+        // （fail-closed 在解析阶段即拒绝）
+        DataScopeContext.set(new DataScopeContext.Filter(
+                List.of(1L), List.of(), Set.of("sys_user"), false));
+        BoundSql boundSql = new BoundSql(new Configuration(),
+                "SELECT * FROM sys_device WHERE creator IN (SELECT creator FROM sys_user WHERE status = 1)",
+                List.<ParameterMapping>of(), null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(BusinessException.class,
+                () -> new DataScopeInnerInterceptor(ruleResolver).beforeQuery(
+                        executor, mappedStatement, null, RowBounds.DEFAULT, null, boundSql));
+    }
+
+    @Test
+    void rejectsNonPlainSelectStatement() {
+        // UNION 等集合查询无法安全注入行级条件——fail-closed 拒绝
+        DataScopeContext.set(new DataScopeContext.Filter(
+                List.of(1L), List.of(), Set.of("sys_user"), false));
+        BoundSql boundSql = new BoundSql(new Configuration(),
+                "SELECT * FROM sys_user UNION SELECT * FROM sys_user",
+                List.<ParameterMapping>of(), null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(BusinessException.class,
+                () -> new DataScopeInnerInterceptor(ruleResolver).beforeQuery(
+                        executor, mappedStatement, null, RowBounds.DEFAULT, null, boundSql));
+    }
+
+    @Test
+    void leavesSqlUntouchedWhenControlledTableInTopLevelWithoutRule() {
+        // 受控表在顶层但未配置规则（resolver 返回 null）→ 该表无行级过滤，SQL 原样（非安全违规）
+        when(ruleResolver.resolve("sys_bar")).thenReturn(null);
+        BoundSql boundSql = run(new DataScopeContext.Filter(
+                List.of(1L), List.of(), Set.of("sys_bar"), false), "SELECT * FROM sys_bar");
+
+        assertThat(boundSql.getSql()).isEqualTo("SELECT * FROM sys_bar");
+    }
 }
