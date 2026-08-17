@@ -62,6 +62,11 @@ app:
   totp:
     # 生产不设默认：缺失或等于 dev 兜底密钥时 TotpService 构造器将抛异常
     encryption-key: ${TOTP_ENCRYPTION_KEY}
+  security:
+    # 生产强制默认口令首登改密（V63 已标记默认哈希账号，登录响应 mustChangePassword=true）
+    force-password-change: ${FORCE_PASSWORD_CHANGE:true}
+    # https 部署下 refresh token cookie 必须带 Secure（防中间人窃取）
+    refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:true}
 
 jwt:
   # 生产不设默认：缺失、等于 dev/占位密钥或长度不足时 JwtProperties 校验将抛异常

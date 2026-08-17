@@ -119,7 +119,7 @@ cd website && pnpm install && pnpm dev --port 5174
 
 访问入口：
 
-- 后台管理系统：http://localhost:5173 ，默认管理员：`admin / admin123`
+- 后台管理系统：http://localhost:5173 ，默认管理员：`admin / admin123`（仅本地 dev/test；生产强制首登改密——默认口令账号登录后必须修改密码，见 [docs/release-review-2025.md](docs/release-review-2025.md) 批次1）
 - 智能管理平台官网：http://localhost:5174
 - 后端接口文档：http://localhost:8080/doc.html
 

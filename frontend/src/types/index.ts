@@ -28,12 +28,16 @@ export interface UserInfo {
   roles: string[]
   perms: string[]
   menus: MenuNode[]
+  /** 当前用户是否处于"必须修改密码"状态（默认口令首登 / 密码过期） */
+  mustChangePassword?: boolean
 }
 
 export interface LoginResponse {
   accessToken: string
   refreshToken: string
   user: UserInfo
+  /** 登录后是否必须修改密码（默认口令首登 / 密码过期；生产 forcePasswordChange 开启时返回 true） */
+  mustChangePassword?: boolean
 }
 
 export interface LoginForm {

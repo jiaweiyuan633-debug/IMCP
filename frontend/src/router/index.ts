@@ -23,6 +23,13 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      // R4-1.47（批次1）：强制改密页——登录后若 mustChangePassword 则只能访问此页
+      path: '/change-password',
+      name: 'ChangePassword',
+      component: () => import('@/views/change-password/index.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/',
       name: 'Root',
       component: BasicLayout,
@@ -91,6 +98,12 @@ router.beforeEach(async (to) => {
   if (!userStore.isLoggedIn) {
     removeDynamicRoutes()
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // R4-1.47（批次1）：强制改密拦截——必须改密的用户只能访问改密页/登录页，
+  // 其余页面一律重定向到 /change-password（改密成功后 userStore.mustChangePassword 置 false）
+  if (userStore.mustChangePassword && to.path !== '/change-password') {
+    return { path: '/change-password' }
   }
 
   if (!permissionStore.routesLoaded) {

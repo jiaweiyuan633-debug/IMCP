@@ -6,8 +6,8 @@ import com.example.admin.common.BusinessException;
 import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.ResultCode;
 import com.example.admin.common.TenantContext;
+import com.example.admin.config.SecurityProperties;
 import com.example.admin.module.auth.dto.LoginRequest;
-import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.system.entity.SysConfigDO;
 import com.example.admin.module.system.entity.SysLoginLogDO;
 import com.example.admin.module.system.entity.SysUserDO;
@@ -79,6 +79,8 @@ class AuthServiceLoginTest {
     private TotpService totpService;
     @Mock
     private BusinessMetrics businessMetrics;
+    @Mock
+    private SecurityProperties securityProperties;
     @Mock
     private HttpServletRequest httpRequest;
 
@@ -201,9 +203,7 @@ class AuthServiceLoginTest {
         when(menuMapper.selectMenusByUserId(10L)).thenReturn(List.of());
         when(jwtUtil.generateJti()).thenReturn("jti-2");
 
-        RefreshRequest request = new RefreshRequest();
-        request.setRefreshToken("refresh-token");
-        authService.refresh(request);
+        authService.refresh("refresh-token");
 
         // selectById 执行时租户上下文已按 token 声明就位（而非默认 1）
         assertThat(tenantAtUserQuery.get()).isEqualTo(2L);
@@ -219,10 +219,7 @@ class AuthServiceLoginTest {
         when(jwtUtil.parse("refresh-token")).thenReturn(claims);
         when(tokenService.consumeRefreshToken("rt-1")).thenReturn(null);
 
-        RefreshRequest request = new RefreshRequest();
-        request.setRefreshToken("refresh-token");
-
-        assertThatThrownBy(() -> authService.refresh(request))
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getCode())
                 .isEqualTo(ResultCode.UNAUTHORIZED.getCode());

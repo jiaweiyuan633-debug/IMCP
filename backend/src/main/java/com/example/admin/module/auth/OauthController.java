@@ -1,6 +1,7 @@
 package com.example.admin.module.auth;
 
 import com.example.admin.common.PageResult;
+import com.example.admin.common.RefreshTokenCookieSupport;
 import com.example.admin.common.Result;
 import com.example.admin.common.annotation.OperLog;
 import com.example.admin.module.auth.dto.OauthAuthorizeUrlRequest;
@@ -15,6 +16,7 @@ import com.example.admin.module.auth.vo.OauthBindingVo;
 import com.example.admin.module.auth.vo.OauthClientVo;
 import com.example.admin.module.auth.vo.OauthConfigVo;
 import com.example.admin.module.auth.vo.OauthProviderVo;
+import com.example.admin.security.JwtProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -45,6 +47,8 @@ public class OauthController {
     private final OauthLoginService oauthLoginService;
     private final OauthConfigService oauthConfigService;
     private final OauthClientService oauthClientService;
+    private final RefreshTokenCookieSupport refreshTokenCookieSupport;
+    private final JwtProperties jwtProperties;
 
     // ---------- 第三方登录 ----------
 
@@ -70,13 +74,23 @@ public class OauthController {
 
     /** 消费一次性登录 ticket。 */
     @PostMapping("/ticket")
-    public Result<LoginResponse> ticket(@RequestBody Map<String, String> body) {
-        return Result.success(oauthLoginService.consumeLoginTicket(body.get("ticket")));
+    public Result<LoginResponse> ticket(@RequestBody Map<String, String> body, HttpServletResponse httpResponse) {
+        LoginResponse response = oauthLoginService.consumeLoginTicket(body.get("ticket"));
+        // P1-F3：OAuth 登录同样把 refresh token 写入 httpOnly Cookie
+        refreshTokenCookieSupport.setRefreshCookie(httpResponse, response.getRefreshToken(),
+                jwtProperties.getRefreshTokenExpireDays() * 24 * 60 * 60L);
+        return Result.success(response);
     }
 
     @PostMapping("/bind")
-    public Result<LoginResponse> bind(@Valid @RequestBody OauthBindRequest request, HttpServletRequest httpRequest) {
-        return Result.success(oauthLoginService.bind(request, httpRequest));
+    public Result<LoginResponse> bind(@Valid @RequestBody OauthBindRequest request,
+                                      HttpServletRequest httpRequest,
+                                      HttpServletResponse httpResponse) {
+        LoginResponse response = oauthLoginService.bind(request, httpRequest);
+        // P1-F3：绑定后登录同样写入 refresh token cookie
+        refreshTokenCookieSupport.setRefreshCookie(httpResponse, response.getRefreshToken(),
+                jwtProperties.getRefreshTokenExpireDays() * 24 * 60 * 60L);
+        return Result.success(response);
     }
 
     @GetMapping("/bindings")

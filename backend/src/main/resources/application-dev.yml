@@ -31,4 +31,8 @@ jwt:
 app:
   totp:
     encryption-key: ${TOTP_ENCRYPTION_KEY:dev-only-totp-encryption-key-please-override}
+  security:
+    # 本地开发关闭默认口令强制改密：保持 admin/admin123 可直接登录（e2e/smoke/load-test 依赖），
+    # 生产由 application-prod.yml 强制开启（V63 迁移标记在 dev 下不生效）
+    force-password-change: ${FORCE_PASSWORD_CHANGE:false}
 

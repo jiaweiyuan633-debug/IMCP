@@ -71,13 +71,18 @@ Java 后端统一响应结构：
 | --- | --- | --- |
 | GET | `/api/auth/login-config` | 登录配置（验证码开关） |
 | GET | `/api/auth/captcha` | 图形验证码 |
-| POST | `/api/auth/login` | 登录，返回 accessToken/refreshToken |
-| POST | `/api/auth/refresh` | 刷新 Token |
-| POST | `/api/auth/logout` | 退出登录 |
+| POST | `/api/auth/login` | 登录，返回 accessToken/refreshToken；refreshToken 同时写入 httpOnly Cookie（批次1） |
+| POST | `/api/auth/refresh` | 刷新 Token：优先读取 httpOnly Cookie，无 Cookie 时回退请求体 refreshToken |
+| POST | `/api/auth/logout` | 退出登录（同时清除 refresh Cookie） |
 | GET | `/api/auth/me` | 当前用户、权限、菜单树 |
-| PUT | `/api/auth/password` | 修改密码 |
+| PUT | `/api/auth/password` | 修改密码（成功后清除"必须改密"标记并记录改密时间） |
 | PUT | `/api/auth/profile` | 编辑个人资料（昵称、邮箱、手机号、头像等） |
 | GET/POST | `/api/auth/totp/*` | 两步验证状态、开启、启用、关闭 |
+
+> **认证安全说明（批次1）**：
+> 1. `refreshToken` 已迁移至 **httpOnly + SameSite=Lax Cookie**（生产 https 下带 Secure），前端脚本无法读取，降低 XSS 窃取长期凭证风险；响应体字段保留供脚本/兼容客户端使用。
+> 2. 登录响应新增 `mustChangePassword` 标记：默认口令首登或密码过期时返回 `true`，前端强制跳转 `/change-password` 改密后才可进入系统（仅生产 profile 开启，本地 dev/test 保持默认口令可直接登录）。
+> 3. 密码过期策略：`password_changed_at` 距今超过 `app.security.password-expire-days`（默认 90 天）即进入强制改密流程。
 
 ## 系统管理
 

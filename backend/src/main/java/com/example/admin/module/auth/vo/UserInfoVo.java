@@ -17,5 +17,6 @@ public class UserInfoVo {
     private List<String> roles;
     private List<String> perms;
     private List<MenuVo> menus;
+    /** 当前用户是否处于"必须修改密码"状态（默认口令首登 / 密码过期）。 */
+    private boolean mustChangePassword;
 }
-

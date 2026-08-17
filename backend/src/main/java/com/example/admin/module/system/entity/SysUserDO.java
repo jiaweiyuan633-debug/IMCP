@@ -26,6 +26,10 @@ public class SysUserDO {
     private Integer status;
     private String totpSecret;
     private Integer totpEnabled;
+    /** 首次登录必须改密（V63，默认口令种子标记为 1；生产由 SecurityProperties.forcePasswordChange 强制执行）。 */
+    private Integer mustChangePassword;
+    /** 上次改密时间（密码过期策略依据，V63）。 */
+    private LocalDateTime passwordChangedAt;
     private LocalDateTime lastLoginTime;
     private Long createdBy;
     private LocalDateTime createdAt;

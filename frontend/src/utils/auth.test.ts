@@ -9,23 +9,26 @@ import {
 } from '@/utils/auth'
 
 /**
- * R4-1.33：凭证存储契约测试。
+ * R4-1.33 + R4-1.47（批次1）：凭证存储契约测试。
  * 覆盖本地读写 + 跨标签页同步（storage 事件驱动的登出广播 / token 刷新）。
  * storage 事件仅在「其他标签页」触发，测试通过手动 dispatch 模拟。
+ *
+ * R4-1.47 变更：refresh token 已迁移后端 httpOnly Cookie，前端不再持久化——
+ * setTokens 仅存 access token；getRefreshToken 恒返回空串。
  */
 describe('auth token storage', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('stores and reads tokens', () => {
-    setTokens('access-1', 'refresh-1')
+  it('stores and reads access token (refresh token no longer persisted)', () => {
+    setTokens('access-1')
     expect(getAccessToken()).toBe('access-1')
-    expect(getRefreshToken()).toBe('refresh-1')
+    expect(getRefreshToken()).toBe('')
   })
 
   it('clears tokens', () => {
-    setTokens('access-1', 'refresh-1')
+    setTokens('access-1')
     clearTokens()
     expect(getAccessToken()).toBe('')
     expect(getRefreshToken()).toBe('')
@@ -46,7 +49,7 @@ describe('auth 跨标签页同步', () => {
   }
 
   it('其他标签页登出广播后同步清空内存并通知订阅者', () => {
-    setTokens('at', 'rt')
+    setTokens('at')
     initAuthSync()
     const listener = vi.fn()
     subscribeAuthCleared(listener)
@@ -59,12 +62,11 @@ describe('auth 跨标签页同步', () => {
   })
 
   it('其他标签页直接清除 token 时同步清空', () => {
-    setTokens('at', 'rt')
+    setTokens('at')
     initAuthSync()
 
     // 模拟其他标签页清除凭证：localStorage 同源共享，此处先删共享存储再派发事件
     localStorage.removeItem('admin_access_token')
-    localStorage.removeItem('admin_refresh_token')
     dispatchStorage('admin_access_token', null)
 
     expect(getAccessToken()).toBe('')
@@ -72,19 +74,17 @@ describe('auth 跨标签页同步', () => {
   })
 
   it('其他标签页刷新 token 时同步内存', () => {
-    setTokens('at', 'rt')
+    setTokens('at')
     initAuthSync()
 
     localStorage.setItem('admin_access_token', 'at2')
-    localStorage.setItem('admin_refresh_token', 'rt2')
     dispatchStorage('admin_access_token', 'at2')
 
     expect(getAccessToken()).toBe('at2')
-    expect(getRefreshToken()).toBe('rt2')
   })
 
   it('subscribeAuthCleared 返回取消订阅函数', () => {
-    setTokens('at', 'rt')
+    setTokens('at')
     initAuthSync()
     const listener = vi.fn()
     const unsubscribe = subscribeAuthCleared(listener)
@@ -96,7 +96,7 @@ describe('auth 跨标签页同步', () => {
   })
 
   it('initAuthSync 幂等：重复调用不导致重复通知', () => {
-    setTokens('at', 'rt')
+    setTokens('at')
     initAuthSync()
     initAuthSync()
     initAuthSync()

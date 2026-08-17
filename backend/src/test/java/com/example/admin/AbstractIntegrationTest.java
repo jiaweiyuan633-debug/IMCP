@@ -1,14 +1,21 @@
 package com.example.admin;
 
+import com.example.admin.security.LoginUser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+
+import java.util.List;
 
 /**
  * 集成测试基类（批次1 可靠性纵深：Testcontainers 补测试金字塔中层）。
@@ -78,5 +85,33 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> String.valueOf(REDIS.getMappedPort(6379)));
         registry.add("spring.data.redis.password", () -> "test");
+    }
+
+    /**
+     * 集成测试以管理员视角运行：统一注入 admin 登录上下文。
+     *
+     * <p>R4-1.37 起部分 Service 方法（如 FormInstanceService.page / ImportExportJobService.page）
+     * 增加 {@code @DataScope} 注解，切面经 {@code SecurityUtils.getLoginUser()} 取当前用户判定
+     * 是否 admin 短路——此前 IT 未注入登录上下文，调用带 @DataScope 的方法即抛「未登录或登录已
+     * 过期」，FormInstanceServiceIT / ImportExportJobServiceIT 从批10起实际处于失效状态（存量
+     * 缺陷，批次1 门禁修复）。admin 角色短路行级过滤，与既有 IT 的全量断言语义一致。
+     */
+    @BeforeEach
+    void setAdminSecurityContext() {
+        LoginUser loginUser = LoginUser.builder()
+                .userId(1L)
+                .deptId(1L)
+                .username("admin")
+                .nickname("系统管理员")
+                .roles(List.of("admin"))
+                .perms(List.of("*"))
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities()));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 }

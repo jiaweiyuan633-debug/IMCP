@@ -3,13 +3,16 @@ import type { AxiosRequestConfig } from 'axios'
 import { message } from 'ant-design-vue'
 import router from '@/router'
 import type { Result } from '@/types'
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/utils/auth'
+import { clearTokens, getAccessToken, setTokens } from '@/utils/auth'
 import { API_BASE_URL } from '@/utils/env'
 import i18n from '@/locales'
 
 const service = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
+  // R4-1.47（批次1·P1-F3）：refresh token 已迁移 httpOnly Cookie，需携带凭证（同源反代无副作用；
+  // dev 直连后端跨域时携带 cookie 依赖后端 CORS allowCredentials 已开启）
+  withCredentials: true,
 })
 
 /**
@@ -54,27 +57,30 @@ service.interceptors.request.use((config) => {
 let refreshPromise: Promise<boolean> | null = null
 
 function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) {
+  // R4-1.47：refresh token 已迁移 httpOnly Cookie，不再从 localStorage 读取；
+  // 无本地 access token 即视为未登录，直接失败
+  if (!getAccessToken()) {
     return Promise.resolve(false)
   }
   if (!refreshPromise) {
-    refreshPromise = doRefresh(refreshToken).finally(() => {
+    refreshPromise = doRefresh().finally(() => {
       refreshPromise = null
     })
   }
   return refreshPromise
 }
 
-async function doRefresh(refreshToken: string): Promise<boolean> {
+async function doRefresh(): Promise<boolean> {
   let failed = false
   try {
+    // refresh token 由 httpOnly Cookie 自动携带（withCredentials），body 不再传
     const response = await axios.post<Result<{ accessToken: string; refreshToken: string }>>(
       `${service.defaults.baseURL}/auth/refresh`,
-      { refreshToken },
+      {},
+      { withCredentials: true },
     )
     if (response.data.code === 0) {
-      setTokens(response.data.data.accessToken, response.data.data.refreshToken)
+      setTokens(response.data.data.accessToken)
       return true
     }
     failed = true
@@ -118,7 +124,13 @@ service.interceptors.response.use(
     if (error.code === 'ERR_CANCELED' || error.__CANCEL__) {
       return Promise.reject(error)
     }
+    // R4-1.47（批次1·P1-F1）：网络错误/超时仅对幂等方法自动重试——
+    // 此前对 POST/PUT/DELETE 无条件重试一次，服务端已落库但响应丢失时会产生
+    // 重复提交（重复用户/重复导入/重复 AI 任务）。写操作改由调用方自行决定重试策略。
+    const method = String(error.config?.method || 'get').toUpperCase()
+    const isIdempotent = ['GET', 'HEAD', 'OPTIONS'].includes(method)
     if (
+      isIdempotent &&
       ['ECONNABORTED', 'ERR_NETWORK'].includes(error.code) &&
       !error.config?.retried
     ) {
@@ -147,4 +159,3 @@ function localizedMessage(code: number | undefined, fallback: string): string {
   const translated = i18n.global.t(key)
   return translated === key ? fallback : translated
 }
-

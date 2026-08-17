@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.admin.common.BusinessException;
 import com.example.admin.common.BusinessMetrics;
 import com.example.admin.common.ResultCode;
+import com.example.admin.config.SecurityProperties;
 import com.example.admin.module.auth.dto.ChangePasswordRequest;
 import com.example.admin.module.auth.dto.LoginRequest;
 import com.example.admin.module.auth.dto.ProfileUpdateRequest;
-import com.example.admin.module.auth.dto.RefreshRequest;
 import com.example.admin.module.auth.dto.TotpCodeRequest;
 import com.example.admin.module.auth.vo.LoginResponse;
 import com.example.admin.module.auth.vo.LoginConfigVo;
@@ -72,6 +72,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TotpService totpService;
     private final BusinessMetrics businessMetrics;
+    private final SecurityProperties securityProperties;
 
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String ip = httpRequest.getRemoteAddr();
@@ -149,6 +150,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .user(toUserInfo(user, roles, perms, menus))
+                .mustChangePassword(mustChangePassword(user))
                 .build();
     }
 
@@ -160,8 +162,11 @@ public class AuthService {
                 .build();
     }
 
-    public LoginResponse refresh(RefreshRequest request) {
-        Claims claims = jwtUtil.parse(request.getRefreshToken());
+    public LoginResponse refresh(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        Claims claims = jwtUtil.parse(refreshToken);
         String refreshJti = claims.getId();
         // R4-1.44：原子消费（GETDEL）替代 hasKey+delete 两步——并发用同一被窃 refresh token
         // 刷新时，原实现两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设；消费返回
@@ -197,15 +202,16 @@ public class AuthService {
 
         String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(),
                 user.getTenantId(), roles, perms);
-        String refreshToken = jwtUtil.createRefreshToken(newRefreshJti, userId, user.getUsername(),
+        String newRefreshToken = jwtUtil.createRefreshToken(newRefreshJti, userId, user.getUsername(),
                 user.getTenantId());
         tokenService.saveAccessToken(accessJti, newRefreshJti);
         tokenService.saveRefreshToken(newRefreshJti, String.valueOf(userId));
 
         return LoginResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
+                .refreshToken(newRefreshToken)
                 .user(toUserInfo(user, roles, perms, menus))
+                .mustChangePassword(mustChangePassword(user))
                 .build();
     }
 
@@ -239,6 +245,9 @@ public class AuthService {
             throw new BusinessException(ResultCode.PASSWORD_ERROR);
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        // 改密成功后清除"必须改密"标记并记录改密时间（密码过期策略从此刻重新计时）
+        user.setMustChangePassword(0);
+        user.setPasswordChangedAt(LocalDateTime.now());
         userMapper.updateById(user);
     }
 
@@ -310,7 +319,34 @@ public class AuthService {
                 .roles(roles == null ? Collections.emptyList() : roles)
                 .perms(perms == null ? Collections.emptyList() : perms)
                 .menus(menus == null ? Collections.emptyList() : menus)
+                .mustChangePassword(mustChangePassword(user))
                 .build();
+    }
+
+    /**
+     * 密码策略判定：是否强制用户改密（批次1·安全阻断）。
+     *
+     * <p>仅在 {@code SecurityProperties.forcePasswordChange} 开启时生效（生产默认开启，
+     * 本地 dev/test 关闭以保持 admin/admin123 的开发与 CI 体验）。两种触发条件：
+     * <ol>
+     *   <li>V63 迁移标记的 {@code must_change_password=1}（仍使用默认种子口令的存量账号）；</li>
+     *   <li>密码过期：{@code password_changed_at} 距今超过 {@code passwordExpireDays} 天
+     *       （默认 90，0 表示禁用过期检查）。</li>
+     * </ol>
+     */
+    private boolean mustChangePassword(SysUserDO user) {
+        if (!securityProperties.isForcePasswordChange()) {
+            return false;
+        }
+        boolean flagged = user.getMustChangePassword() != null && user.getMustChangePassword() == 1;
+        if (flagged) {
+            return true;
+        }
+        int expireDays = securityProperties.getPasswordExpireDays();
+        if (expireDays <= 0 || user.getPasswordChangedAt() == null) {
+            return false;
+        }
+        return user.getPasswordChangedAt().plusDays(expireDays).isBefore(LocalDateTime.now());
     }
 
     private List<MenuVo> buildMenuTree(List<SysMenuDO> menus) {

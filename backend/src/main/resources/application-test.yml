@@ -50,3 +50,6 @@ app:
   mcp:
     # 非 dev 不设默认：缺失时 McpAuthFilter fail-closed 拒绝一切 MCP 连接
     auth-token: ${MCP_AUTH_TOKEN}
+  security:
+    # 测试/联调环境同样关闭默认口令强制改密（CI e2e/smoke 依赖 admin/admin123）
+    force-password-change: ${FORCE_PASSWORD_CHANGE:false}

@@ -1,12 +1,13 @@
 const ACCESS_TOKEN_KEY = 'admin_access_token'
-const REFRESH_TOKEN_KEY = 'admin_refresh_token'
-// R4-1.33：登出广播哨兵键——写时间戳告知其他标签页「本标签页已登出」，
+// R4-1.47（批次1·P1-F3）：refresh token 不再落 localStorage——已迁移到后端 httpOnly Cookie
+// （XSS 无法读取，降低长期会话被脚本窃取的风险）。refresh 轮换由 /auth/refresh 自动完成，
+// 前端仅保留短时 access token 的内存 + localStorage 缓存（刷新页面后凭 cookie 静默续期）。
+// 登出广播哨兵键保留：写时间戳告知其他标签页「本标签页已登出」，
 // 配合 storage 事件让所有标签页同步失效会话（此前 tab A 登出后 tab B 的 token 仍存活）
 const AUTH_CLEARED_KEY = 'admin_auth_cleared_at'
 
 // 内存缓存：避免每次请求重复读 localStorage，且跨标签页清除后本标签页立即失效
 let memoryAccessToken = ''
-let memoryRefreshToken = ''
 
 type AuthClearedListener = () => void
 const clearedListeners = new Set<AuthClearedListener>()
@@ -18,25 +19,23 @@ export function getAccessToken(): string {
   return memoryAccessToken
 }
 
+/**
+ * 兼容旧调用方：refresh token 已迁移 httpOnly Cookie，前端不再持有，恒返回空串。
+ * 401 刷新流程不再依赖本地 refresh token（见 utils/request.ts doRefresh）。
+ */
 export function getRefreshToken(): string {
-  if (!memoryRefreshToken) {
-    memoryRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || ''
-  }
-  return memoryRefreshToken
+  return ''
 }
 
-export function setTokens(accessToken: string, refreshToken: string): void {
+/** 仅持久化 access token（refresh token 由后端 httpOnly Cookie 管理）。 */
+export function setTokens(accessToken: string): void {
   memoryAccessToken = accessToken
-  memoryRefreshToken = refreshToken
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
 }
 
 export function clearTokens(): void {
   memoryAccessToken = ''
-  memoryRefreshToken = ''
   localStorage.removeItem(ACCESS_TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
   // 向其他标签页广播登出（同标签页不会收到自己的 storage 事件，无自触发）
   localStorage.setItem(AUTH_CLEARED_KEY, String(Date.now()))
 }
@@ -61,21 +60,17 @@ function onStorageChange(event: StorageEvent) {
     // 必须连共享存储一起清——getAccessToken 在内存为空时会从 localStorage 回填，
     // 若只清内存，残留 token 会让本标签页会话死灰复燃。
     memoryAccessToken = ''
-    memoryRefreshToken = ''
     localStorage.removeItem(ACCESS_TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
     notifyAuthCleared()
     return
   }
-  if (event.key === ACCESS_TOKEN_KEY || event.key === REFRESH_TOKEN_KEY) {
+  if (event.key === ACCESS_TOKEN_KEY) {
     if (localStorage.getItem(ACCESS_TOKEN_KEY)) {
       // 其他标签页登录/续期刷新了 token → 同步内存
       memoryAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || ''
-      memoryRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || ''
     } else {
       // 其他标签页直接清除了 token
       memoryAccessToken = ''
-      memoryRefreshToken = ''
       notifyAuthCleared()
     }
   }

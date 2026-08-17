@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  *
  * 通过 vi.mock 构造一个可编程的 axios 实例，捕获请求/响应拦截器处理器后直接驱动，
  * 覆盖：成功解包、blob 原样返回、业务码错误 reject、401 刷新重试、刷新失败跳登录、
- * 网络错误自动重试、请求拦截器附加 token、泛型包装方法转发。
+ * 网络错误自动重试（R4-1.47 起仅幂等方法）、请求拦截器附加 token、泛型包装方法转发。
  */
 
 // 可编程 axios 实例 + 捕获的拦截器处理器
@@ -34,7 +34,7 @@ const { requestHandlers, responseHandlers, errorHandlers, instance, axiosPost, a
     const axiosPost = vi.fn()
     const authMocks = {
       getAccessToken: vi.fn(() => 'at'),
-      getRefreshToken: vi.fn(() => 'rt'),
+      getRefreshToken: vi.fn(() => ''),
       setTokens: vi.fn(),
       clearTokens: vi.fn(),
     }
@@ -82,7 +82,7 @@ describe('request 拦截器', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     authMocks.getAccessToken.mockReturnValue('at')
-    authMocks.getRefreshToken.mockReturnValue('rt')
+    authMocks.getRefreshToken.mockReturnValue('')
   })
 
   it('成功响应解包为 Result.data', async () => {
@@ -123,7 +123,8 @@ describe('request 拦截器', () => {
       config: { retried: false, headers: {} },
     })
 
-    expect(authMocks.setTokens).toHaveBeenCalledWith('at2', 'rt2')
+    // R4-1.47：setTokens 只持久化 access token（refresh token 走 httpOnly Cookie）
+    expect(authMocks.setTokens).toHaveBeenCalledWith('at2')
     expect(instance.request).toHaveBeenCalledWith(
       expect.objectContaining({ retried: true, headers: { Authorization: 'Bearer at' } }),
     )
@@ -141,19 +142,24 @@ describe('request 拦截器', () => {
     expect(routerPush).toHaveBeenCalledWith('/login')
   })
 
-  it('无 refreshToken 时直接 reject 且不跳转', async () => {
-    authMocks.getRefreshToken.mockReturnValue('')
+  it('无本地 access token 时刷新直接失败（不跳转、不清 token）', async () => {
+    authMocks.getAccessToken.mockReturnValue('')
 
     await expect(
       onFulfilled({ data: { code: 401, message: '未认证' }, config: { retried: false, headers: {} } }),
     ).rejects.toMatchObject({ code: 401 })
+    expect(axiosPost).not.toHaveBeenCalled()
     expect(authMocks.clearTokens).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
   })
 
-  it('网络错误自动重试一次', async () => {
+  it('GET 网络错误自动重试一次', async () => {
     instance.request.mockResolvedValue('网络重试后的数据')
-    const error = { code: 'ERR_NETWORK', config: { retried: false, headers: {} }, message: 'Network Error' }
+    const error = {
+      code: 'ERR_NETWORK',
+      config: { retried: false, headers: {}, method: 'get' },
+      message: 'Network Error',
+    }
 
     vi.useFakeTimers()
     const promise = onRejected(error)
@@ -163,6 +169,29 @@ describe('request 拦截器', () => {
 
     expect(instance.request).toHaveBeenCalledWith(expect.objectContaining({ retried: true }))
     expect(result).toBe('网络重试后的数据')
+  })
+
+  it('POST 网络错误不自动重试（幂等保护，R4-1.47）', async () => {
+    const error = {
+      code: 'ERR_NETWORK',
+      config: { retried: false, headers: {}, method: 'post' },
+      message: 'Network Error',
+    }
+
+    await expect(onRejected(error)).rejects.toBe(error)
+    expect(instance.request).not.toHaveBeenCalled()
+  })
+
+  it('PUT/DELETE 网络错误不自动重试（写操作幂等保护）', async () => {
+    for (const method of ['put', 'delete']) {
+      const error = {
+        code: 'ERR_NETWORK',
+        config: { retried: false, headers: {}, method },
+        message: 'Network Error',
+      }
+      await expect(onRejected(error)).rejects.toBe(error)
+    }
+    expect(instance.request).not.toHaveBeenCalled()
   })
 
   it('错误分支 401 刷新成功后重放请求', async () => {
