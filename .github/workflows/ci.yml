@@ -88,6 +88,9 @@ jobs:
           fetch-depth: 0
       - name: Gitleaks secrets scan
         uses: gitleaks/gitleaks-action@v2
+        with:
+          # 批次7（R4-1.53）：显式 fail——该 action 默认只出报告不失败，密钥门禁形同虚设
+          fail: true
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@0.29.0
         with:

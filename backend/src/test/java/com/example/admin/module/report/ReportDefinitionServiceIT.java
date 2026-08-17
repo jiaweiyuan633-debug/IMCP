@@ -136,6 +136,62 @@ class ReportDefinitionServiceIT extends AbstractIntegrationTest {
                 .containsExactly("租户2报表");
     }
 
+    // ---------- 批次7（R4-1.53）：报表执行引擎真实 MySQL 补强测试 ----------
+
+    @Test
+    void executeRejectsSensitiveColumnQuery() {
+        // 报表查询命中凭据列（sys_user.password）必须拒绝——先建合法报表再直改库，
+        // 验证执行期守卫拦截（保存期校验同样会拦，但这里验证执行路径的纵深）
+        Long id = reportDefinitionService.create(request("IT-REP-200", "敏感列报表", "SELECT 1 AS one"));
+        jdbcTemplate.update("UPDATE report_definition SET data_source = ? WHERE id = ?",
+                "SELECT password FROM sys_user", id);
+
+        ReportExecuteRequest executeRequest = new ReportExecuteRequest();
+        executeRequest.setParams(Map.of());
+        assertThatThrownBy(() -> reportDefinitionService.execute(id, executeRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.REPORT_SQL_INVALID.getMessage());
+    }
+
+    @Test
+    void executeCapsResultRowsToConfiguredLimit() {
+        // 批量插入验证 LIMIT 封顶：guard 追加/收紧 app.report.max-rows（默认 5000，IT 用默认配置）
+        TenantContext.setTenantId(1L);
+        jdbcTemplate.update("INSERT INTO sys_device (tenant_id, device_code, device_name, status) VALUES (1, 'IT-DEV-700', 'cap测试', 1)");
+        for (int i = 1; i <= 3; i++) {
+            jdbcTemplate.update("INSERT INTO sys_device (tenant_id, device_code, device_name, status) VALUES (1, ?, 'cap测试', 1)",
+                    "IT-DEV-70" + i);
+        }
+        Long id = reportDefinitionService.create(
+                request("IT-REP-202", "行数封顶", "SELECT id FROM sys_device WHERE device_name = 'cap测试'"));
+        // 直接改库写入超大 LIMIT，验证 guard 收紧到配置上限
+        jdbcTemplate.update("UPDATE report_definition SET data_source = ? WHERE id = ?",
+                "SELECT id FROM sys_device WHERE device_name = 'cap测试' LIMIT 1000000", id);
+
+        ReportExecuteRequest executeRequest = new ReportExecuteRequest();
+        executeRequest.setParams(Map.of());
+        ReportExecuteResultVo result = reportDefinitionService.execute(id, executeRequest);
+
+        // 存在上限配置（默认 5000）且实际只有 4 行——断言结果不超上限且能取到数据
+        assertThat(result.getRows().size()).isLessThanOrEqualTo(5000);
+        assertThat(result.getRows().size()).isGreaterThanOrEqualTo(1);
+        // 清理测试数据
+        jdbcTemplate.update("DELETE FROM sys_device WHERE device_code LIKE 'IT-DEV-70%'");
+    }
+
+    @Test
+    void executeRejectsMultiStatementInjection() {
+        // 多语句注入：即使绕过保存校验直改库，执行期守卫必须拒绝（防拼接写库）
+        Long id = reportDefinitionService.create(request("IT-REP-203", "多语句", "SELECT 1 AS one"));
+        jdbcTemplate.update("UPDATE report_definition SET data_source = ? WHERE id = ?",
+                "SELECT 1; DROP TABLE sys_device", id);
+
+        ReportExecuteRequest executeRequest = new ReportExecuteRequest();
+        executeRequest.setParams(Map.of());
+        assertThatThrownBy(() -> reportDefinitionService.execute(id, executeRequest))
+                .isInstanceOf(BusinessException.class);
+    }
+
     private ReportDefinitionSaveRequest request(String code, String name, String dataSource) {
         ReportDefinitionSaveRequest request = new ReportDefinitionSaveRequest();
         request.setCode(code);

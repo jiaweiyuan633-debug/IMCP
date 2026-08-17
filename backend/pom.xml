@@ -329,6 +329,26 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <!-- 批次7（R4-1.53）：SpotBugs 静态分析——先以 report 模式接入（不 enforce，
+                 避免存量问题阻塞构建），CI 可产出门禁报告供人工审阅；存量问题清零后再
+                 切换 enforce 模式（spotbugs:check 绑 verify）成为硬门禁。 -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.8.6.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
