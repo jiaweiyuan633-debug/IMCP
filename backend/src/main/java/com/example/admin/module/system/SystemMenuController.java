@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "菜单管理", description = "菜单与按钮权限树")
 @RestController
 @RequestMapping("/api/system/menu")
 @RequiredArgsConstructor

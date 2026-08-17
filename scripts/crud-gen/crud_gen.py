@@ -216,6 +216,15 @@ def build_model(spec: dict) -> dict:
         "comment": comment,
         "package": package,
         "permPrefix": perm_prefix,
+        "datascope": bool(spec.get("datascope")),
+        # 批次8（R4-1.54）：datascope=true 时注入行级数据权限注解/import/租户行，否则为空串。
+        # 模板引擎无 [[if]]，用预展开片段实现条件输出（见 EntityService.java.tpl）
+        "datascope_import": ("import com.example.admin.common.annotation.DataScope;\n"
+                             "import com.example.admin.common.TenantContext;\n")
+        if spec.get("datascope") else "",
+        "datascope_annotation": "@DataScope(tables = {\"%s\"})\n    " % table if spec.get("datascope") else "",
+        "datascope_tenant_line": "        entity.setTenantId(TenantContext.getTenantId());\n"
+        if spec.get("datascope") else "",
         "imports": "\n".join(extra_imports) if extra_imports else "",
         "fields_do": [do_line(f) for f in fields],
         "fields_query": [query_line(f) for f in fields],

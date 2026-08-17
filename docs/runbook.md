@@ -82,7 +82,52 @@ scripts/load-test-multi.ps1
 - 部署只走 Helm Chart（`k8s/helm/admin-scaffold`）或 ArgoCD，禁止直接 `kubectl apply` 零散资源，避免清单漂移
 - 配置 `JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、数据库密码、AI 回调 Token
 - 确认上传卷存储类为 RWX（`--set storage.className=...`），Redis 单点则按需启用哨兵
-- 开启 HTTPS 与 WAF
+- 开启 HTTPS 与 WAF（`--set ingress.tls.enabled=true --set ingress.forceHttps=true`）
 - 配置 Prometheus + Grafana 告警
 - 执行备份演练
 - 验证租户隔离和数据权限
+
+## 生产运维（批次8·R4-1.54）
+
+### 告警处置对照表
+
+| 告警 | 触发 | 影响 | 排查步骤 |
+| --- | --- | --- | --- |
+| AdminBackendDown / AIServiceDown | `up==0` 2 分钟 | 服务不可用 | `kubectl get pods -n admin-scaffold`；`kubectl logs -l app=<release>-backend --tail=200`；检查资源/探针/网络策略 |
+| BackendHighErrorRate | 5xx >5% 5 分钟 | 接口故障 | Grafana 按 `application/instance/uri` 定位；检查日志异常堆栈、下游依赖 |
+| BackendHighLatency | P95 >1s | 体验劣化 | 定位慢接口；检查慢 SQL（`sys_sql_log`）、外部调用、GC |
+| BackendJvmHeapHighUsage | 堆 >90% | OOM 风险 | dump 分析（`jmap -dump`）；检查泄漏；必要时扩容 |
+| BackendThreadsBusy | Tomcat 忙线程 >90% | 请求排队 | 检查慢请求/线程泄漏；扩容副本 |
+| RedisDown / MySqlDown | exporter 不可达 | 全站故障 | 检查对应 Pod/云实例；注意**需启用 prometheus.yml 对应 exporter job** |
+| OutboxDeadLetterAccumulating | 发件箱投递失败 | 消息/回调缺失 | 查 `sys_outbox` 表；检查回调端点/网络 |
+| AiDeadLetterQueueGrowth | AI 重试耗尽 >10/h | AI 任务失败 | 查死信（AI `/api/v1/tasks/dead`）；检查 LLM Provider 配置/配额 |
+| PersistentVolumeAlmostFull | PVC >85% | 写入失败 | 清理或扩容 PVC |
+
+### 水平扩容
+
+- 应用：`helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold --set replicas.backend=4 ...`
+  （HPA 默认 cpu 70% 自动扩 2~6 副本，依赖 metrics-server）。扩 AI 副本会把 LLM 并发翻倍，
+  先核对 Provider RPM/TPM 配额。
+- 数据库：MySQL 升配/读写分离（云 RDS 优先）；Redis 启用哨兵/集群（`config.redisSentinel*`）。
+- 上传卷：PVC 扩容（按存储类能力）或迁移更大 RWX 卷。
+
+### 密钥轮换流程（分批，避免全站中断）
+
+1. **DB 密码**：云 RDS 改密 → 更新 Secret（ESO 同步或 `kubectl edit secret`）→
+   `kubectl -n admin-scaffold rollout restart deployment/admin-scaffold-backend`。
+2. **JWT_SECRET**：生成新密钥 → 更新 Secret → 滚动重启 backend（存量 access token 失效，
+   用户需重新登录；刷新令牌同样失效，属预期）。
+3. **TOTP_ENCRYPTION_KEY**：生成新密钥 → 更新 Secret → 滚动重启 backend。注意：存量
+   TOTP 密钥按旧 key 加密，换 key 后所有已绑定 TOTP 用户的动态码失效，需重新绑定——
+   建议在低峰窗口执行并提前通知，或先轮换再让用户重绑。
+4. **AI AUTH_TOKEN / MCP_AUTH_TOKEN**：更新 Secret → 同时滚动重启 backend 与 ai-service
+   （两处必须一致，否则 401/回调签名失败）。
+5. 轮换后验证：`scripts/smoke.ps1` 全绿 + 一次真实登录 + 一次 AI 任务。
+
+### 版本升级与回滚
+
+- 升级：`helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold --namespace admin-scaffold
+  --set images.backend=<new-sha> ...`（生产 values 固定 sha 镜像，见 `gitops/argocd/values-prod.yaml`）。
+- 大版本 Flyway 迁移：先备份数据库 → 单副本试跑迁移 → 验证后全量滚动。
+- 回滚：`helm rollback admin-scaffold <revision>`（回滚前确认数据库迁移已兼容——
+  Flyway 前向迁移不可逆，若本次含破坏性迁移需先恢复数据库备份再回滚应用）。

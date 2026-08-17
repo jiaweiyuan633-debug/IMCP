@@ -22,7 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "用户管理", description = "用户 CRUD/状态/角色授权/导入导出")
 @RestController
 @RequestMapping("/api/system/user")
 @RequiredArgsConstructor

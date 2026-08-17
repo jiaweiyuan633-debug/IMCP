@@ -25,12 +25,18 @@ python scripts/crud-gen/crud_gen.py path/to/spec.json --dry-run                 
   "table": "device_alarm_rule",        // 数据库表名
   "comment": "设备告警规则",            // 中文说明，用于类注释 / OperLog / 页面标题
   "permPrefix": "device:alarm-rule",   // 权限编码前缀（默认 module:kebab）
+  "datascope": true,                   // 可选：true 时 Service 生成 @DataScope 注解 + create 注入租户（默认 false）
   "fields": [
     { "name": "name", "type": "String", "comment": "规则名称", "queryLike": true, "required": true, "max": 50 },
     { "name": "severity", "type": "Integer", "comment": "级别", "queryEq": true, "required": true }
   ]
 }
 ```
+
+> **`datascope`（批次8·R4-1.54）**：仅当业务确需行级数据权限时置 `true`——生成
+> `@DataScope(tables = {"表名"})` 注解与 `create` 的 `setTenantId` 注入。启用后必须
+> 在 `sys_data_permission` 注册本表规则，否则 filter 激活但无规则时按无过滤处理
+> （详见 `docs/architecture-conventions.md` 数据权限章节）。默认 `false` 生成普通 CRUD。
 
 字段属性：
 
@@ -69,9 +75,11 @@ python scripts/crud-gen/crud_gen.py path/to/spec.json --dry-run                 
 
 ## 生成后必做
 
-1. 按 `docs/database/README.md` 的约定补一张 Flyway 迁移创建 `table`（含 `tenant_id/created_at/updated_at/created_by/updated_by/version/deleted` 列），并在 `sys_data_permission` 注册数据权限（如需）。
+1. 按 `docs/database/README.md` 的约定补一张 Flyway 迁移创建 `table`（含 `tenant_id/created_at/updated_at/created_by/updated_by/version/deleted` 列）；若 `spec.datascope=true`，同时创建 `sys_data_permission` 规则。
 2. 按 V60 之后的菜单迁移规范，用 `perm` 动态解析为新模块插入菜单与按钮并授权 `role_id=1`。
-3. 运行 `mvn -o test` 确保生成的 Service 有单元测试（JaCoCo 门禁会拦截未测试的新代码）。
+3. **i18n（批次8·R4-1.54）**：生成的 `index.vue` 页面文案为中文直写（生成器不产 i18n 文件），合入基线前必须把页面文案改为 `zh-CN.ts`/`en-US.ts` 语言包 key（当前平台全量中英文国际化是交付红线，中文直写页会破坏 en-US 界面）。
+4. **数据权限（批次8·R4-1.54）**：`spec.datascope=true` 生成的 `@DataScope` 只约束列表查询；按 id 直查的写路径（update/delete 等）必须按 `docs/architecture-conventions.md` 补单条归属校验（`loadXxxOrThrow` + `checkDataScope`，admin 短路）。
+5. 运行 `mvn -o test` 确保生成的 Service 有单元测试（JaCoCo 门禁会拦截未测试的新代码）。
 
 ## 开发与测试
 

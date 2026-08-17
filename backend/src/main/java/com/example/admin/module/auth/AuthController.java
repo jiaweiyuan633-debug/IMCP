@@ -23,7 +23,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "认证", description = "登录/登出/Token 刷新/个人中心/两步验证")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

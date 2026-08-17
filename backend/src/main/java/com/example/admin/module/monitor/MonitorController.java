@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "监控", description = "服务器/SQL/登录日志/操作日志/缓存/在线用户")
 @RestController
 @RequestMapping("/api/monitor")
 @RequiredArgsConstructor

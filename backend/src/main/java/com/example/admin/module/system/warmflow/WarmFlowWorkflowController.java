@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "工作流", description = "流程实例/审批/驳回/撤回/转办")
 @RestController
 @RequestMapping("/api/system/workflow-engine")
 @RequiredArgsConstructor

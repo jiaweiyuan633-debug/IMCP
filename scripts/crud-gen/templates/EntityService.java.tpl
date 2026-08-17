@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-
+{{datascope_import}}
 /**
  * {{comment}}服务：分页查询、详情、新增、编辑、删除。
+ * 批次8（R4-1.54）：spec.datascope=true 时生成行级数据权限注解（@DataScope）与租户上下文
+ * 注入；启用后需在 sys_data_permission 注册本表规则（见 README「生成后必做」）。
  */
 @Service
 @RequiredArgsConstructor
@@ -26,7 +28,7 @@ public class {{Entity}}Service {
 
     private final {{Entity}}Mapper {{entity}}Mapper;
 
-    public PageResult<{{Entity}}Vo> page({{Entity}}Query query) {
+    {{datascope_annotation}}public PageResult<{{Entity}}Vo> page({{Entity}}Query query) {
         Page<{{Entity}}DO> page = new Page<>(query.getPageNum(), query.getPageSize());
         LambdaQueryWrapper<{{Entity}}DO> wrapper = new LambdaQueryWrapper<{{Entity}}DO>()
 [[for:where_lines]]{{item}}
@@ -42,7 +44,7 @@ public class {{Entity}}Service {
 
     public Long create({{Entity}}SaveRequest request) {
         {{Entity}}DO entity = toEntity(request);
-        {{entity}}Mapper.insert(entity);
+{{datascope_tenant_line}}        {{entity}}Mapper.insert(entity);
         return entity.getId();
     }
 

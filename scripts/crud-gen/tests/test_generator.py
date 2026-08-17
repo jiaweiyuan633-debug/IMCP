@@ -134,6 +134,34 @@ class GenerateTest(unittest.TestCase):
                     self.assertNotRegex(line, r"^\s*\{\{", "残留模板行：%s:%s" % (rel, i))
 
 
+class DataScopeGenerationTest(unittest.TestCase):
+    """批次8（R4-1.54）：spec.datascope=true 时生成 @DataScope 注解、import 与租户上下文注入。"""
+
+    def setUp(self):
+        spec = load_example()
+        spec["datascope"] = True
+        self.service = generate(spec, TEMPLATES)[
+            "backend/src/main/java/com/example/admin/module/device/AlarmRuleService.java"]
+
+    def test_injects_data_scope_annotation_and_import(self):
+        # 单行模式 ^ 只匹配整体开头，断言用无锚定正则（行内查找注解行内容）
+        self.assertRegex(self.service, r"@DataScope\(tables\s*=\s*\{\s*\"device_alarm_rule\"\s*\}\)",
+                         "应生成 @DataScope 注解行")
+        self.assertIn("import com.example.admin.common.annotation.DataScope;", self.service)
+
+    def test_injects_tenant_context_on_create(self):
+        self.assertIn("entity.setTenantId(TenantContext.getTenantId());", self.service)
+
+    def test_datascope_false_yields_no_annotation(self):
+        spec = load_example()  # 默认无 datascope
+        service = generate(spec, TEMPLATES)[
+            "backend/src/main/java/com/example/admin/module/device/AlarmRuleService.java"]
+        # 注释文本可能提及 @DataScope，断言实际注解行与 import 不存在即可
+        self.assertNotRegex(service, r"^\s*@DataScope\(", "不应生成 @DataScope 注解")
+        self.assertNotIn("import com.example.admin.common.annotation.DataScope;", service)
+        self.assertNotIn("TenantContext.getTenantId()", service)
+
+
 class SpecValidationTest(unittest.TestCase):
     def test_missing_required_key_raises(self):
         with self.assertRaises(SpecError):

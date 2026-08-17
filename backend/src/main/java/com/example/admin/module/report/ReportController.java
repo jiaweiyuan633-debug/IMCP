@@ -15,7 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "报表", description = "报表执行与定义")
 @RestController
 @RequestMapping("/api/report")
 @RequiredArgsConstructor

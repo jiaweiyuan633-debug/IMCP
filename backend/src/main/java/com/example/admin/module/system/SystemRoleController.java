@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "角色管理", description = "角色 CRUD/菜单授权/数据权限")
 @RestController
 @RequestMapping("/api/system/role")
 @RequiredArgsConstructor
