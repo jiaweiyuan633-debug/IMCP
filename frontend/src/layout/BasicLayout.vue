@@ -239,6 +239,10 @@ let messageSocket: WebSocket | null = null
 let noticeRetryCount = 0
 const NOTICE_MAX_RETRY = 5
 let noticeDisposed = false
+// 批次5（R4-1.51）：消息 WebSocket 受控重连——与 SSE 同模式（指数退避/上限/卸载停连）
+let messageRetryCount = 0
+const MESSAGE_MAX_RETRY = 5
+let messageDisposed = false
 let unsubscribeAuthCleared: (() => void) | null = null
 const mobileDrawer = ref(false)
 const isMobile = ref(false)
@@ -281,6 +285,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   noticeDisposed = true
+  messageDisposed = true
   unsubscribeAuthCleared?.()
   unsubscribeAuthCleared = null
   window.removeEventListener('resize', onResize)
@@ -528,33 +533,53 @@ function scheduleNoticeReconnect() {
 }
 
 function startMessageSocket() {
-  if (messageSocket) {
+  // 批次5（R4-1.51）：WS 受控重连——此前 onclose/onerror 仅置空不重连，
+  // 消息实时推送一旦断开即永久失效；现与 noticeStream 一致：指数退避、有上限、
+  // 组件卸载后不再重连
+  if (messageSocket || messageDisposed || messageRetryCount >= MESSAGE_MAX_RETRY) {
     return
   }
   // WS 鉴权同样走短期一次性 ticket，不在 URL 上暴露长期 access token
   getNoticeSseTicket()
     .then((ticket) => {
-      if (messageSocket) {
+      if (messageSocket || messageDisposed) {
         return
       }
       const wsBase = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
       const socket = new WebSocket(`${wsBase}/ws/messages?ticket=${encodeURIComponent(ticket)}`)
+      socket.onopen = () => {
+        messageRetryCount = 0
+      }
       socket.onmessage = async () => {
         await refreshNoticeItems()
         unreadCount.value = await getUnreadTotal()
       }
       socket.onclose = () => {
         messageSocket = null
+        scheduleMessageReconnect()
       }
       socket.onerror = () => {
         socket.close()
         messageSocket = null
+        scheduleMessageReconnect()
       }
       messageSocket = socket
     })
     .catch(() => {
       messageSocket = null
+      scheduleMessageReconnect()
     })
+}
+
+function scheduleMessageReconnect() {
+  if (messageDisposed || messageRetryCount >= MESSAGE_MAX_RETRY) {
+    return
+  }
+  messageRetryCount += 1
+  const delay = Math.min(1000 * 2 ** (messageRetryCount - 1), 30000)
+  setTimeout(() => {
+    startMessageSocket()
+  }, delay)
 }
 </script>
 

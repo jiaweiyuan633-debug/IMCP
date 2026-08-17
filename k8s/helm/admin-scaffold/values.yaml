@@ -147,4 +147,14 @@ secret:
 
 ingress:
   host: admin.example.com
+  # 批次5（R4-1.51）：TLS 与上传体积——原 Chart 无 TLS（生产 HTTP 明文）+ 无
+  # proxy-body-size（网关默认 1MB，后端允许 20MB 上传必 413）
+  tls:
+    enabled: false
+    # cert-manager ClusterIssuer 名称（如 letsencrypt-prod / ca-issuer）
+    clusterIssuer: ""
+  # 强制 HTTPS 跳转（ingress-nginx force-ssl-redirect）
+  forceHttps: false
+  # 上传请求体上限（与后端 multipart max-file-size 对齐，默认 20m）
+  proxyBodySize: "20m"
 

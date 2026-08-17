@@ -64,7 +64,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 
 - **指标可视化（Grafana）**：`k8s/monitoring/grafana/` 提供 Grafana Deployment + Service 与预置配置（Prometheus 数据源、Dashboard 提供方、平台总览 dashboard JSON）。配置以独立文件为单一来源，按该目录 `README.md` 部署（含创建 `monitoring` 命名空间；Prometheus 需预先部署于该命名空间，仓库不含其服务端清单）。
 - **链路追踪（Zipkin）**：后端已内置 Micrometer Tracing（Brave），设置 `config.zipkinEndpoint` 后 Chart 注入 `MANAGEMENT_TRACING_ENABLED=true` + `ZIPKIN_ENDPOINT` 自动上报；留空时注入 `MANAGEMENT_TRACING_ENABLED=false` 显式关闭（见上表）。本地演示：`docker compose --profile monitoring up -d zipkin`（`openzipkin/zipkin:3`，端口 9411）；生产可在集群内自部署 Zipkin，把端点配到 `config.zipkinEndpoint` 即可。
-- **采集**：`k8s/monitoring/prometheus.yml` 抓取目标以 FQDN 跨命名空间指向业务 Service（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080` / `admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000`，随 Helm release/命名空间变化）；注意 ai-service 抓取端点为 `/api/v1/metrics`（已修正，`/metrics` 会 404 误报宕机）。
+- **采集**：`k8s/monitoring/prometheus.yml` 抓取目标以 FQDN 跨命名空间指向业务 Service（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080` / `admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000`，随 Helm release/命名空间变化）；注意 ai-service 抓取端点为根路径 `/metrics`（批次5·R4-1.51 修正：此前文档误述为 `/api/v1/metrics`，与代码不符会 404 误报宕机）。
 - **告警**：`k8s/monitoring/prometheus-rules.yml` + `alertmanager.yml` 为告警收敛路由配置。
 
 生产建议：

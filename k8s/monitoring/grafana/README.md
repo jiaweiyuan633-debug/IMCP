@@ -49,6 +49,6 @@ kubectl -n monitoring port-forward svc/grafana 3000:3000
 ## 指标说明
 
 - 后端（Spring Boot + Micrometer）：`/actuator/prometheus`，指标带 `application=admin-backend` 标签。
-- AI 服务（FastAPI + prometheus_client）：`/api/v1/metrics`（注意：`prometheus.yml` 中该 job 的 `metrics_path` 已修正为 `/api/v1/metrics`，原先 `/metrics` 会抓取 404 误报服务宕机）。
+- AI 服务（FastAPI + prometheus_client）：`/metrics`（根路径，`prometheus.yml` 中该 job 的 `metrics_path` 为 `/metrics`；批次5·R4-1.51 修正了此前误述的 `/api/v1/metrics`——与代码不符会抓取 404 误报服务宕机）。
 - 跨命名空间：`prometheus.yml` 的抓取目标用全限定名（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080`），Prometheus 部署于 `monitoring` 命名空间、跨命名空间抓取 `admin-scaffold` 命名空间的业务 Service（Helm release=admin-scaffold）；若 release/命名空间不同，需同步修改 `prometheus.yml` 的 targets FQDN。
 - AI 服务目前仅暴露进程级指标（CPU/RSS/版本/存活），业务自定义指标可后续在 `app/api/routes.py` 的 `/metrics` 端点补充。

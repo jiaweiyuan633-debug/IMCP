@@ -459,7 +459,26 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
+  {{- /* 批次5（R4-1.51）：TLS（cert-manager）+ 强制 HTTPS + 上传体积——原 Chart 无
+     TLS（生产 HTTP 明文）、无 proxy-body-size（网关默认 1MB，后端允许 20MB 上传必 413）。
+     任一配置开启时输出 annotations 块；proxyBodySize 默认 20m 恒输出。 */ -}}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+    {{- if .Values.ingress.forceHttps }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- end }}
+    {{- if ne .Values.ingress.proxyBodySize "0" }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.ingress.proxyBodySize | quote }}
+    {{- end }}
 spec:
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Release.Name }}-tls
+  {{- end }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:
@@ -484,6 +503,15 @@ spec:
           # 仍为其签发令牌）同源直达后端，FileAccessFilter 仍校验令牌。此前缺失导致存量文件/头像
           # 在 K8s 落入 SPA 回退返回 index.html（R4-1.42 与批14 docker nginx 补 /files 对齐）
           - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-backend
+                port:
+                  number: 8080
+          # 批次5（R4-1.51）：站内消息 WebSocket 直达后端——此前 /ws 落入 path:/ →
+          # frontend → SPA 回退返回 index.html，WS 握手必然失败
+          - path: /ws
             pathType: Prefix
             backend:
               service:

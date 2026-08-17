@@ -1,6 +1,7 @@
 """应用级 Prometheus 指标（R4-1.8）。
 
-默认注册表已含进程级指标（process_* / python_* 等），/metrics 由 routes.py 提供。
+默认注册表已含进程级指标（process_* / python_* 等），/metrics 由 main.py 提供
+（根路径，批次5·R4-1.51 修正过时注释——此前误述由 routes.py 提供）。
 此处补充 ai-service 业务指标，让运维在 Prometheus/Grafana 里直接观察任务吞吐与
 队列水位，而不必逐个查 Redis：
 

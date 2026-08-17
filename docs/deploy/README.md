@@ -95,7 +95,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 
 - 后端健康检查：`/actuator/health`（Kubernetes 探针细分使用 `/actuator/health/readiness` 与 `/actuator/health/liveness`）
 - 后端指标：`/actuator/prometheus`（Micrometer，指标带 `application=admin-backend` 标签）
-- AI 指标：`/api/v1/metrics`
+- AI 指标：`/metrics`（根路径；批次5·R4-1.51 修正了此前误述的 `/api/v1/metrics`——与代码不符会抓取 404）
 - **Prometheus 本体需预先部署**：本仓库仅提供采集/告警配置与 Grafana 数据源，不含 Prometheus 服务端清单。本地演示：`docker run -d --name prometheus -p 9090:9090 -v "$(pwd)/k8s/monitoring:/etc/prometheus:ro" prom/prometheus --config.file=/etc/prometheus/prometheus.yml`；生产：`helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n monitoring`。
 - **命名空间对齐（关键）**：监控栈（Prometheus + Grafana）部署于 `monitoring` 命名空间，`prometheus.yml` 抓取目标用全限定名跨命名空间指向 `admin-scaffold` 命名空间的业务 Service（`admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080` / `admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000`）。若 Helm release 或命名空间不同，须同步修改 `prometheus.yml` 的 targets FQDN。
 - 采集配置与告警规则位于 [k8s/monitoring/](../../k8s/monitoring/)：
@@ -125,7 +125,7 @@ helm upgrade --install admin-scaffold ./k8s/helm/admin-scaffold \
 ### 可视化（Grafana）
 
 - `k8s/monitoring/grafana/` 提供 Grafana Deployment + 预置 Prometheus 数据源 + 平台总览 dashboard（后端 JVM/HTTP/连接池、AI 服务进程指标），按该目录 `README.md` 部署（含创建 `monitoring` 命名空间；Prometheus 需预先部署于该命名空间）
-- 指标来源：后端 `/actuator/prometheus`、AI 服务 `/api/v1/metrics`（`prometheus.yml` 的 ai-service job 已修正为此路径）
+- 指标来源：后端 `/actuator/prometheus`、AI 服务 `/metrics`（`prometheus.yml` 的 ai-service job 已修正为此路径）
 
 ## 4. 运维脚本
 
