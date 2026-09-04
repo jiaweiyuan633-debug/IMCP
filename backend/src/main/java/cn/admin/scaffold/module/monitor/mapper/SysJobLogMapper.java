@@ -1,0 +1,10 @@
+package cn.admin.scaffold.module.monitor.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import cn.admin.scaffold.module.monitor.entity.SysJobLogDO;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface SysJobLogMapper extends BaseMapper<SysJobLogDO> {
+}
+

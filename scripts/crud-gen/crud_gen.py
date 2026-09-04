@@ -29,7 +29,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 
-BASE_PACKAGE = "com.example.admin.module"
+BASE_PACKAGE = "cn.admin.scaffold.module"
 
 # Java 类型 → TypeScript 类型
 TS_TYPE_MAP = {
@@ -219,8 +219,8 @@ def build_model(spec: dict) -> dict:
         "datascope": bool(spec.get("datascope")),
         # 批次8（R4-1.54）：datascope=true 时注入行级数据权限注解/import/租户行，否则为空串。
         # 模板引擎无 [[if]]，用预展开片段实现条件输出（见 EntityService.java.tpl）
-        "datascope_import": ("import com.example.admin.common.annotation.DataScope;\n"
-                             "import com.example.admin.common.TenantContext;\n")
+        "datascope_import": ("import cn.admin.scaffold.common.annotation.DataScope;\n"
+                             "import cn.admin.scaffold.common.TenantContext;\n")
         if spec.get("datascope") else "",
         "datascope_annotation": "@DataScope(tables = {\"%s\"})\n    " % table if spec.get("datascope") else "",
         "datascope_tenant_line": "        entity.setTenantId(TenantContext.getTenantId());\n"

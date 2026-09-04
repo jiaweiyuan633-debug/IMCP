@@ -17,7 +17,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>cn.admin.scaffold</groupId>
     <artifactId>admin-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>admin-backend</name>
@@ -329,9 +329,12 @@
                     </excludes>
                 </configuration>
             </plugin>
-            <!-- 批次7（R4-1.53）：SpotBugs 静态分析——先以 report 模式接入（不 enforce，
-                 避免存量问题阻塞构建），CI 可产出门禁报告供人工审阅；存量问题清零后再
-                 切换 enforce 模式（spotbugs:check 绑 verify）成为硬门禁。 -->
+            <!-- 批次7（R4-1.53）接入；批次9（R4-1.55）由 report-only 切为硬门禁。
+                 enforce 语义（本地实测 4.8.6.4）：<failOnError>false</failOnError> 时无论多少
+                 bug 均不失败（纯报告）；切 true 后 check 在存在未豁免 bug 时即失败并输出
+                 "failed with N bugs"。存量 445 条经 backend/spotbugs-exclude.xml 白名单
+                 （Lombok 生成方法 EI 豁免，见 lombok.config 的 @lombok.Generated）+ 真修清零后
+                 长期为 0：新增任何未豁免 bug（含 DM_CONVERT_CASE/BX/REC 等）都会使 mvn verify 红。 -->
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
@@ -339,7 +342,8 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Low</threshold>
-                    <failOnError>false</failOnError>
+                    <failOnError>true</failOnError>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
                 <executions>
                     <execution>

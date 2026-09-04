@@ -147,7 +147,7 @@ class DataScopeGenerationTest(unittest.TestCase):
         # 单行模式 ^ 只匹配整体开头，断言用无锚定正则（行内查找注解行内容）
         self.assertRegex(self.service, r"@DataScope\(tables\s*=\s*\{\s*\"device_alarm_rule\"\s*\}\)",
                          "应生成 @DataScope 注解行")
-        self.assertIn("import com.example.admin.common.annotation.DataScope;", self.service)
+        self.assertIn("import cn.admin.scaffold.common.annotation.DataScope;", self.service)
 
     def test_injects_tenant_context_on_create(self):
         self.assertIn("entity.setTenantId(TenantContext.getTenantId());", self.service)
@@ -158,7 +158,7 @@ class DataScopeGenerationTest(unittest.TestCase):
             "backend/src/main/java/com/example/admin/module/device/AlarmRuleService.java"]
         # 注释文本可能提及 @DataScope，断言实际注解行与 import 不存在即可
         self.assertNotRegex(service, r"^\s*@DataScope\(", "不应生成 @DataScope 注解")
-        self.assertNotIn("import com.example.admin.common.annotation.DataScope;", service)
+        self.assertNotIn("import cn.admin.scaffold.common.annotation.DataScope;", service)
         self.assertNotIn("TenantContext.getTenantId()", service)
 
 

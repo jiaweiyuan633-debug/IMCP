@@ -1,8 +1,8 @@
 package {{package}};
 
-import com.example.admin.common.PageResult;
-import com.example.admin.common.Result;
-import com.example.admin.common.annotation.OperLog;
+import cn.admin.scaffold.common.PageResult;
+import cn.admin.scaffold.common.Result;
+import cn.admin.scaffold.common.annotation.OperLog;
 import {{package}}.dto.{{Entity}}Query;
 import {{package}}.dto.{{Entity}}SaveRequest;
 import {{package}}.vo.{{Entity}}Vo;
