@@ -92,8 +92,9 @@ jobs:
           # 显式 fail——该 action 默认只出报告不失败，密钥门禁形同虚设
           fail: true
       - name: Trivy filesystem scan
-        # 版本 tag 带 v 前缀：@0.29.0 无对应 tag 会被 GitHub 判 "unable to find version"
-        uses: aquasecurity/trivy-action@v0.29.0
+        # 用 v0.36.0：v0.29.0 内部引用 aquasecurity/setup-trivy@v0.2.2（该 tag 不存在），
+        # 在 runner 上会解析失败；新版已修正内部依赖。tag 均带 v 前缀。
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .

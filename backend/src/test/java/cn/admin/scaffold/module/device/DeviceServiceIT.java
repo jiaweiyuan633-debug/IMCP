@@ -71,7 +71,11 @@ class DeviceServiceIT extends AbstractIntegrationTest {
         DeviceQuery query = new DeviceQuery();
         query.setPageNum(1);
         query.setPageSize(10);
-        // 租户2 只看到自己的记录
+        // 按本用例创建的编码过滤：共享库中其它 IT 类（如 TelemetryServiceIT）可能先向租户2
+        // 插入同名设备（IT-TEL-100/租户2设备），无过滤的全量查询会把残留一并查出，导致断言
+        // 依赖测试类执行顺序（CI 与本地目录遍历顺序不同而偶发翻倍）。加编码过滤后语义收敛为
+        // 「同编码 IT-DEV-100 下租户2 只见自己那条」——若租户隔离失效仍会串见租户1的"租户1设备"。
+        query.setDeviceCode("IT-DEV-100");
         assertThat(deviceService.page(query).getRecords())
                 .extracting(DeviceVo::getDeviceName)
                 .containsExactly("租户2设备");
