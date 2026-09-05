@@ -96,7 +96,7 @@
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.52.0</version>
+            <version>4.7.0</version>
         </dependency>
         <!-- 可靠性纵深（批次1）：外部调用重试（spring-retry，版本由 Boot BOM 管理） -->
         <dependency>
