@@ -93,7 +93,7 @@ jobs:
           fail: true
       - name: Trivy filesystem scan
         # 版本 tag 带 v 前缀：@0.29.0 无对应 tag 会被 GitHub 判 "unable to find version"
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
