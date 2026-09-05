@@ -135,7 +135,7 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>7.4</version>
+            <version>9.0</version>
         </dependency>
         <!-- MCP 模型上下文协议：Server(SSE) + Client 双端 -->
         <dependency>
