@@ -87,10 +87,13 @@ jobs:
         with:
           fetch-depth: 0
       - name: Gitleaks secrets scan
+        # gitleaks-action@v2 的 action.yml 不声明任何 with 输入（配置全走 GITLEAKS_* env），
+        # 传 with.fail 会被 runner 以 "Unexpected input(s) 'fail'" 拒绝并报错；发现泄漏即
+        # 使 job 失败是 v2 的硬门禁默认行为。env.GITHUB_TOKEN 供其在 PR 上评论泄漏（push
+        # 无 PR 时自动跳过）；本仓库为个人账号，无需 GITLEAKS_LICENSE。
         uses: gitleaks/gitleaks-action@v2
-        with:
-          # 显式 fail——该 action 默认只出报告不失败，密钥门禁形同虚设
-          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Trivy filesystem scan
         # 用 v0.36.0：v0.29.0 内部引用 aquasecurity/setup-trivy@v0.2.2（该 tag 不存在），
         # 在 runner 上会解析失败；新版已修正内部依赖。tag 均带 v 前缀。
