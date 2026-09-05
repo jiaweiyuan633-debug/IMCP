@@ -191,7 +191,7 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>easyexcel</artifactId>
-            <version>3.3.4</version>
+            <version>4.0.3</version>
         </dependency>
         <dependency>
             <!-- POI 4.1.2（EasyExcel 传递）锁定 commons-io 2.11，但 commons-compress 1.26 需要
