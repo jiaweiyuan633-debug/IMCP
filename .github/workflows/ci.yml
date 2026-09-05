@@ -194,7 +194,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build and push backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: ${{ env.REGISTRY_ENABLED == 'true' }}
@@ -202,7 +202,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push ai-service image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ai-service
           push: ${{ env.REGISTRY_ENABLED == 'true' }}
@@ -210,7 +210,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: frontend
           push: ${{ env.REGISTRY_ENABLED == 'true' }}
@@ -220,7 +220,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push website image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: website
           push: ${{ env.REGISTRY_ENABLED == 'true' }}
