@@ -29,7 +29,7 @@ public class SysJobSchedulerService {
 
     @PostConstruct
     public void initJobs() {
-        // R4-1.18：@PostConstruct 阶段无租户上下文，selectList 会被拦截器注入默认
+        // @PostConstruct 阶段无租户上下文，selectList 会被拦截器注入默认
         // tenant_id=1、只拉回租户 1 的启用任务，其他租户任务重启后触发器不被重建。
         // 启动扫描必须跨租户拉取全部启用任务。
         List<SysJobDO> jobs = jobMapper.selectEnabledIgnoreTenant();

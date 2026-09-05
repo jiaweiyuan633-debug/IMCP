@@ -1,0 +1,11 @@
+# CODEOWNERS
+
+# 默认拥有者：请在首次启用分支保护前替换为实际维护者团队。
+# 示例：* @your-org/backend-maintainers
+# 说明：CODEOWNERS 中的条目决定哪些改动需要特定团队评审。
+
+* @admin-scaffold-maintainers
+
+# 关键安全路径建议由安全负责人评审
+/backend/src/main/java/cn/admin/scaffold/security/ @admin-scaffold-maintainers
+/ai-service/app/pii/ @admin-scaffold-maintainers

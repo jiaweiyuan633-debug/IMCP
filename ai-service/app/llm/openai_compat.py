@@ -4,7 +4,7 @@
 OpenAI、DeepSeek、通义千问、Moonshot、Ollama、vLLM、LM Studio 等绝大多数服务。
 网络错误与上游 5xx 抛 ``LLMError``（可重试）；认证/模型不存在（401/403/404）抛 ``LLMConfigError``（不可重试）。
 
-R4-1.34：连接复用——provider 持有单个持久 ``httpx.AsyncClient``（连接池），
+连接复用——provider 持有单个持久 ``httpx.AsyncClient``（连接池），
 所有调用复用同一池，避免每次请求重建 TCP 连接与 TLS 握手；随服务关闭（``aclose``）释放。
 """
 
@@ -39,7 +39,7 @@ class OpenAICompatibleProvider:
         self.embedding_model = embedding_model
         self.timeout_seconds = timeout_seconds
         self.name = name
-        # R4-1.34：持久复用单个 AsyncClient（连接池 + TLS 会话复用）。此前每次调用
+        # 持久复用单个 AsyncClient（连接池 + TLS 会话复用）。此前每次调用
         # 都新建/销毁 client，每个请求都重建 TCP 连接与 TLS 握手；连接池在长连接
         # keep-alive 下复用同一连接。惰性创建：首个请求才实例化（__init__ 可能
         # 在事件循环外执行，httpx 连接池构造需在运行中的循环内进行）。

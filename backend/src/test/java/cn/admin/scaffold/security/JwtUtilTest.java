@@ -26,7 +26,7 @@ class JwtUtilTest {
         assertEquals(2L, ((Number) claims.get("tenantId")).longValue());
         assertEquals(List.of("admin"), claims.get("roles", List.class));
 
-        // R1-1.7：refresh token 同样携带租户声明，供 refresh/filter 查询前就位租户上下文
+        // refresh token 同样携带租户声明，供 refresh/filter 查询前就位租户上下文
         String refreshToken = jwtUtil.createRefreshToken("rt-001", 1L, "admin", 2L);
         Claims refreshClaims = jwtUtil.parse(refreshToken);
         assertEquals(2L, ((Number) refreshClaims.get("tenantId")).longValue());

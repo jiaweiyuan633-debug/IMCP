@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 数据权限表-列映射配置（批次2b）。维护 sys_data_permission，CRUD 后缓存即时重载。
+ * 数据权限表-列映射配置。维护 sys_data_permission，CRUD 后缓存即时重载。
  */
 @RestController
 @RequestMapping("/api/system/data-permission")

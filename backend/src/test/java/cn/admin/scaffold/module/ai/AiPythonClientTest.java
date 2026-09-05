@@ -12,7 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * AI 出站调用投递前 SSRF 复核单测（R4-1.44 批次17）。
+ * AI 出站调用投递前 SSRF 复核单测。
  *
  * <p>baseUrl 内部地址（回环 IP）在静态校验阶段即被拦截，RestTemplate 不应被调用；
  * 恶意/误配的 AI 服务地址不能在任务提交时把服务端当内网探测跳板。

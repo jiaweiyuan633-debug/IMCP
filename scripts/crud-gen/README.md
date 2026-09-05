@@ -1,6 +1,6 @@
 # CRUD 代码生成器（零依赖）
 
-> R4-1.36（批次9）引入。定位：**标准 CRUD 骨架**的快速产出，复杂业务在生成后手写扩展。
+> 定位：**标准 CRUD 骨架**的快速产出，复杂业务在生成后手写扩展。
 > 与 `docs/architecture-conventions.md` 修订后的约定一致：`标准 CRUD 用轻量生成器，复杂业务手写`。
 
 ## 环境
@@ -33,7 +33,7 @@ python scripts/crud-gen/crud_gen.py path/to/spec.json --dry-run                 
 }
 ```
 
-> **`datascope`（批次8·R4-1.54）**：仅当业务确需行级数据权限时置 `true`——生成
+> **`datascope`**：仅当业务确需行级数据权限时置 `true`——生成
 > `@DataScope(tables = {"表名"})` 注解与 `create` 的 `setTenantId` 注入。启用后必须
 > 在 `sys_data_permission` 注册本表规则，否则 filter 激活但无规则时按无过滤处理
 > （详见 `docs/architecture-conventions.md` 数据权限章节）。默认 `false` 生成普通 CRUD。
@@ -54,7 +54,7 @@ python scripts/crud-gen/crud_gen.py path/to/spec.json --dry-run                 
 
 ## 生成物（9 个文件）
 
-后端（`backend/src/main/java/com/example/admin/module/{module}/`）：
+后端（`backend/src/main/java/cn/admin/scaffold/module/{module}/`）：
 
 | 文件 | 说明 |
 | --- | --- |
@@ -70,15 +70,15 @@ python scripts/crud-gen/crud_gen.py path/to/spec.json --dry-run                 
 
 | 文件 | 说明 |
 | --- | --- |
-| `src/api/{module}.ts` | 接口 + `Vo/SaveRequest` 类型 + page/create/update/delete 函数 |
+| `src/api/{module}.ts` | 接口 + `Vo/SaveRequest` 类型 + page/detail/create/update/delete 函数 |
 | `src/views/{module}/{kebab}/index.vue` | 列表页骨架（搜索 + 表格 + 弹窗表单，中文直写不依赖 i18n） |
 
 ## 生成后必做
 
 1. 按 `docs/database/README.md` 的约定补一张 Flyway 迁移创建 `table`（含 `tenant_id/created_at/updated_at/created_by/updated_by/version/deleted` 列）；若 `spec.datascope=true`，同时创建 `sys_data_permission` 规则。
 2. 按 V60 之后的菜单迁移规范，用 `perm` 动态解析为新模块插入菜单与按钮并授权 `role_id=1`。
-3. **i18n（批次8·R4-1.54）**：生成的 `index.vue` 页面文案为中文直写（生成器不产 i18n 文件），合入基线前必须把页面文案改为 `zh-CN.ts`/`en-US.ts` 语言包 key（当前平台全量中英文国际化是交付红线，中文直写页会破坏 en-US 界面）。
-4. **数据权限（批次8·R4-1.54）**：`spec.datascope=true` 生成的 `@DataScope` 只约束列表查询；按 id 直查的写路径（update/delete 等）必须按 `docs/architecture-conventions.md` 补单条归属校验（`loadXxxOrThrow` + `checkDataScope`，admin 短路）。
+3. **i18n**：生成的 `index.vue` 页面文案为中文直写（生成器不产 i18n 文件），合入基线前必须把页面文案改为 `zh-CN.ts`/`en-US.ts` 语言包 key（当前平台全量中英文国际化是交付红线，中文直写页会破坏 en-US 界面）。
+4. **数据权限**：`spec.datascope=true` 生成的 `@DataScope` 只约束列表查询；按 id 直查的写路径（update/delete 等）必须按 `docs/architecture-conventions.md` 补单条归属校验（`loadXxxOrThrow` + `checkDataScope`，admin 短路）。
 5. 运行 `mvn -o test` 确保生成的 Service 有单元测试（JaCoCo 门禁会拦截未测试的新代码）。
 
 ## 开发与测试

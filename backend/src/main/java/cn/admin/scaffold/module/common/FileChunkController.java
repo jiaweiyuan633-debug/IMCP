@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 分片上传 + 秒传端点（批次2c）。
+ * 分片上传 + 秒传端点。
  */
 @RestController
 @RequestMapping("/api/common/file/chunk")

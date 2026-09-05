@@ -2,7 +2,7 @@
 
 覆盖：健康检查、对话（Mock）、SSE 流式、Embedding、向量入库/检索、
 任务队列（提交→终态）、定时管道注册/查询/删除、鉴权拒绝。
-这是批次3 集成层（routes + services + 叶子模块 + TaskManager + Scheduler）
+这是集成层（routes + services + 叶子模块 + TaskManager + Scheduler）
 的唯一端到端验证；其余单测各自验证内部细节。
 """
 
@@ -83,7 +83,7 @@ def test_embeddings_dim() -> None:
 
 
 def test_unknown_provider_returns_400() -> None:
-    """R4-1.34：未知 provider 属客户端错误返回 400，而非 KeyError 导致的 500。
+    """未知 provider 属客户端错误返回 400，而非 KeyError 导致的 500。
 
     修复前 ProviderRegistry.get 抛 KeyError、FastAPI 未捕获 → 500；调用方无法
     区分「服务端故障」与「provider 拼错」两种语义，也无法据此修正参数。
@@ -183,7 +183,7 @@ def test_schedule_crud() -> None:
 
 
 def test_chat_masks_pii_by_default() -> None:
-    """R4-1.34 + 批次3：PII 强制默认开启——user 消息出站前先脱敏（手机号不落外部 LLM），
+    """PII 强制默认开启——user 消息出站前先脱敏（手机号不落外部 LLM），
     模型复述的敏感信息出站前再脱敏。输入 PII 已在出站层脱敏，输出自然不含原始号码。"""
     with _boot_client() as client:
         response = client.post(
@@ -239,7 +239,7 @@ def test_unauthorized_rejected() -> None:
 
 
 def test_dead_letter_api_endpoints_and_route_order() -> None:
-    """R4-1.21：/tasks/dead 字面量路由先于 /tasks/{task_id} 注册（否则被参数路由吞掉）。
+    """/tasks/dead 字面量路由先于 /tasks/{task_id} 注册（否则被参数路由吞掉）。
 
     若注册顺序错误，GET /api/v1/tasks/dead 会被 {task_id} 捕获为查询任务
     "dead"（404 task not found），DELETE 则因无 DELETE /tasks/{task_id} 返回 405——

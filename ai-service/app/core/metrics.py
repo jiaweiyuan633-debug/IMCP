@@ -1,7 +1,7 @@
-"""应用级 Prometheus 指标（R4-1.8）。
+"""应用级 Prometheus 指标。
 
 默认注册表已含进程级指标（process_* / python_* 等），/metrics 由 main.py 提供
-（根路径，批次5·R4-1.51 修正过时注释——此前误述由 routes.py 提供）。
+（根路径——此前注释曾误述由 routes.py 提供，已修正）。
 此处补充 ai-service 业务指标，让运维在 Prometheus/Grafana 里直接观察任务吞吐与
 队列水位，而不必逐个查 Redis：
 
@@ -40,7 +40,7 @@ async def sample_queue_depth(redis: Any) -> None:
     """抓取时采样三条队列深度并写入 gauge（见模块 docstring 约定）。
 
     Redis 不可用时写 -1 而不抛错：/metrics 是监控面，不能因存储侧故障反噬成
-    scrape 失败。redis 可为 None（应用尚未完成 lifespan 初始化）——同样按未知处理。
+    scrape 失败。redis 可为 None（应用 lifespan 初始化尚未进行）——同样按未知处理。
     """
     if redis is None:
         _set_depths(-1, -1, -1)

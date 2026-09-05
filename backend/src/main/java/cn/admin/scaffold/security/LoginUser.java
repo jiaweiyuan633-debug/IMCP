@@ -24,7 +24,11 @@ public class LoginUser implements UserDetails {
     private List<String> roles;
     private List<String> perms;
 
-    /** 防御快照：调用方拿到的是不可变副本，无法经 getter 篡改主体角色/权限（批次9·R4-1.55）。 */
+    /** 口令生命周期拦截标记：must_change_password=1 或口令已过期（JwtAuthenticationFilter 按库判定后写入，
+     *  PasswordPolicyEnforcementFilter 据此对受限账号返回 403；避免每个业务请求重复查库）。 */
+    private boolean passwordChangeRequired;
+
+    /** 防御快照：调用方拿到的是不可变副本，无法经 getter 篡改主体角色/权限。 */
     public List<String> getRoles() {
         return roles == null ? null : List.copyOf(roles);
     }

@@ -9,11 +9,11 @@ import {
 } from '@/utils/auth'
 
 /**
- * R4-1.33 + R4-1.47（批次1）：凭证存储契约测试。
+ * 凭证存储契约测试。
  * 覆盖本地读写 + 跨标签页同步（storage 事件驱动的登出广播 / token 刷新）。
  * storage 事件仅在「其他标签页」触发，测试通过手动 dispatch 模拟。
  *
- * R4-1.47 变更：refresh token 已迁移后端 httpOnly Cookie，前端不再持久化——
+ * refresh token 已迁移后端 httpOnly Cookie，前端不再持久化——
  * setTokens 仅存 access token；getRefreshToken 恒返回空串。
  */
 describe('auth token storage', () => {

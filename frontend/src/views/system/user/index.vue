@@ -150,7 +150,7 @@ import { isStrongPassword, PASSWORD_PATTERN } from '@/utils/validation'
 
 const { t } = useI18n()
 
-// R4-1.40：密码框行内即时校验（编辑时可空，仅当填写时按复杂度规则校验）
+// 密码框行内即时校验（编辑时可空，仅当填写时按复杂度规则校验）
 const passwordRules = [{ pattern: PASSWORD_PATTERN, message: t('page.passwordPolicy'), trigger: 'blur' }]
 
 const searchFields: SearchField[] = [
@@ -354,7 +354,7 @@ onMounted(async () => {
     postOptions.value = await getPostOptions()
     deptTree.value = await getDeptTree()
   } catch {
-    // R4-1.44：选项/树加载失败保持空下拉（请求层已 toast），避免未捕获 rejection
+    // 选项/树加载失败保持空下拉（请求层已 toast），避免未捕获 rejection
     roleOptions.value = []
     postOptions.value = []
     deptTree.value = []

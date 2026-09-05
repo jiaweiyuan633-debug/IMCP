@@ -2,6 +2,7 @@ package cn.admin.scaffold.config;
 
 import cn.admin.scaffold.security.ApiPermAuthorizationFilter;
 import cn.admin.scaffold.security.JwtAuthenticationFilter;
+import cn.admin.scaffold.security.PasswordPolicyEnforcementFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * CORS 兜底策略单测（R4-1.45 批次18）。
+ * CORS 兜底策略单测。
  *
  * <p>{@code @Value("${app.cors.allowed-origin-patterns:*}")} 的兜底 `*` 是最后防线：仅当
  * application.yml 中该属性段被整体移除时才会命中，此时凭据跨域意外全开；改为空串兜底后
@@ -27,6 +28,7 @@ class SecurityConfigTest {
 
     private final SecurityConfig securityConfig = new SecurityConfig(
             mock(JwtAuthenticationFilter.class),
+            mock(PasswordPolicyEnforcementFilter.class),
             mock(ApiPermAuthorizationFilter.class),
             new ObjectMapper());
 

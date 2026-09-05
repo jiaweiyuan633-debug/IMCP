@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 分片上传初始化响应（批次2c）。
+ * 分片上传初始化响应。
  * exists=true 表示 sha256 命中已存文件（秒传），前端跳过整场上传直接使用 fileId/url。
  */
 @Data

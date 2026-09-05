@@ -1,8 +1,17 @@
+# 镜像一律使用不可变 tag，禁止默认 latest：latest 的拉取语义依赖 K8s 按 tag 的隐式
+# imagePullPolicy=Always，节点缓存陈旧后无法复现实际运行版本，回滚与审计都不可靠。
+# 发布时以 commit sha / 正式版本覆盖下列 tag；示例 1.0.0 与 Chart.yaml appVersion 对齐，
+# 仅作占位，不代表真实构建产物。
 images:
-  backend: admin-backend:latest
-  ai: ai-service:latest
-  frontend: frontend:latest
-  website: website:latest
+  backend: admin-backend:1.0.0
+  ai: ai-service:1.0.0
+  frontend: frontend:1.0.0
+  website: website:1.0.0
+
+# 私有镜像仓库拉取凭证：元素为 {"name": "<imagePullSecret 名>"}；空列表时不注入
+# imagePullSecrets（模板用 {{- with .Values.imagePullSecrets }} 包裹）。集群已在
+# ServiceAccount 上挂 registry 凭证时保持为空即可。
+imagePullSecrets: []
 
 replicas:
   backend: 2
@@ -80,7 +89,7 @@ config:
   redisUrl: redis://redis:6379/0
   # 内部服务主机名：留空由模板按 {{ .Release.Name }} 推导（release 名为 admin 时即
   # admin-backend / admin-ai / admin-frontend），与模板 Service 命名保持一致；非默认
-  # release 名或自定义 Service 名时须显式覆盖为实际地址（R4-1.45）。
+  # release 名或自定义 Service 名时须显式覆盖为实际地址。
   callbackBaseUrl: ""
   aiBaseUrl: ""
   # RAG 向量检索（可选）：false 走 MySQL ngram 全文检索（零依赖）；true 需先部署 k8s/milvus
@@ -97,7 +106,9 @@ config:
   frontendUrl: ""
   # CORS 允许的前端域名（逗号分隔，可含 * 通配），注入 CORS_ALLOWED_ORIGIN_PATTERNS。
   # 生产缺省为空串即拒绝全部跨域来源（application-prod.yml），未配置时后台前端 API 请求
-  # 会 403 Invalid CORS request；须覆盖为实际前端域名，与 ingress.host 保持一致（R4-1.45 收紧兜底）
+  # 会 403 Invalid CORS request。默认 https://admin.example.com 与 ingress.host 一致，
+  # scheme（https）与 TLS 默认开启匹配——更换域名必须同时覆盖 ingress.host 与
+  # corsAllowedOriginPatterns，二者不一致会导致前端 API 请求 403 或证书域名不符
   corsAllowedOriginPatterns: https://admin.example.com
   # 可选：Redis 主从哨兵高可用。不设（留空）则后端走 redisHost/redisPort 单实例；
   # 设置 master 时后端自动切换为哨兵拓扑（application-prod.yml on-property 激活）。
@@ -112,7 +123,7 @@ config:
   # 实例化 Zipkin Sender/AsyncZipkinSpanHandler（zipkin auto-config 无端点非空条件），每次 flush 构造
   # 非法 URI 失败丢 span，故必须显式关闭而非仅"不注入"。配置端点时注入 true + ZIPKIN_ENDPOINT 开启上报。
   zipkinEndpoint: ""
-  # AI 服务生产配置（批次3·R4-1.49）：此前 Helm 无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
+  # AI 服务生产配置：此前 Helm 无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
   # K8s 下 ai-service 永远以 mock 提供方运行（16 维 mock 向量），检索结果失真且无报错。
   # llmProviders 为 JSON 字符串（含 API Key），如：
   #   '{"deepseek": {"base_url": "https://api.deepseek.com", "api_key": "sk-xxx", "model": "deepseek-chat"}}'
@@ -136,7 +147,7 @@ storage:
 
 # 密钥一律不留默认值：部署时必须通过 --set secret.*=... 显式注入，
 # 留空或未注入时 all.yaml 顶部 fail 校验将终止渲染，杜绝明文默认密钥上生产。
-# 批次6（R4-1.52）：externalSecret 指定已存在的 Secret 名称（如 External Secrets Operator
+# externalSecret 指定已存在的 Secret 名称（如 External Secrets Operator
 # 或手工创建的 Secret），设置后跳过内部 Secret 创建与 fail 校验，envFrom 直接引用外部
 # Secret——GitOps 场景用 ESO/Vault 注入密钥时无需在 values 里填任何明文。
 secret:
@@ -153,14 +164,16 @@ secret:
 
 ingress:
   host: admin.example.com
-  # 批次5（R4-1.51）：TLS 与上传体积——原 Chart 无 TLS（生产 HTTP 明文）+ 无
-  # proxy-body-size（网关默认 1MB，后端允许 20MB 上传必 413）
+  # TLS 默认开启：生产 HTTP 明文既不安全也不可审计。enabled=true 而 clusterIssuer 为空时
+  # all.yaml 顶部会 fail-fast 终止渲染——部署方必须显式提供 issuer，或显式置 enabled=false
+  # 关闭 TLS。上传体积注解（proxy-body-size）独立于 TLS 恒注入（网关默认 1MB，后端允许
+  # 20MB 上传必 413）。
   tls:
-    enabled: false
-    # cert-manager ClusterIssuer 名称（如 letsencrypt-prod / ca-issuer）
+    enabled: true
+    # cert-manager ClusterIssuer 名称（如 letsencrypt-prod / ca-issuer），TLS 开启时必填
     clusterIssuer: ""
-  # 强制 HTTPS 跳转（ingress-nginx force-ssl-redirect）
-  forceHttps: false
+  # 强制 HTTPS 跳转（ingress-nginx force-ssl-redirect），默认开启与 TLS 配套
+  forceHttps: true
   # 上传请求体上限（与后端 multipart max-file-size 对齐，默认 20m）
   proxyBodySize: "20m"
 

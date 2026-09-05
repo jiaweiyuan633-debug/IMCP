@@ -10,13 +10,13 @@ import i18n from '@/locales'
 const service = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
-  // R4-1.47（批次1·P1-F3）：refresh token 已迁移 httpOnly Cookie，需携带凭证（同源反代无副作用；
+  // refresh token 已迁移 httpOnly Cookie，需携带凭证（同源反代无副作用；
   // dev 直连后端跨域时携带 cookie 依赖后端 CORS allowCredentials 已开启）
   withCredentials: true,
 })
 
 /**
- * R4-1.32：泛型化请求包装——类型契约的唯一入口。
+ * 泛型化请求包装——类型契约的唯一入口。
  *
  * 响应拦截器已把 Result 成功分支解包为 data（业务码非 0 或网络异常则 reject），
  * 故这里把方法返回类型声明为 Promise<T>，由 api 层调用处显式传入期望的数据类型
@@ -57,7 +57,7 @@ service.interceptors.request.use((config) => {
 let refreshPromise: Promise<boolean> | null = null
 
 function refreshAccessToken(): Promise<boolean> {
-  // R4-1.47：refresh token 已迁移 httpOnly Cookie，不再从 localStorage 读取；
+  // refresh token 已迁移 httpOnly Cookie，不再从 localStorage 读取；
   // 无本地 access token 即视为未登录，直接失败
   if (!getAccessToken()) {
     return Promise.resolve(false)
@@ -119,12 +119,12 @@ service.interceptors.response.use(
     return Promise.reject(error)
   },
   async (error) => {
-    // R4-1.33：主动取消（AbortController，如 useTableQuery 卸载/重发时 abort）
+    // 主动取消（AbortController，如 useTableQuery 卸载/重发时 abort）
     // 不算业务错误——静默透传，不弹错误提示、不触发网络重试
     if (error.code === 'ERR_CANCELED' || error.__CANCEL__) {
       return Promise.reject(error)
     }
-    // R4-1.47（批次1·P1-F1）：网络错误/超时仅对幂等方法自动重试——
+    // 网络错误/超时仅对幂等方法自动重试——
     // 此前对 POST/PUT/DELETE 无条件重试一次，服务端已落库但响应丢失时会产生
     // 重复提交（重复用户/重复导入/重复 AI 任务）。写操作改由调用方自行决定重试策略。
     const method = String(error.config?.method || 'get').toUpperCase()

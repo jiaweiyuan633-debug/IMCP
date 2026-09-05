@@ -4,7 +4,7 @@ import re
 class TextSummaryService:
 
     async def run(self, params: dict) -> dict:
-        # 批次3（R4-1.49）：移除 force_fail/delay_seconds 演示后门——任意持令牌者可
+        # force_fail/delay_seconds 演示后门已移除——否则任意持令牌者可
         # 强制任务失败刷死信、用大 delay 占满 worker 池造成排队 DoS
         content = str(params.get("content", "")).strip()
         if not content:

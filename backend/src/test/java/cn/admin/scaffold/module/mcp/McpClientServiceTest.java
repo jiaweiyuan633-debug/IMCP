@@ -18,7 +18,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
- * MCP Client 投递 SSRF 复核单测（R4-1.40 批次13）。
+ * MCP Client 投递 SSRF 复核单测。
  *
  * <p>保存时的静态校验兜不住「主机名解析到内网 IP」与「保存后 DNS 变更」，连接前必须按
  * 解析后的全部地址复核。此处 mock 掉 DNS 校验以确定性返回内部地址判定，断言连接被拒。

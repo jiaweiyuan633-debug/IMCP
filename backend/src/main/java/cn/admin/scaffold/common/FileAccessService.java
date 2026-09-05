@@ -64,7 +64,7 @@ public class FileAccessService {
                 return false;
             }
             String boundUserId = parts[1];
-            // R2-1.4：绑定用户的令牌要求已登录请求与绑定用户一致，防止令牌跨用户复用；
+            // 绑定用户的令牌要求已登录请求与绑定用户一致，防止令牌跨用户复用；
             // 公开资源令牌（boundUserId 为空，如匿名上传时签发）任何请求（含已登录用户）均可访问，
             // 否则同一分享链接匿名可看、登录反被拒，破坏 URL 分享语义；
             // 匿名请求（img 预览等浏览器无法携带登录态的场合）一律凭签名与有效期校验。
@@ -93,7 +93,7 @@ public class FileAccessService {
     /**
      * 与 Spring UrlPathHelper 相同顺序规范化受保护路径：先剥离 {@code ;} 矩阵参数（removeSemicolonContent），
      * 再 URL 解码，最后 cleanPath 归一化 {@code ./ ../ //} 序列——保证签发令牌的路径与 FileAccessFilter
-     * 校验的路径完全一致，防止同一 url 因两种规范化口径分叉被变体绕过（R4-1.43 自 FileAccessFilter 提升共用）。
+     * 校验的路径完全一致，防止同一 url 因两种规范化口径分叉被变体绕过（与 FileAccessFilter 共用同一实现）。
      */
     public static String normalizePath(String rawUri) {
         int semicolon = rawUri.indexOf(';');

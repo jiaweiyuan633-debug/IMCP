@@ -205,8 +205,14 @@ app:
     # 批次1·安全阻断：默认口令强制首登改密 + 密码过期策略 + refresh token httpOnly Cookie
     # 生产默认开启；本地 dev/test 覆盖为 false 保持 admin/admin123 可直接登录的开发/CI 体验
     # （e2e/smoke/load-test 依赖该默认口令，见 V63 迁移注释与 application-dev/test.yml）。
+    # force-password-change 同时是"服务端口令生命周期强制"开关：开启后除改密/登出/刷新/自身
+    # 信息接口外，被标记(must_change_password=1)或口令过期的账号一律 403（服务端兜底，绕过
+    # 前端的 CLI/非浏览器客户端同样被拦）。
     force-password-change: ${FORCE_PASSWORD_CHANGE:true}
     password-expire-days: ${PASSWORD_EXPIRE_DAYS:90}
+    # API 资源权限规则严格模式（默认 false）：开启后已认证请求命不中 sys_api_perm 规则即 403，
+    # 用于暴露规则漏配；开启前须确保受管接口均已登记规则（个人自助端点自动豁免）
+    api-perm-strict: ${API_PERM_STRICT:false}
     refresh-cookie-name: ${REFRESH_COOKIE_NAME:admin_refresh_token}
     # Secure 仅生产（https）开启；本地 http 下 Secure cookie 不会被浏览器保存
     refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:false}

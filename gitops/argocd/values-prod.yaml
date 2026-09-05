@@ -1,8 +1,22 @@
+# admin-scaffold 生产覆盖值——被 argocd/application.yaml 经 helm.valueFiles 引用，
+# 与 Chart values.yaml 深合并（此处只覆盖生产差异，其余取 Chart 默认）。
+# ---------------------------------------------------------------------------
+# 【上线前必替换占位符清单】
+#   1. images.* 的 <COMMIT_SHA>：换成 CI 构建产物的真实 commit sha / 正式版本号，
+#      registry.example.com 换成实际私有镜像仓库地址（不可变 tag，禁止 latest）。
+#   2. ingress.host 与 config.corsAllowedOriginPatterns 的 admin.example.com：换成
+#      实际前端域名，两处必须同步改（CORS scheme 保持 https，与 TLS 默认开启匹配）。
+#   3. ingress.tls.clusterIssuer：换成集群中已安装的 cert-manager ClusterIssuer 名
+#      （占位 letsencrypt-http01 若不存在，证书会停在 Pending，入口不可达）。
+#   4. secret.*（下方保持空串）：密钥禁止明文入仓，由部署时注入——ArgoCD
+#      helm.parameters 或 ESO/Vault 生成 Secret 后设 secret.existingSecret=<Secret 名>。
+#   5. argocd/application.yaml 的 spec.source.repoURL：换成实际私有 Git 仓库地址。
+# ---------------------------------------------------------------------------
 images:
-  backend: registry.example.com/admin-backend:1.0.0
-  ai: registry.example.com/ai-service:1.0.0
-  frontend: registry.example.com/admin-frontend:1.0.0
-  website: registry.example.com/website:1.0.0
+  backend: "registry.example.com/admin-backend:<COMMIT_SHA>"
+  ai: "registry.example.com/ai-service:<COMMIT_SHA>"
+  frontend: "registry.example.com/admin-frontend:<COMMIT_SHA>"
+  website: "registry.example.com/website:<COMMIT_SHA>"
 
 config:
   dbHost: mysql.example.internal
@@ -11,11 +25,16 @@ config:
   dbUser: admin
   redisHost: redis.example.internal
   redisPort: "6379"
+  # 回调/出站地址：与 Chart 按 release 名推导一致时可省略；服务名或命名空间不同须显式覆盖
   callbackBaseUrl: http://admin-backend:8080
   aiBaseUrl: http://ai-service:8000
+  # 显式给出生产前端域名（Chart 默认同为 https://admin.example.com）：换域名时必须与
+  # ingress.host 同步修改（含 https scheme），否则前端 API 请求 403 Invalid CORS request
+  corsAllowedOriginPatterns: https://admin.example.com
 
-# 生产密钥禁止明文入仓：必须由部署时注入（ArgoCD helm.parameters / External Secrets Operator / Vault / Sealed Secrets）。
-# 留空（或未注入）时 Helm 模板将 fail-fast，ArgoCD 同步会失败，直至密钥注入完成。
+# 生产密钥禁止明文入仓：必须由部署时注入（ArgoCD helm.parameters / External Secrets
+# Operator / Vault / Sealed Secrets）。留空（或未注入）时 Helm 模板将 fail-fast，
+# ArgoCD 同步会失败，直至密钥注入完成。
 secret:
   dbPassword: ""
   jwtSecret: ""
@@ -25,3 +44,12 @@ secret:
 
 ingress:
   host: admin.example.com
+  # TLS 显式开启（与 Chart 默认一致）：Chart 在 enabled=true 而 clusterIssuer 为空时
+  # fail-fast，故此处给出占位 issuer，上线前按上方清单替换为真实 ClusterIssuer
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-http01
+  # 强制 HTTPS 跳转，与 TLS 配套（ingress-nginx force-ssl-redirect）
+  forceHttps: true
+  # 上传请求体上限（与后端 multipart max-file-size 对齐）
+  proxyBodySize: "20m"

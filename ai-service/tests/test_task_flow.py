@@ -37,7 +37,7 @@ async def test_task_failure_retries_then_failed() -> None:
     manager = TaskManager(redis, Settings())
     await manager.create_task(TaskCreateRequest(
         task_no="task-fail",
-        # 批次3（R4-1.49）：force_fail 演示后门已移除——改用 content 缺失触发
+        # force_fail 演示后门已移除——改用 content 缺失触发
         # ValueError（可重试异常），重试耗尽后 FAILED
         biz_type="text_summary",
         params={},
@@ -48,13 +48,13 @@ async def test_task_failure_retries_then_failed() -> None:
     assert current is not None
     assert current.status == "FAILED"
     assert current.retry_count == 3
-    # R4-1.20：重试耗尽分类必须随任务记录保留，可经 GET /tasks 读取
+    # 重试耗尽分类必须随任务记录保留，可经 GET /tasks 读取
     assert current.reason == "retries_exhausted"
 
 
 @pytest.mark.asyncio
 async def test_dead_letter_list_and_purge() -> None:
-    """R4-1.21：死信记录富化失败时间戳/任务类型/重试次数，可经 list/purge 管理。
+    """死信记录富化失败时间戳/任务类型/重试次数，可经 list/purge 管理。
 
     修复前死信记录只有 task_no/error/reason——无失败时刻、无任务类型，运维无法
     按时间排障；且队列只写无读/无清，历史失败只能被新失败挤出裁剪窗口。此断言
@@ -65,7 +65,7 @@ async def test_dead_letter_list_and_purge() -> None:
     manager = TaskManager(redis, Settings())
     await manager.create_task(TaskCreateRequest(
         task_no="task-dl",
-        # 批次3（R4-1.49）：同 test_task_failure_retries_then_failed，content 缺失触发可重试失败
+        # 同 test_task_failure_retries_then_failed，content 缺失触发可重试失败
         biz_type="text_summary",
         params={},
     ))
@@ -148,7 +148,7 @@ async def test_callback_signs_with_hmac() -> None:
 
 @pytest.mark.asyncio
 async def test_callback_carries_failure_reason_for_failed_task() -> None:
-    """R4-1.20：失败分类（reason）必须随回调载荷透传，后端据此落 ai_task.error_type。
+    """失败分类（reason）必须随回调载荷透传，后端据此落 ai_task.error_type。
 
     若回退到修复前契约（回调只带 error 文本、不带分类），后端系统记录无法区分
     瞬时超时（timeout，值得重试）与确定性错误（non_retryable，重试无意义）。
@@ -186,6 +186,60 @@ async def test_callback_carries_failure_reason_for_failed_task() -> None:
     assert captured["json"]["status"] == "FAILED"
     assert captured["json"]["reason"] == "timeout"
     assert captured["json"]["error"] == "task timeout after 60s"
+
+
+@pytest.mark.asyncio
+async def test_callback_uses_hmac_key_when_configured() -> None:
+    """配置 CALLBACK_HMAC_KEY 时，回调签名用独立密钥而非 AUTH_TOKEN（跨端轮换支持）。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    manager = TaskManager(
+        redis,
+        Settings(auth_token="inbound-token", callback_hmac_key="callback-secret"),
+    )
+    captured = {}
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, url, json=None, headers=None):
+            captured["headers"] = headers
+            captured["json"] = json
+            response = SimpleNamespace(status_code=200)
+            response.raise_for_status = lambda: None
+            return response
+
+    with patch("app.tasks.manager.httpx.AsyncClient", FakeAsyncClient):
+        await manager._callback("task-hmac", {
+            "callback_url": "http://127.0.0.1:8080/api/ai/callback/task",
+            "biz_type": "text_summary",
+            "status": "SUCCEEDED",
+            "result": {"summary": "ok"},
+            "error": None,
+        })
+
+    timestamp = captured["headers"]["X-Ai-Timestamp"]
+    signature = captured["headers"]["X-Ai-Signature"]
+    body = json.dumps(captured["json"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    expected = hmac.new(
+        b"callback-secret",
+        timestamp.encode("utf-8") + b"\n" + body,
+        hashlib.sha256,
+    ).hexdigest()
+    assert hmac.compare_digest(signature, expected)
+    # 用入站密钥签名必然不一致（证明用的是独立回调密钥）
+    wrong = hmac.new(
+        b"inbound-token",
+        timestamp.encode("utf-8") + b"\n" + body,
+        hashlib.sha256,
+    ).hexdigest()
+    assert not hmac.compare_digest(signature, wrong)
 
 
 async def _wait_for_terminal(manager: TaskManager, task_no: str, attempts: int = 20):

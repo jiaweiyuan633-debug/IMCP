@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * R4-1.32：auth API 契约测试——锁定请求方法、URL 与载荷形状。
+ * auth API 契约测试——锁定请求方法、URL 与载荷形状。
  * 泛型化的 request 使"api 声明的返回类型"与实际数据形状在编译期绑定，
  * 测试在此之上断言路径/参数不漂移。
  */

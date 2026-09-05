@@ -43,7 +43,7 @@ class PresignedFileServiceTest {
     @BeforeEach
     void setUp() {
         securityUtils = mockStatic(SecurityUtils.class);
-        // R4-1.44：confirm 校验签发用户，测试统一模拟当前登录用户 1
+        // confirm 校验签发用户，测试统一模拟当前登录用户 1
         securityUtils.when(SecurityUtils::tryGetUserId).thenReturn(1L);
         storage = mock(FileStorage.class);
         fileStorageManager = mock(FileStorageManager.class);
@@ -130,7 +130,7 @@ class PresignedFileServiceTest {
 
     @Test
     void confirmRejectsWhenUserMismatch() throws Exception {
-        // R4-1.44：同租户其他用户（签发者 2、当前登录 1）拿到 objectKey 抢先 confirm → 拒绝，
+        // 同租户其他用户（签发者 2、当前登录 1）拿到 objectKey 抢先 confirm → 拒绝，
         // 否则可绕过配额与归属登记把对象据为己有
         String pending = objectMapper.writeValueAsString(Map.of("tenantId", 1L, "userId", 2L));
         when(valueOps.get("file:presign:1/x.png")).thenReturn(pending);

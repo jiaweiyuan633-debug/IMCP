@@ -31,7 +31,7 @@ public final class LogMaskUtils {
     /** 打码占位符：与前端约定的统一掩码。保存侧据此识别"未改动的敏感值"并合并保留原值。 */
     public static final String MASK = "******";
 
-    /** 判断键名是否命中敏感字段黑名单（R4-1.37 起供渠道配置加密与回显打码共用同一清单，防止两套清单漂移）。 */
+    /** 判断键名是否命中敏感字段黑名单：渠道配置加密与回显打码共用同一清单，防止两套清单漂移。 */
     public static boolean isSensitiveField(String key) {
         return key != null && SENSITIVE_FIELDS_LOWER.contains(key.toLowerCase(Locale.ROOT));
     }
@@ -41,7 +41,7 @@ public final class LogMaskUtils {
             "password", "oldPassword", "newPassword",
             "totpCode", "totpSecret", "secret", "secretKey",
             "apiKey", "api_key", "appSecret", "clientSecret",
-            // R4-1.41：MCP Server authToken 此前漏入清单，@OperLog 新增/编辑服务会把明文令牌落操作日志
+            // MCP Server authToken 纳入清单：漏配时 @OperLog 新增/编辑服务会把明文令牌落操作日志
             "authToken", "auth_token",
             "accessKeyId", "accessKeySecret",
             "accessToken", "access_token", "refreshToken", "refresh_token",
@@ -50,7 +50,7 @@ public final class LogMaskUtils {
             "configValue", "configJson",
             "phone", "mobile", "email", "idCard", "idCardNo");
 
-    /** 小写化副本：敏感键匹配大小写不敏感（R4-1.37），覆盖 Webhook 常见的 "Authorization" 等首字母大写键。 */
+    /** 小写化副本：敏感键匹配大小写不敏感，覆盖 Webhook 常见的 "Authorization" 等首字母大写键。 */
     private static final Set<String> SENSITIVE_FIELDS_LOWER =
             SENSITIVE_FIELDS.stream().map(s -> s.toLowerCase(Locale.ROOT)).collect(Collectors.toUnmodifiableSet());
 
@@ -70,7 +70,7 @@ public final class LogMaskUtils {
     }
 
     /**
-     * 全量 JSON 脱敏 + 额外字段整值打码（R4-1.38，@OperLog.maskFields）：先按黑名单递归打码，
+     * 全量 JSON 脱敏 + 额外字段整值打码（配合 @OperLog.maskFields）：先按黑名单递归打码，
      * 再对 extraFields 命中的键名（大小写不敏感，数组内对象与嵌套对象均覆盖）整值打码。
      * 用于发送类操作的正文/参数脱敏，避免向黑名单加入 content 等通用键误伤公告/通知审计留痕。
      */

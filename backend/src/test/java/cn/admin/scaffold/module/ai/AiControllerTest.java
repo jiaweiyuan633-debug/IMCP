@@ -16,7 +16,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * AI 回调请求体有界读单测（R4-1.44 批次17）。
+ * AI 回调请求体有界读单测。
  *
  * <p>{@code /api/ai/callback/**} 为 permitAll 且 HMAC 校验发生在整读之后，原
  * {@code readAllBytes()} 无界读入可被未认证者用任意巨大 body 打 OOM；改为

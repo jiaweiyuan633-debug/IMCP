@@ -1,13 +1,19 @@
 {{- /* 密钥治理：缺省/空值即终止渲染（fail-fast），杜绝明文默认密钥上生产。
-     批次6（R4-1.52）：设置 secret.existingSecret 时跳过校验（外部 Secret 由 ESO/手工提供） */ -}}
+     设置 secret.existingSecret 时跳过校验（外部 Secret 由 ESO/手工提供） */ -}}
 {{- if and (not .Values.secret.existingSecret) (or (not .Values.secret.dbPassword) (not .Values.secret.jwtSecret) (not .Values.secret.totpEncryptionKey) (not .Values.secret.aiAuthToken) (not .Values.secret.mcpAuthToken)) }}
 {{ fail "secret.dbPassword / secret.jwtSecret / secret.totpEncryptionKey / secret.aiAuthToken / secret.mcpAuthToken 必须通过 --set 显式注入（例如 --set secret.dbPassword=xxx --set secret.jwtSecret=xxx --set secret.totpEncryptionKey=xxx --set secret.aiAuthToken=xxx --set secret.mcpAuthToken=xxx），或设置 secret.existingSecret 引用外部 Secret" }}
+{{- end }}
+{{- /* TLS 治理：ingress.tls 默认开启（values.yaml）。enabled=true 而 clusterIssuer 为空时
+     cert-manager 不会签发证书，Ingress 却已按 TLS 声明流量——fail-fast 终止渲染，
+     部署方必须显式提供 issuer，或显式置 enabled=false 关闭 TLS。 */ -}}
+{{- if and .Values.ingress.tls.enabled (not .Values.ingress.tls.clusterIssuer) }}
+{{ fail "ingress.tls.enabled=true 时必须提供 ingress.tls.clusterIssuer（cert-manager ClusterIssuer 名称，如 --set ingress.tls.clusterIssuer=letsencrypt-prod）；不需要 TLS 时显式 --set ingress.tls.enabled=false" }}
 {{- end }}
 {{- /*
     内部服务主机名：values.config.{callbackBaseUrl,aiBaseUrl,frontendUrl} 留空时按
     .Release.Name 推导（{release}-backend / -ai / -frontend），与下方各 Service
     命名保持一致。values.yaml 不再硬编码 admin-* 默认值，避免非默认 release 名下回调/出站
-    AI/前端地址漂移指向不存在的服务（R4-1.45）。
+    AI/前端地址漂移指向不存在的服务。
 */ -}}
 {{- $callbackBaseUrl := .Values.config.callbackBaseUrl | default (printf "http://%s-backend:8080" .Release.Name) -}}
 {{- $aiBaseUrl := .Values.config.aiBaseUrl | default (printf "http://%s-ai:8000" .Release.Name) -}}
@@ -42,7 +48,7 @@ data:
   # 生产配置层必需项：缺失会导致后端启动失败（fail-fast）
   FRONTEND_URL: {{ $frontendUrl }}
   CORS_ALLOWED_ORIGIN_PATTERNS: {{ .Values.config.corsAllowedOriginPatterns }}
-  # 上传持久化挂载点：本地存储 root + /uploads 静态资源根（P2-15 高可用）
+  # 上传持久化挂载点：本地存储 root + /uploads 静态资源根
   UPLOAD_PATH: {{ .Values.storage.uploadPath }}
 {{- if .Values.config.redisSentinelMaster }}
   # Redis 主从哨兵（可选）：仅当 master 非空时注入，避免空值误激活后端哨兵段（application-prod.yml on-property）
@@ -58,7 +64,7 @@ data:
   # Zipkin 上报端点，与 MANAGEMENT_TRACING_ENABLED 配套（application.yml management.zipkin.tracing.endpoint）
   ZIPKIN_ENDPOINT: {{ .Values.config.zipkinEndpoint }}
   {{- end }}
-  # AI 服务生产配置（批次3·R4-1.49）：此前无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
+  # AI 服务生产配置：此前无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
   # K8s 下 AI 服务永远以 mock 提供方运行（16 维 mock 向量、检索失真且无报错）。
   # llmProviders 留空时注入空串 → ai-service 保持 mock 默认（dev 语义）；配置时
   # LLM_PROVIDERS 由模板注入（含 API Key，仅经 Secret 透出更安全，见 aiLlmApiKeys）
@@ -80,7 +86,7 @@ stringData:
   AUTH_TOKEN: {{ .Values.secret.aiAuthToken }}
   MCP_AUTH_TOKEN: {{ .Values.secret.mcpAuthToken }}
   {{- if .Values.secret.aiLlmApiKeys }}
-  # AI 服务 LLM 供应商 API Key（批次3）：模板将 LLM_PROVIDERS 拆分为「provider 配置 + api_key
+  # AI 服务 LLM 供应商 API Key：模板将 LLM_PROVIDERS 拆分为「provider 配置 + api_key
   # 占位符」时经 Secret 注入；简单场景可直接把 key 内联进 config.aiLlmProviders JSON
   AI_LLM_API_KEYS: {{ .Values.secret.aiLlmApiKeys }}
   {{- end }}
@@ -117,9 +123,13 @@ spec:
         app: {{ .Release.Name }}-backend
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # 优雅停机宽限期 > 后端 prod 关闭超时（30s），排空在途请求再销毁
       terminationGracePeriodSeconds: {{ .Values.storage.terminationGracePeriodSeconds }}
-      # 多副本打散到不同节点，避免单节点故障拖垮全部实例（P2-15 高可用）
+      # 多副本打散到不同节点，避免单节点故障拖垮全部实例
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -136,6 +146,9 @@ spec:
       containers:
         - name: backend
           image: {{ .Values.images.backend }}
+          # 不可变 tag（见 values.yaml images，默认禁 latest）：显式 IfNotPresent，
+          # 避免依赖 K8s 按 tag 的隐式拉取语义（仅 latest 才默认 Always）
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           securityContext:
@@ -168,7 +181,7 @@ spec:
             - configMapRef:
                 name: {{ .Release.Name }}-config
             - secretRef:
-                # 批次6：existingSecret 时引用外部 Secret（ESO/手工），否则用 Chart 自建
+                # existingSecret 时引用外部 Secret（ESO/手工），否则用 Chart 自建
                 name: {{ .Values.secret.existingSecret | default (printf "%s-secret" .Release.Name) }}
 ---
 apiVersion: apps/v1
@@ -186,8 +199,12 @@ spec:
         app: {{ .Release.Name }}-ai
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: {{ .Values.storage.terminationGracePeriodSeconds }}
-      # 多副本打散到不同节点（P2-15 高可用）
+      # 多副本打散到不同节点
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -198,6 +215,9 @@ spec:
       containers:
         - name: ai
           image: {{ .Values.images.ai }}
+          # 不可变 tag（见 values.yaml images，默认禁 latest）：显式 IfNotPresent，
+          # 避免依赖 K8s 按 tag 的隐式拉取语义（仅 latest 才默认 Always）
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           securityContext:
@@ -206,14 +226,14 @@ spec:
             {{- toYaml .Values.resources.ai | nindent 12 }}
           readinessProbe:
             httpGet:
-              # 批次3：readiness 打 /readyz（依赖 Redis，就绪语义）
+              # readiness 打 /readyz（依赖 Redis，就绪语义）
               path: /readyz
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              # 批次3：liveness 打 /livez（纯进程存活，恒 200）——原共用 /health 依赖
+              # liveness 打 /livez（纯进程存活，恒 200）——原共用 /health 依赖
               # Redis，Redis 抖动时所有副本 CrashLoopBackOff
               path: /livez
               port: 8000
@@ -240,9 +260,16 @@ spec:
         app: {{ .Release.Name }}-frontend
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: frontend
           image: {{ .Values.images.frontend }}
+          # 不可变 tag（见 values.yaml images，默认禁 latest）：显式 IfNotPresent，
+          # 避免依赖 K8s 按 tag 的隐式拉取语义（仅 latest 才默认 Always）
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           securityContext:
@@ -277,9 +304,16 @@ spec:
         app: {{ .Release.Name }}-website
     spec:
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: website
           image: {{ .Values.images.website }}
+          # 不可变 tag（见 values.yaml images，默认禁 latest）：显式 IfNotPresent，
+          # 避免依赖 K8s 按 tag 的隐式拉取语义（仅 latest 才默认 Always）
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           securityContext:
@@ -463,7 +497,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
-  {{- /* 批次5（R4-1.51）：TLS（cert-manager）+ 强制 HTTPS + 上传体积——原 Chart 无
+  {{- /* TLS（cert-manager）+ 强制 HTTPS + 上传体积——原 Chart 无
      TLS（生产 HTTP 明文）、无 proxy-body-size（网关默认 1MB，后端允许 20MB 上传必 413）。
      任一配置开启时输出 annotations 块；proxyBodySize 默认 20m 恒输出。 */ -}}
   annotations:
@@ -503,9 +537,9 @@ spec:
                 name: {{ .Release.Name }}-backend
                 port:
                   number: 8080
-          # 历史 /uploads/ 文件地址（R3-1.2 令牌化改造前的存量 URL，CommonController.isAccessiblePath
+          # 历史 /uploads/ 文件地址（令牌化改造前的存量 URL，CommonController.isAccessiblePath
           # 仍为其签发令牌）同源直达后端，FileAccessFilter 仍校验令牌。此前缺失导致存量文件/头像
-          # 在 K8s 落入 SPA 回退返回 index.html（R4-1.42 与批14 docker nginx 补 /files 对齐）
+          # 在 K8s 落入 SPA 回退返回 index.html（与 docker nginx 补 /files 对齐）
           - path: /uploads
             pathType: Prefix
             backend:
@@ -513,7 +547,7 @@ spec:
                 name: {{ .Release.Name }}-backend
                 port:
                   number: 8080
-          # 批次5（R4-1.51）：站内消息 WebSocket 直达后端——此前 /ws 落入 path:/ →
+          # 站内消息 WebSocket 直达后端——此前 /ws 落入 path:/ →
           # frontend → SPA 回退返回 index.html，WS 握手必然失败
           - path: /ws
             pathType: Prefix

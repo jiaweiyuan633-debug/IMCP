@@ -43,7 +43,7 @@ public class OutboxDispatcher {
     private static final int STATUS_SUCCESS = 1;
     private static final int STATUS_FAILED = 2;
     private static final int STATUS_DEAD = 3;
-    /** R4-1.30：投递中（已被某实例原子抢占，防止同一行被重复投递）。 */
+    /** 投递中（已被某实例原子抢占，防止同一行被重复投递）。 */
     private static final int STATUS_PROCESSING = 4;
     /** 投递中状态滞留超时（分钟）：超过即视为抢占者崩溃/超长处理，允许清扫回收重新投递。 */
     private static final int PROCESSING_STALE_MINUTES = 5;
@@ -77,7 +77,7 @@ public class OutboxDispatcher {
         if (outboxId == null) {
             return;
         }
-        // R4-1.30：条件更新抢占——仅当行仍可投递（待投递/待重试且已到重试时间）且未被他人
+        // 条件更新抢占——仅当行仍可投递（待投递/待重试且已到重试时间）且未被他人
         // 领取时才置 PROCESSING；受影响行数为 0 说明已被抢占/已终态/未到重试时间，直接跳过。
         int claimed = jdbcTemplate.update(
                 "UPDATE sys_outbox SET status = ?, updated_at = NOW() WHERE id = ?"
@@ -104,7 +104,7 @@ public class OutboxDispatcher {
             ok = handler.handle(row.payload);
         } catch (Throwable t) {
             ok = false;
-            // R4-1.38：异常消息可能内嵌完整 webhook URL（含查询凭证），handler 层已自 sanitize，
+            // 异常消息可能内嵌完整 webhook URL（含查询凭证），handler 层已自 sanitize，
             // 投递器层再统一兜底，防绕过脱敏进入日志与 last_error 列。
             error = LogMaskUtils.sanitize(truncate(t.getMessage()));
             log.warn("发件箱投递失败，topic={}，outboxId={}，retryCount={}，err={}", row.topic, outboxId, row.retryCount, error, t);

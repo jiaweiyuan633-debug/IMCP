@@ -1,7 +1,7 @@
 package cn.admin.scaffold.module.common;
 
 /**
- * HTTP Range 请求头解析（批次2c）。支持三种形式：
+ * HTTP Range 请求头解析。支持三种形式：
  * bytes=start-end、bytes=start-（至末尾）、bytes=-suffix（末尾 N 字节）。
  * 仅处理单段 Range；多段或多段语法返回 null，由调用方按无效范围处理。
  */

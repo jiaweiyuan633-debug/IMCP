@@ -18,7 +18,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.18 回归测试：启动重新调度必须跨租户拉取全部启用任务。
+ * 回归测试：启动重新调度必须跨租户拉取全部启用任务。
  *
  * <p>背景：旧代码在 {@link SysJobSchedulerService#initJobs} 里 {@code selectList(status=1)}——
  * @PostConstruct 阶段无租户上下文，拦截器注入默认 tenant_id=1、只拉回租户 1 的任务，

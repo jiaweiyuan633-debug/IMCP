@@ -24,7 +24,7 @@ if (-not (Test-Path $BackupFile)) {
     throw "Backup file not found: $BackupFile"
 }
 $mysql = Join-Path $MySqlBin 'mysql.exe'
-# 批次6（R4-1.52）：口令改经 MYSQL_PWD 环境变量注入，避免进程命令行明文
+# 口令改经 MYSQL_PWD 环境变量注入，避免进程命令行明文
 $env:MYSQL_PWD = $DbPassword
 
 # ---- 1. MySQL 恢复 ----

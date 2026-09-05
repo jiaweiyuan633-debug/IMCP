@@ -22,7 +22,7 @@
 
     <main id="top">
       <section class="hero">
-        <img class="hero-visual" src="/src/assets/dashboard-preview.svg" alt="智能管理平台管理后台预览" />
+        <img class="hero-visual" :src="dashboardPreview" alt="智能管理平台管理后台预览" />
         <div class="hero-overlay" />
         <div class="container hero-content">
           <p class="eyebrow">企业生产管理 · 双端智能平台</p>
@@ -78,7 +78,7 @@
             <p>信息密度、操作效率与安全边界并重，适合高频重复的日常工作。</p>
           </div>
           <div class="product-showcase">
-            <img src="/src/assets/dashboard-preview.svg" alt="后台管理系统界面" />
+            <img :src="dashboardPreview" alt="后台管理系统界面" />
             <div class="product-points">
               <div v-for="point in productPoints" :key="point.title" class="point">
                 <CheckCircle2 :size="22" />
@@ -137,16 +137,18 @@
             <p class="eyebrow">预约演示</p>
             <h2>30 分钟了解智能管理平台是否适合你</h2>
             <p>提交需求后，顾问会结合你的组织规模和业务流程，给出部署建议与演示方案。</p>
-            <div class="contact-info">
-              <Phone :size="20" />
-              <span>400-800-0015</span>
-            </div>
-            <div class="contact-info">
-              <Mail :size="20" />
-              <span>hello@example.com</span>
-            </div>
+            <template v-if="contactChannels.length">
+              <div v-for="channel in contactChannels" :key="channel.label" class="contact-info">
+                <component :is="channel.icon" :size="20" />
+                <span>{{ channel.value }}</span>
+              </div>
+            </template>
+            <p v-else class="contact-demo">
+              <Info :size="18" />
+              <span>演示站点 — 联系方式待上线配置后开放</span>
+            </p>
           </div>
-          <form class="contact-form" @submit.prevent="submit">
+          <form class="contact-form" @submit.prevent="onSubmit">
             <h3>获取专属方案</h3>
             <label>
               <span>姓名</span>
@@ -164,11 +166,18 @@
               <span>业务需求</span>
               <textarea v-model="form.message" rows="4" placeholder="简单描述你的管理场景" />
             </label>
-            <button class="btn btn-primary btn-block" type="submit">
+            <!-- honeypot：对用户不可见；机器人自动填写命中后静默丢弃，不做任何成功反馈 -->
+            <label class="hp-wrap" aria-hidden="true">
+              <span>网站（请勿填写）</span>
+              <input v-model="form.website" type="text" name="website" tabindex="-1" autocomplete="off" />
+            </label>
+            <button class="btn btn-primary btn-block" type="submit" :disabled="!leadEnabled || submitting || cooldown">
               <ArrowRight :size="18" />
-              提交需求
+              {{ submitting ? '提交中…' : '提交需求' }}
             </button>
-            <p v-if="submitted" class="submit-tip">已收到需求，顾问将尽快与你联系。</p>
+            <p v-if="demoMode" class="demo-tip">演示模式：表单未启用，正式线索收集接入后开放提交。</p>
+            <p v-else-if="formState === 'ok'" class="submit-tip">已收到需求，顾问将尽快与你联系。</p>
+            <p v-else-if="formState === 'error'" class="submit-tip error">提交失败，请稍后重试或通过上方联系方式联系我们。</p>
           </form>
         </div>
       </section>
@@ -186,7 +195,7 @@
           <a href="#pricing">定价</a>
           <a href="#contact">联系我们</a>
         </div>
-        <p class="copyright">© 2026 智能管理平台</p>
+        <p class="copyright">© {{ currentYear }} {{ companyName }}</p>
       </div>
     </footer>
   </div>
@@ -199,6 +208,7 @@ import {
   ArrowRight,
   BrainCircuit,
   CheckCircle2,
+  Info,
   LockKeyhole,
   Mail,
   Menu,
@@ -209,10 +219,40 @@ import {
   X,
 } from 'lucide-vue-next'
 import { trackEvent } from './analytics'
+// 资源经 vite 打包内联 URL（hash 文件名），避免 /src/** 根路径在生产构建中不存在
+import dashboardPreview from './assets/dashboard-preview.svg'
 
 const navOpen = ref(false)
-const submitted = ref(false)
-const form = reactive({ name: '', company: '', phone: '', message: '' })
+
+// ---- 配置驱动（.env.production / 部署注入；未配置即演示模式降级）----
+const leadEndpoint = (import.meta.env.VITE_LEAD_ENDPOINT || '').trim()
+const contactPhone = (import.meta.env.VITE_CONTACT_PHONE || '').trim()
+const contactEmail = (import.meta.env.VITE_CONTACT_EMAIL || '').trim()
+const companyName = (import.meta.env.VITE_COMPANY_NAME || '').trim() || '智能管理平台'
+const currentYear = new Date().getFullYear()
+
+// 预约表单仅在有真实线索端点时启用；否则禁用按钮并明确提示演示模式，绝不假装提交成功
+const leadEnabled = leadEndpoint.length > 0
+const demoMode = !leadEnabled
+// 联系方式仅在 env 注入后渲染（不展示 400-800-0015 / hello@example.com 之类虚构占位）
+const contactChannels = [
+  ...(contactPhone ? [{ label: 'phone', icon: Phone, value: contactPhone }] : []),
+  ...(contactEmail ? [{ label: 'email', icon: Mail, value: contactEmail }] : []),
+]
+
+const submitting = ref(false)
+// 前端限频：成功提交后冷却 30s 内禁用按钮（防误连点；反爬/幂等仍需服务端兜底）
+const cooldown = ref(false)
+let cooldownTimer: number | undefined
+function armCooldown() {
+  cooldown.value = true
+  window.clearTimeout(cooldownTimer)
+  cooldownTimer = window.setTimeout(() => {
+    cooldown.value = false
+  }, 30_000)
+}
+const formState = ref<'idle' | 'ok' | 'error'>('idle')
+const form = reactive({ name: '', company: '', phone: '', message: '', website: '' })
 
 const features = [
   { icon: ShieldCheck, title: '组织与权限', desc: '用户、角色、菜单、按钮和数据权限统一管理，支持部门与岗位组织模型。' },
@@ -275,8 +315,41 @@ const pricing = [
   },
 ]
 
-function submit() {
-  trackEvent('lead_submit', { company: form.company })
-  submitted.value = true
+async function onSubmit() {
+  if (!leadEnabled || submitting.value || cooldown.value) {
+    return
+  }
+  // honeypot 命中（机器人填了隐藏字段）：静默丢弃，不请求端点、不给真实成功反馈
+  if (form.website.trim()) {
+    formState.value = 'ok'
+    armCooldown()
+    return
+  }
+  submitting.value = true
+  formState.value = 'idle'
+  try {
+    const response = await fetch(leadEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        company: form.company,
+        phone: form.phone,
+        message: form.message,
+        source: 'website-contact-form',
+      }),
+    })
+    if (!response.ok) {
+      throw new Error(`lead endpoint responded ${response.status}`)
+    }
+    formState.value = 'ok'
+    armCooldown()
+    trackEvent('lead_submit', { company: form.company })
+  } catch (error) {
+    console.error('[website] 线索提交失败：', error)
+    formState.value = 'error'
+  } finally {
+    submitting.value = false
+  }
 }
 </script>

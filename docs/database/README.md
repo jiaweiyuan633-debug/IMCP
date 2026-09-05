@@ -1,161 +1,115 @@
-# 数据库设计
+# 数据库设计与迁移
 
-Flyway 脚本是唯一事实来源，位于 `backend/src/main/resources/db/migration/`，当前版本 V1-V62。
+## 1. 事实来源
 
-## 版本记录
+Flyway 迁移脚本是数据库结构的唯一事实来源，位于 `backend/src/main/resources/db/migration/`。**本文不固化版本号：当前版本一律以该目录最新 V 文件为准**（核对时最新为 `V63__password_change_policy.sql`，后续新增取 V64 起）。列结构、索引、种子数据以各 V 文件为准；只读本 README 无法替代查阅迁移目录。
 
-| 版本 | 内容 |
-| --- | --- |
-| V1 | 初始系统表：用户、角色、菜单、部门、岗位、字典、参数、日志、AI 表 |
-| V2 | 按钮权限与菜单种子数据 |
-| V3 | 企业基础模块：部门、岗位、字典、参数配置 |
-| V4 | 数据权限、定时任务表与基础任务 |
-| V5 | 监控、通知公告、看板统计表 |
-| V6 | 审计字段、通知已读、文件元数据 |
-| V7 | 租户、简化工作流与菜单权限 |
-| V8 | 核心业务表审计字段与乐观锁 |
-| V9 | 租户隔离字段与工作流审批日志 |
-| V10 | 告警规则表与菜单权限 |
-| V11 | 文件管理菜单权限 |
-| V12 | 业务表租户隔离字段 |
-| V13 | 流程定义、流程节点与工作流引擎字段 |
-| V14 | 后台管理系统通知文案更新 |
-| V15 | 告警规则分级、静默期与 Webhook |
-| V16 | 工作流转办与撤回字段 |
-| V17 | 角色、部门、岗位、字典、参数租户隔离 |
-| V18 | 审计日志表 |
-| V19 | 审计日志菜单权限 |
-| V20 | TOTP 两步验证字段 |
-| V21 | 租户用户/存储配额与管理员 |
-| V22 | AI 服务每日任务限额 |
-| V23 | 工作流条件/并行/表单与超时提醒 |
-| V24 | 文件对象存储 key |
-| V25 | TOTP 密钥列扩容以支持加密存储 |
-| V26 | 关联表补齐 `created_at/updated_at` |
-| V27 | 登录日志、操作日志、工作流、AI 任务、公告、定时任务高频查询索引 |
-| V28 | 所有自增主键统一为 `BIGINT UNSIGNED` |
-| V29 | 普通用户角色移除看板权限，授权通知公告菜单 |
-| V30 | 文件存储增强：`content_type/category/sha256/扫描状态/逻辑删除` |
-| V31 | 消息中心：`sys_message`、`sys_message_read` 与消息待办、铃铛聚合 |
-| V32 | Warm-Flow 工作流引擎表（`flow_definition/flow_node/flow_skip/flow_ins_order/flow_task` 等） |
-| V33 | `sys_user` 用户名唯一键按租户隔离（`uk_sys_user_tenant_username`） |
-| V34 | 字段级审计日志：`sys_field_audit_log` |
-| V35 | 组件演示菜单种子数据 |
-| V36 | 设备模块：`sys_device` |
-| V37 | 报表模块菜单 |
-| V38 | 消息通道：`sys_channel_config`、`sys_channel_log` |
-| V39 | AI 增强：`ai_prompt_template`、`ai_knowledge_base`、`ai_knowledge_doc` |
-| V40 | OAuth/SSO：`sys_oauth_config`、`sys_user_oauth`、`sys_oauth_client` |
-| V41 | MCP Server 配置：`sys_mcp_server` |
-| V42 | 可靠投递发件箱：`sys_outbox` |
-| V43 | 数据权限规则可配置：`sys_data_permission` |
-| V44 | 消息模板：`sys_message_template`；`sys_message` 增加 `content_type`（TEXT/HTML 富文本） |
-| V45 | API 资源级权限：`sys_api_perm`（method+path → 所需权限编码），URL 层从"仅认证"升级为"认证+资源权限" |
-| V46 | 共享字典：`sys_dict_type` 增加 `is_shared`（tenant_id=0 全局一份）+ `common_status` 种子共享字典 |
-| V47 | 报表定义：`report_definition`（自定义 SQL 报表，执行期只读守卫 + 行数上限） |
-| V48 | 物模型/遥测：`device_thing_model`、`device_telemetry` |
-| V49 | 导入导出中心：`import_export_template`、`import_export_job` |
-| V50 | 表单引擎：`form_definition`、`form_instance` |
-| V51 | 批次4 菜单权限种子补齐（报表/设备/导入导出/表单） |
-| V52 | 导入导出任务查询字段与索引补充 |
-| V53 | 大屏模板：`screen_template` 与菜单权限 |
-| V54 | AI 任务错误类型字段 |
-| V55 | AI 任务重试字段 |
-| V56 | 共享字典菜单父级修复 |
-| V57 | OAuth 密钥加密存储（`SecretCipher` 对称加密列迁移） |
-| V58 | 可靠投递发件箱处理状态字段 |
-| V59 | 审计日志数据权限注册：`sys_audit_log`/`sys_field_audit_log` → `sys_data_permission` |
-| V60 | 菜单 id 动态化：`uk_sys_menu_perm` 唯一索引，菜单业务定位键由「数字 id 区间」改为「perm 唯一键」 |
-| V61 | 业务表数据权限注册：`form_instance`/`import_export_job` → `sys_data_permission`（表单提交记录按提交人、导入导出任务按创建人过滤） |
-| V62 | 渠道发送日志 PII 落库加固：`sys_channel_log` 的 `target`/`content` 扩列以容纳加密密文（VARCHAR→TEXT） |
+运行时行为要点：
 
-## 表清单
+- Flyway 在应用启动时自动执行（prod 层 `spring.flyway.enabled=true`、`locations=classpath:db/migration`）。
+- `placeholder-replacement: false`：迁移中字面量 `${key}`（如消息模板列注释）不会被替换，不要依赖 Flyway 占位符。
+- prod `baseline-on-migrate: false`：禁止对非空库自动打基线；dev/test 允许 baseline（迁移一致性由 Flyway `validate-on-migrate` 默认开启保障）。
 
-### 系统与权限
+## 2. 迁移纪律
 
-| 表 | 说明 |
-| --- | --- |
-| `sys_user` | 用户，含部门、租户、审计字段、乐观锁 |
-| `sys_role` | 角色，含数据权限范围、审计字段、乐观锁 |
-| `sys_menu` | 菜单与按钮权限 |
-| `sys_api_perm` | API 资源权限映射：method+path 模式 → 所需权限编码，URL 层资源级校验 |
-| `sys_data_permission` | 数据权限规则（表 → 行级表达式列映射），可配置热加载 |
-| `sys_user_role` | 用户角色 |
-| `sys_role_menu` | 角色菜单 |
-| `sys_role_dept` | 角色自定义数据权限部门 |
-| `sys_dept` | 部门，含审计字段、乐观锁 |
-| `sys_post` | 岗位，含审计字段、乐观锁 |
-| `sys_user_post` | 用户岗位 |
+1. **只新增 V(n+1)**：新脚本编号 = 当前目录最大版本 +1，文件名形如 `V64__<描述>.sql`；**永不修改已发布的迁移**。Flyway 对已执行脚本做 checksum 校验，改历史脚本会使 checksum 不一致、`migrate` 失败，生产启动即失败。表结构/数据变更一律走新迁移。
+2. **禁止手工改生产库**：包括数据修复、加索引——全部写成迁移（含 UPDATE 语句）。
+3. **H2/MySQL 双写兼容**：既有迁移为兼容测试库（H2 MySQL 模式）对同一表的多个变更拆成独立 `ALTER TABLE` 语句（见 `V33__tenant_user_unique_key.sql` 注释），新迁移沿用该写法。
+4. **菜单/权限迁移规范**（自 `V60__menu_perm_unique_dynamic.sql` 起）：`sys_menu.id` 一律由数据库自增分配，**禁止在迁移中硬编码 id 区间**；定位菜单用 `WHERE perm='...'`，给角色授权用
+   `INSERT INTO sys_role_menu (role_id, menu_id) SELECT <角色id>, id FROM sys_menu WHERE perm='...'`
+   动态解析。`perm` 是菜单业务定位键（唯一索引 `uk_sys_menu_perm`）；目录/菜单行 `perm` 为 NULL 时不受该唯一约束。
+5. 依赖外部数据状态的数据迁移（如按默认口令哈希标记账号）要显式写清语义并可在 dev/test 下关闭（见 V63 注释与 `application-dev/test.yml`）。
 
-### 基础数据
+## 3. 表清单策略：迁移目录自取 + 主题域导读
 
-| 表 | 说明 |
-| --- | --- |
-| `sys_dict_type` | 字典类型，含审计字段、乐观锁；`is_shared=1` 表示共享字典（tenant_id=0 全局一份） |
-| `sys_dict_data` | 字典数据，含审计字段、乐观锁；共享类型数据在 tenant_id=0，租户私有数据按 dict_value 覆盖共享层 |
-| `sys_config` | 参数配置，含审计字段、乐观锁 |
-| `sys_tenant` | 租户，含审计字段、乐观锁 |
+**不在此逐张罗列表清单**——迁移持续新增，手抄清单必然过期。开发/运维查表时：`ls backend/src/main/resources/db/migration/ | sort` 取全部 V 文件，按文件名定位所需表；下表为主题域导读，帮助按域找到入口表（表名均来自迁移目录，列结构以对应 V 文件为准）：
 
-### 日志与监控
+**系统与权限**
 
-| 表 | 说明 |
-| --- | --- |
-| `sys_login_log` | 登录日志 |
-| `sys_oper_log` | 操作日志 |
-| `sys_sql_log` | SQL 监控日志 |
-| `sys_job` | 定时任务，含审计字段、乐观锁 |
-| `sys_job_log` | 任务日志 |
-| `sys_alert_rule` | 服务器告警规则，含租户 |
-| `sys_audit_log` | 审计日志，含租户、操作参数与结果 |
+- `sys_user`（含租户、审计、逻辑删除、密码策略字段）、`sys_role`、`sys_menu`、`sys_dept`、`sys_post`
+- 关联表：`sys_user_role` / `sys_role_menu` / `sys_role_dept` / `sys_user_post`
+- 资源权限：`sys_api_perm`（method+path → 所需权限编码，URL 层资源级校验）、`sys_data_permission`（表 → 行级表达式列映射，可热加载）
 
-### 业务与消息
+**基础数据与租户**
 
-| 表 | 说明 |
-| --- | --- |
-| `sys_notice` | 通知公告，含审计字段、乐观锁 |
-| `sys_notice_read` | 通知已读 |
-| `sys_file` | 文件元数据，含租户、存储类型 |
-| `sys_message` | 系统消息，含租户、类型、标题、内容（TEXT/HTML 富文本）、已读状态 |
-| `sys_message_read` | 消息已读 |
-| `sys_message_template` | 消息模板：`${key}` 占位符 + TEXT/HTML 内容类型，按模板渲染发送 |
-| `sys_channel_config` | 消息渠道配置（邮件/短信/钉钉/企微） |
-| `sys_channel_log` | 渠道发送记录（含重试失败的错误信息） |
-| `sys_workflow` | 工作流实例，含流程定义、当前节点、审计字段、乐观锁 |
-| `sys_workflow_log` | 工作流审批日志 |
-| `sys_process_def` | 流程定义，含租户、唯一流程标识 |
-| `sys_process_node` | 流程节点，含审批角色 |
-| Warm-Flow 引擎表 | `flow_definition/flow_node/flow_skip/flow_ins_order/flow_task` 等流程引擎持久化表 |
+- `sys_dict_type` / `sys_dict_data`（`is_shared=1` 共享字典，tenant_id=0 全局一份）、`sys_config`（参数）、`sys_tenant`
 
-### AI
+**认证与安全**
 
-| 表 | 说明 |
-| --- | --- |
-| `ai_service_config` | AI 服务配置 |
-| `ai_task` | AI 任务 |
-| `ai_task_result` | AI 任务结果 |
+- TOTP 密钥、`must_change_password`/`password_changed_at`（V63 密码策略）均在 `sys_user` 列上
+- OAuth/SSO：`sys_oauth_config`（平台级配置，租户 1 可管）、`sys_oauth_client`（租户私有，`client_id` 全局唯一）、`sys_user_oauth`（绑定关系）
+- MCP：`sys_mcp_server`
 
-## 关键设计
+**日志与审计**
 
-- 用户、角色、部门、岗位使用逻辑删除。
-- `created_by/updated_by` 由 `MyMetaObjectHandler` 自动填充，核心业务表带 `version` 乐观锁并由 `OptimisticLockerInnerInterceptor` 校验。
-- 租户隔离：`sys_user`、`sys_file`、`sys_notice`、`sys_message`、`sys_job`、`sys_workflow`、日志与 AI 业务表均带 `tenant_id`，MyBatis-Plus 租户拦截器按当前 `TenantContext` 自动追加条件；自定义 `<script>` Mapper 方法通过 `@InterceptorIgnore(tenantLine = "true")` 处理。
-- OAuth 三表隔离模型（R4-1.22，刻意不进租户白名单）：`sys_oauth_config` 为**平台级配置**，登录/授权在匿名上下文按 provider 全局解析（`OauthLoginService.requireEnabled`），注入租户条件会恒落租户 1 使非平台租户配置查不到——因此仅租户 1（平台）管理员可管理，服务层 `requirePlatformTenant` 守卫；`sys_oauth_client` 为**租户私有**（SSO 应用），page 过滤当前租户、create 落当前租户、update/status/delete 校验归属，且 `client_id` 跨租户全局唯一（SSO 匿名链路按 client_id `selectOne`，重名抛 `TooManyResultsException`）；`sys_user_oauth` 所有访问均已显式按租户过滤，无需额外约束。
-- 用户名唯一性按租户隔离：`sys_user` 使用 `uk_sys_user_tenant_username(tenant_id, username)`，多租户下各租户可存在同名账号。
-- 数据权限：角色支持全部数据、本部门、本部门及以下、自定义部门四种范围，查询时由 `DataScopeHelper` 统一注入。
-- 数据权限 AOP：`@DataScope` 注解 + MyBatis SQL 拦截器，受控表与关联列从 `sys_data_permission` 配置表读取（可热加载）。当前受控表：`sys_user`（按用户 ID）、`ai_task`（按创建人）、`sys_oper_log`/`sys_login_log`、`sys_audit_log`/`sys_field_audit_log`（日志类）、`form_instance`（按提交人 submitter_id）、`import_export_job`（按创建人 created_by）。**语义矩阵**：`report_definition`/`form_definition`/`screen_template` 是租户内全局共享的配置类数据（由租户隔离 + builtin/status 业务条件控制可见性），`sys_notice`/`sys_message` 公告全员可见、消息按接收人定向分发，`sys_channel_config`/`ai_service_config` 等配置表仅管理员管理——以上**明确不施加**行级过滤，靠业务查询条件或租户隔离兜底。
-- 权限、字典、参数支持 Redis 缓存，权限变更自动失效缓存。
-- 文件元数据统一写入 `sys_file`，存储后端支持本地目录与 MinIO。
-- SQL 日志阈值由 `SQL_LOG_THRESHOLD_MS` 控制，默认 50ms。
-- 定时任务使用 Quartz JDBC 存储，任务定义与执行日志持久化。
-- 工作流引擎包含流程定义、审批节点、待办任务与审批日志，支持按角色流转。
-- 通知实时推送使用 SSE，告警规则由定时任务检查并写入通知公告。
-- SSE 使用一次性 Ticket 建立连接，避免 Token 出现在 URL。
-- 告警支持 `INFO/WARNING/CRITICAL` 分级、静默期与 Webhook 推送。
-- 工作流支持发起人撤回和审批转办。
-- 工作流节点支持条件表达式、并行审批、表单数据和超时提醒。
-- 租户支持用户上限、存储配额与管理员绑定。
-- AI 服务支持每日任务限额，非管理员查看用户敏感字段自动脱敏。
-- 上传文件通过签名 Token 访问，TOTP 密钥加密存储。
-- 所有数据库变更必须新增 Flyway 脚本，禁止手工改生产库。
-- 高频查询字段采用组合索引，索引命名统一为 `idx_表名_字段名`。
-- 菜单迁移规范（R4-1.36 起）：`sys_menu.id` 一律由数据库自增分配，**禁止**在迁移脚本中硬编码 id 区间；新增菜单的守卫用 `WHERE perm='...'`、给角色授权用 `INSERT INTO sys_role_menu (role_id, menu_id) SELECT 角色id, id FROM sys_menu WHERE perm='...'` 动态解析。`perm` 是菜单业务定位键（`uk_sys_menu_perm` 唯一索引约束），目录/菜单行（perm 为 NULL）不受唯一约束。
+- `sys_login_log` / `sys_oper_log` / `sys_sql_log`、`sys_audit_log` / `sys_field_audit_log`（字段级审计）、`sys_job` / `sys_job_log`（Quartz JDBC 存储）、`sys_alert_rule`
+
+**消息、通知与文件**
+
+- `sys_notice` / `sys_notice_read`、`sys_message` / `sys_message_read` / `sys_message_template`、`sys_channel_config` / `sys_channel_log`（消息渠道）、`sys_outbox`（可靠投递发件箱）、`sys_file`（文件元数据）
+
+**工作流**
+
+- `sys_workflow` / `sys_workflow_log`、`sys_process_def` / `sys_process_node`
+- Warm-Flow 引擎持久化表：`flow_definition` / `flow_node` / `flow_skip` / `flow_ins_order` / `flow_task` 等（V32 引入，`flow_*` 前缀）
+
+**AI**
+
+- `ai_service_config`、`ai_task` / `ai_task_result`、`ai_prompt_template` / `ai_knowledge_base` / `ai_knowledge_doc`
+
+**设备与物联**
+
+- `sys_device`、`device_thing_model`（物模型）、`device_telemetry`（遥测，纯追加时序）
+
+**报表 / 表单 / 导入导出 / 大屏**
+
+- `report_definition`（自定义 SQL 报表）、`form_definition` / `form_instance`、`import_export_template` / `import_export_job`、`screen_template`
+
+## 4. 关键设计规约
+
+### 4.1 审计列与填充
+
+核心业务表普遍带下列列（以各表迁移为准，不是每表全部具备）：
+
+| 列 | 语义 | 维护方 |
+| --- | --- | --- |
+| `tenant_id` | 租户标识（多租户表） | 租户拦截器自动追加/落库 |
+| `created_by` / `updated_by` | 操作人（用户 id） | `MyMetaObjectHandler` 自动填充 |
+| `created_at` / `updated_at` | 创建/更新时间 | `MyMetaObjectHandler` + DB 默认值 |
+| `deleted` | 逻辑删除标记 | MyBatis-Plus `@TableLogic` |
+| `version` | 乐观锁版本 | `OptimisticLockerInnerInterceptor` 校验，更新时 +1 |
+
+- `application.yml`：`logic-delete-field: deleted`、`logic-delete-value: 1`、`logic-not-delete-value: 0`。
+- 实体缺失某字段时自动填充会跳过（非严格填充），无需逐实体声明。
+
+### 4.2 主键口径
+
+- 主键统一 `BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`（存量表于 `V28__primary_keys_unsigned.sql` 统一；新表按同口径建）。
+- 关联表主键为复合键（如 `sys_user_role(user_id, role_id)`）。
+
+### 4.3 逻辑删除 + 唯一键取舍（禁止该组合）
+
+- **禁止新增「逻辑删除 + 业务编码唯一键」组合**：逻辑删除后行仍在，`(tenant_id, 编码)` 唯一键仍占位——同名/同编码数据永远无法重建（exists 检查过滤 `deleted=0` 判定"不存在"，INSERT 却命中唯一键）。
+- **存量表处置**（`sys_user`/`sys_role`/`sys_post`/`sys_dict_type`/`sys_config`/`ai_prompt_template` 等）：删除路径统一在删除前调用 `cn.admin.scaffold.common.UniqueKeyRelease.releaseCode`，把业务编码改写为 `原编码#del#时间戳`（如 `admin#del#20240101120000000`）释放唯一键、保留逻辑删除行（审计可追溯），同名数据可立即重建。
+- **确需例外时**：唯一键必须包含 `deleted` 且 `deleted` 存删除时间戳（约定详见 [`../architecture-conventions.md`](../architecture-conventions.md)）。仓库已发布迁移中的 `deleted` 均为 `TINYINT NOT NULL DEFAULT 0`（0=在存，1=已删），尚无时间戳实现——该条款适用于新增表设计，若未来落地时间戳删除列，以对应新迁移为准。
+- 用户名唯一性按租户隔离：`sys_user` 用 `uk_sys_user_tenant_username(tenant_id, username)`（V33 替换 V1 的全局 `uk_sys_user_username`），多租户下各租户可存在同名账号。
+
+### 4.4 无外键的设计决策
+
+迁移目录中**不使用 FOREIGN KEY / REFERENCES 约束**（全目录核对无外键声明）。关联完整性由应用层维护（Service 显式校验、删除前检查引用、MyBatis-Plus 逻辑删除），以规避多租户/跨库与迁移顺序复杂度、减少锁竞争。这意味着：层叠行为需应用层实现；孤儿数据防护靠业务校验与数据权限，不在 DB 层兜底。
+
+### 4.5 索引规约
+
+- 命名：普通/查询组合索引 `idx_<表>_<语义>`（如 `idx_sys_message_tenant_receiver`、`idx_ai_task_tenant_status`）；唯一索引 `uk_<表>_<语义>`（如 `uk_sys_user_tenant_username`）。
+- 高频查询先建组合索引且租户/状态类条件列放前（参考 `V27__add_common_query_indexes.sql`：`(tenant_id, username/status/...)` 模式），遥测等时序表按 `(device_id, property_key, occurred_at)` 建模。
+- 迁移中建索引用 `CREATE INDEX` 或表内 `KEY`；删除/替换唯一键用独立 `ALTER TABLE`（见 V33）。
+
+### 4.6 多租户隔离机制
+
+- MyBatis-Plus `TenantLineInnerInterceptor` 按 `TenantContext` 当前租户自动追加 `tenant_id` 条件（`MybatisPlusConfig`）；自定义 `<script>` Mapper 方法与跨租户查询按需显式处理（租户白名单配置见 `MybatisPlusConfig`，注释中说明了 OAuth 等平台级表为何不进白名单）。
+- 数据权限：角色支持全部数据/本部门/本部门及以下/自定义部门四种范围，`DataScopeAspect` + `DataScopeInnerInterceptor` 从 `sys_data_permission` 配置读取受控表与关联列，可热加载；配置类/公告/消息等明确不施加行级过滤的语义以代码为准。
+
+### 4.7 说明
+
+- 升级/发布前确认迁移脚本与镜像版本一致：新增发布只追加 V 文件，不回头改旧脚本（§2）。
+- 字段级审计、乐观锁冲突、逻辑删除组合等运行时行为以 `backend` 代码（`MyMetaObjectHandler`、`OptimisticLockerInnerInterceptor`、`UniqueKeyRelease` 等）与 `application.yml` 为准，本文件仅作导读。

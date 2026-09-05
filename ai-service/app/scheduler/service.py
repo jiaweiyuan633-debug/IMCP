@@ -176,11 +176,11 @@ class Scheduler:
     ) -> dict:
         """注册一个调度：写 spec hash 并加入到期队列，返回调度信息。
 
-        批次3（R4-1.49）：注册期校验 biz_type 已注册（否则该调度每次触发都因
+        注册期校验 biz_type 已注册（否则该调度每次触发都因
         未知任务类型入队失败、且因调度器不重排而永久停摆）。
         """
         _parse_schedule(schedule)  # 非法表达式在此抛 ValueError
-        # 批次3：biz_type 校验——任务管理器支持时校验（鸭子类型：有 _service_names 即校验），
+        # biz_type 校验——任务管理器支持时校验（鸭子类型：有 _service_names 即校验），
         # 测试的 FakeTaskManager 无该方法时跳过
         if (
             self._task_manager is not None
@@ -199,7 +199,7 @@ class Scheduler:
             "params": params,
             "enabled": enabled,
             "run_count": 0,
-            # 批次3：失败退避状态——入队失败后按指数退避重排，避免瞬时故障导致调度永久停摆
+            # 失败退避状态——入队失败后按指数退避重排，避免瞬时故障导致调度永久停摆
             "fail_count": 0,
         }
         await self.redis.hset(
@@ -232,7 +232,7 @@ class Scheduler:
     async def _process_due(self, id_: str, now: float) -> None:
         """处理单个到期调度：读 spec → 入队 → 推进 run_count → 重排下次触发。
 
-        批次3（R4-1.49）修复「单次瞬时失败即永久停摆」：原实现入队失败直接 return——
+        修复「单次瞬时失败即永久停摆」：原实现入队失败直接 return——
         due 条目已被 run_loop 移除、run_count 未推进、下次触发时间从未写回，该调度
         从此静默死亡。现在失败按指数退避重排 due（fail_count 递增，退避 2^n 秒封顶
         60s），恢复后自然继续；409（同名任务已存在）视为幂等成功——调度器周期触发
@@ -258,7 +258,7 @@ class Scheduler:
         except Exception as exc:  # noqa: BLE001 - 单条失败不应中断循环
             if getattr(exc, "status_code", None) == 409:
                 # 幂等成功：同名任务已存在（含上次触发遗留），本轮已入队——推进 run_count
-                # 使下次触发使用新 task_no，并清零失败计数（批次3）
+                # 使下次触发使用新 task_no，并清零失败计数
                 spec["run_count"] += 1
                 spec["fail_count"] = 0
             else:
@@ -287,28 +287,111 @@ class Scheduler:
         await self.redis.zadd(self.settings.scheduler_due_key, {id_: next_ts})
 
     async def run_loop(self) -> None:
-        """后台主循环：扫到期条目出队处理；无到期时按 poll_seconds 休眠。"""
+        """后台主循环：扫到期条目出队处理；无到期时按 poll_seconds 休眠。
+
+        整轮循环包在 try 里：Redis 抖动等瞬时错误只触发指数退避后重启本轮，
+        不让调度循环被单个异常杀死（修复前 zrangebyscore/zrem 抛错即退出循环、
+        且无自愈路径，调度永久停摆）。条目在 zrem 之后、重排之前崩溃会丢条目：
+        单条处理异常按指数退避写回 due，周期性对账（reconcile_due）兜底。
+        """
+        backoff = 0.0
+        last_reconcile = 0.0
         while True:
-            now = time.time()
-            due_ids = await self.redis.zrangebyscore(
-                self.settings.scheduler_due_key, 0, now
+            try:
+                # 周期性对账（与 worker 自愈同节奏）：自愈「zrem 后崩溃丢条目」
+                # 与 register 写 spec 后崩溃的缺口，避免调度静默停止
+                if time.monotonic() - last_reconcile >= 60.0:
+                    await self.reconcile_due()
+                    last_reconcile = time.monotonic()
+                now = time.time()
+                due_ids = await self.redis.zrangebyscore(
+                    self.settings.scheduler_due_key, 0, now
+                )
+                if not due_ids:
+                    backoff = 0.0
+                    await asyncio.sleep(self.settings.scheduler_poll_seconds)
+                    continue
+                # 多副本领取互斥——zrangebyscore 只读，两实例可读到同一批到期项；
+                # zrem 返回实际删除数，仅删除到（>0）的实例拥有这批的处置权，另一实例跳过。
+                removed = await self.redis.zrem(self.settings.scheduler_due_key, *due_ids)
+                if not removed:
+                    backoff = 0.0
+                    continue
+                for id_ in due_ids:
+                    try:
+                        await self._process_due(id_, now)
+                    except asyncio.CancelledError:
+                        await self._best_effort_reschedule(id_, now)
+                        raise
+                    except Exception:  # Redis 类故障不中断整批
+                        logger.exception("调度 %s 处理异常，按退避写回", id_)
+                        await self._best_effort_reschedule(id_, now)
+                backoff = 0.0
+            except asyncio.CancelledError:
+                raise
+            except Exception as exception:  # noqa: BLE001 —— 瞬时错误不杀死调度循环
+                backoff = min(backoff * 2 + 0.5, 10.0)
+                logger.error(
+                    "调度循环瞬时错误，%.1fs 后重试: %s", backoff, exception
+                )
+                await asyncio.sleep(backoff)
+
+    async def _best_effort_reschedule(self, id_: str, now: float) -> None:
+        """异常写回：条目已被 zrem 出队但重排尚未执行时，按指数退避补回 due。
+
+        尽力而为——spec 已删除/已禁用/写回本身失败时静默放弃，交由启动/周期
+        对账（reconcile_due）兜底，不在失败路径上二次抛出。
+        """
+        try:
+            raw = await self.redis.hget(self.settings.scheduler_spec_key, id_)
+            if raw is None:
+                return
+            spec = json.loads(raw)
+            if not spec.get("enabled", True):
+                return
+            backoff = min(2 ** min(int(spec.get("fail_count", 0)), 6), 60.0)
+            await self.redis.zadd(self.settings.scheduler_due_key, {id_: now + backoff})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("调度 %s 异常写回失败，交由对账兜底: %s", id_, exc)
+
+    async def reconcile_due(self) -> int:
+        """对账补排：为「启用但缺失 due 条目」的 spec 计算下次触发并写回 due。
+
+        崩溃一致性：register 在写 spec 之后、写 due 之前崩溃，或 run_loop 在
+        zrem 之后、重排之前崩溃，都会出现 spec 存在而 due 缺失——若不补排，
+        该调度静默停止（永不触发）。本方法读 spec hash 逐一核对 due 成员，
+        缺失且 enabled 的补排到 now 之后的下一次触发（不做已错过的补跑，避免
+        重启瞬间批量重复触发）。返回补排数量。
+        """
+        now = time.time()
+        specs = await self.redis.hgetall(self.settings.scheduler_spec_key)
+        if not specs:
+            return 0
+        due = set(await self.redis.zrange(self.settings.scheduler_due_key, 0, -1))
+        rescheduled = 0
+        for id_, raw in specs.items():
+            if id_ in due:
+                continue
+            try:
+                spec = json.loads(raw)
+                if not spec.get("enabled", True):
+                    continue
+                next_ts = _next_run_after(spec["schedule"], now)
+            except (TypeError, ValueError):
+                logger.warning("调度 %s spec 无效，跳过对账补排", id_)
+                continue
+            await self.redis.zadd(self.settings.scheduler_due_key, {id_: next_ts})
+            rescheduled += 1
+            logger.warning(
+                "调度 %s 缺失 due 条目，对账补排至 %s", id_, next_ts
             )
-            if not due_ids:
-                await asyncio.sleep(self.settings.scheduler_poll_seconds)
-                continue
-            # R4-1.30：多副本领取互斥——zrangebyscore 只读，两实例可读到同一批到期项；
-            # zrem 返回实际删除数，仅删除到（>0）的实例拥有这批的处置权，另一实例跳过。
-            # 若不判 removed，两实例都会 _process_due 并各自 create_task，调度任务被重复触发。
-            removed = await self.redis.zrem(self.settings.scheduler_due_key, *due_ids)
-            if not removed:
-                continue
-            for id_ in due_ids:
-                await self._process_due(id_, now)
+        return rescheduled
 
     async def start(self) -> None:
-        """启动后台循环；已运行则忽略。"""
+        """启动后台循环；已运行则忽略。启动前先对账补排缺失的 due 条目。"""
         if self._loop_task is not None and not self._loop_task.done():
             return
+        await self.reconcile_due()
         self._loop_task = asyncio.create_task(self.run_loop())
         self._loop_task.add_done_callback(
             lambda task: task.cancelled()

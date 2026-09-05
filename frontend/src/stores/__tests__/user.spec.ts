@@ -32,9 +32,9 @@ vi.mock('@/stores/permission', () => ({
 }))
 
 /**
- * R4-1.53（批次7）：user store 契约测试——登录应用 token（refresh 走 cookie 不落
+ * user store 契约测试——登录应用 token（refresh 走 cookie 不落
  * localStorage）、mustChangePassword 状态流转（首登强制改密）、登出/重置清理。
- * 覆盖批次1 的 refresh cookie 迁移与强制改密标记。
+ * 覆盖 refresh cookie 迁移与强制改密标记。
  */
 describe('user store', () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('user store', () => {
 
     await store.login({ username: 'admin', password: 'x' })
 
-    // 批次1：setTokens 只持久化 access token（refresh token 由 httpOnly Cookie 管理）
+    // setTokens 只持久化 access token（refresh token 由 httpOnly Cookie 管理）
     expect(authMocks.setTokens).toHaveBeenCalledWith('at2')
     expect(store.accessToken).toBe('at2')
     expect(store.userInfo?.username).toBe('admin')

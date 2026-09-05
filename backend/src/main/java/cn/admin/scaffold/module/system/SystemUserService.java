@@ -124,7 +124,7 @@ public class SystemUserService {
         if (!StringUtils.hasText(request.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "密码不能为空");
         }
-        // R4-1.40：Service 层复杂度兜底（Controller @Valid 之外防内部调用绕过），与 PasswordPolicy 共用规则
+        // Service 层复杂度兜底（Controller @Valid 之外防内部调用绕过），与 PasswordPolicy 共用规则
         if (!PasswordPolicy.matches(request.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), PasswordPolicy.MESSAGE);
         }
@@ -139,6 +139,10 @@ public class SystemUserService {
         user.setPhone(request.getPhone());
         user.setStatus(request.getStatus() == null ? Integer.valueOf(ENABLED) : request.getStatus());
         user.setDeptId(request.getDeptId());
+        // 管理员建号：口令由管理员代设，用户首次登录必须改密（prod 策略开启时服务端强制），
+        // password_changed_at 留空 = 从未自行改密
+        user.setMustChangePassword(1);
+        user.setPasswordChangedAt(null);
         userMapper.insert(user);
         // 新建用户归创建者管理，不走公开入口的归属校验（新用户 id 不在创建者可见集合内）
         if (request.getRoleIds() != null) {
@@ -156,7 +160,7 @@ public class SystemUserService {
         if (request.getId() == null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户 ID 不能为空");
         }
-        // R4-1.39：page 按数据范围过滤但按 id 直查可绕过，编辑前先做归属校验
+        // page 按数据范围过滤但按 id 直查可绕过，编辑前先做归属校验
         SysUserDO user = loadUserOrThrow(request.getId());
         checkUserDataScope(user);
         SysUserDO sameName = userMapper.selectOne(
@@ -166,11 +170,14 @@ public class SystemUserService {
         }
         user.setUsername(request.getUsername().trim());
         if (StringUtils.hasText(request.getPassword())) {
-            // R4-1.40：编辑改密同样走 PasswordPolicy 复杂度校验
+            // 编辑改密同样走 PasswordPolicy 复杂度校验
             if (!PasswordPolicy.matches(request.getPassword())) {
                 throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), PasswordPolicy.MESSAGE);
             }
+            // 管理员重置口令：清除"已自行改密"证据，下次登录强制改密并重新计时过期策略
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setMustChangePassword(1);
+            user.setPasswordChangedAt(null);
         }
         user.setNickname(request.getNickname());
         user.setAvatar(request.getAvatar());
@@ -187,42 +194,53 @@ public class SystemUserService {
         if (request.getPostIds() != null) {
             assignPostsInternal(user.getId(), request.getPostIds());
         }
+        if (StringUtils.hasText(request.getPassword())) {
+            // 管理员重置口令后吊销该用户全部会话：旧口令签发的令牌一律作废，目标用户需重新登录
+            tokenService.revokeAllUserSessionsAfterCommit(user.getId());
+        }
     }
 
     @Transactional
     public void delete(Long id) {
         SysUserDO user = loadUserOrThrow(id);
         checkUserDataScope(user);
-        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, username) 唯一键冲突——删除前释放 username
+        // 逻辑删除 + (tenant_id, username) 唯一键冲突——删除前释放 username
         // 唯一键（改为 原username#del#时间戳），否则删除后同名账号永远无法重建
         user.setUsername(UniqueKeyRelease.releaseCode(user.getUsername()));
         userMapper.updateById(user);
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
         userPostMapper.deleteByUserId(id);
-        // R4-1.31：删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
+        // 删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
         tokenService.evictUserPermissionsAfterCommit(id);
+        // 删除（逻辑删除）后吊销该用户全部会话：旧令牌不可续期，清理 refresh 链与在线记录
+        tokenService.revokeAllUserSessionsAfterCommit(id);
     }
 
     public void updateStatus(Long id, Integer status) {
-        // R4-1.39：page 受控但按 id 直查可绕过，禁用/启用前先做归属校验
+        // page 受控但按 id 直查可绕过，禁用/启用前先做归属校验
         SysUserDO user = loadUserOrThrow(id);
         checkUserDataScope(user);
         user.setStatus(status);
         userMapper.updateById(user);
-        // R4-1.31：禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照（期间角色
+        // 禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照（期间角色
         // 权限已变但用户非绑定角色路径未触达失效），会残留旧权限；清除后下次请求按库重新缓存
         tokenService.evictUserPermissionsAfterCommit(id);
+        // 停用账号即吊销全部会话（refresh 链一并作废，防止停用期旧 token 续期探测）；
+        // 既有每请求 status 校验继续保留作纵深。重新启用后用户需重新登录。
+        if (status != null && status != 1) {
+            tokenService.revokeAllUserSessionsAfterCommit(id);
+        }
     }
 
-    /** 公开入口（Controller 调用）：R4-1.39 分配角色前先校验目标用户归属，防按 id 越权提权。 */
+    /** 公开入口（Controller 调用）：分配角色前先校验目标用户归属，防按 id 越权提权。 */
     @Transactional
     public void assignRoles(Long userId, List<Long> roleIds) {
         checkUserDataScope(loadUserOrThrow(userId));
         assignRolesInternal(userId, roleIds);
     }
 
-    /** 公开入口（Controller 调用）：R4-1.39 分配岗位前先校验目标用户归属。 */
+    /** 公开入口（Controller 调用）：分配岗位前先校验目标用户归属。 */
     public void assignPosts(Long userId, List<Long> postIds) {
         checkUserDataScope(loadUserOrThrow(userId));
         assignPostsInternal(userId, postIds);
@@ -232,8 +250,8 @@ public class SystemUserService {
     private void assignRolesInternal(Long userId, List<Long> roleIds) {
         userRoleMapper.deleteByUserId(userId);
         // 清空与重设都需失效角色+权限缓存（清空后用户仍持旧角色/旧权限是缺陷）；只失效该用户，避免全局 KEYS 全扫与缓存雪崩。
-        // R4-1.12：提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧角色）会重新缓存
-        // 旧角色/权限，撤销的最长残留 30 分钟。改为事务提交后失效（批次2：角色缓存一并失效）。
+        // 提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧角色）会重新缓存
+        // 旧角色/权限，撤销的最长残留 30 分钟。改为事务提交后失效（角色缓存一并失效）。
         tokenService.evictUserRolesAndPermissionsAfterCommit(userId);
         if (roleIds == null || roleIds.isEmpty()) {
             return;
@@ -254,7 +272,7 @@ public class SystemUserService {
     }
 
     /**
-     * 单条归属校验（R4-1.39）：sys_user page/export 已按数据范围过滤，但 update/delete/updateStatus/
+     * 单条归属校验：sys_user page/export 已按数据范围过滤，但 update/delete/updateStatus/
      * assignRoles/assignPosts 按 id 直查后直接操作，非 admin 可猜测/遍历 id 越权改密/删号/提权。
      * 与 FormInstanceService.checkDataScope 同一语义：admin 短路，allowedUserIds 为 null 放行，
      * 否则目标用户 id 必须命中当前用户可见集合，越权抛 FORBIDDEN。
@@ -389,11 +407,11 @@ public class SystemUserService {
     }
 
     /**
-     * 导入用户：预检查重 → 分批事务插入 → 逐行错误收集。
+     * 导入用户：预检查重 → 分批插入 → 逐行错误收集。
      *
-     * <p>批次4（R4-1.50）：原实现单事务 + 每行 exists+insert（2N 次 DB 往返、整批
-     * 一个事务、与并发 create 撞唯一键时整批回滚）。现改为：先一次性批量查重收集
-     * 重复行，再按 500 行/批插入（每批独立事务），失败行单独记录不整批回滚。
+     * <p>原实现单事务 + 每行 exists+insert（2N 次 DB 往返、整批一个事务、与并发 create 撞唯一键时
+     * 整批回滚）。现改为：先一次性批量查重收集重复行，再按 500 行/批插入（无事务边界，每行
+     * INSERT 独立 autocommit，见 {@link #insertBatch}），失败行单独记录不连累其他行。
      * 返回 {@link ImportResult}：成功数 + 失败行明细（行号/用户名/原因）。
      */
     public ImportResult importUsers(MultipartFile file) throws IOException {
@@ -447,6 +465,9 @@ public class SystemUserService {
             user.setTenantId(TenantContext.getTenantId());
             user.setUsername(username);
             user.setPassword(passwordEncoder.encode(defaultPassword));
+            // 批量导入使用系统默认口令，标记首次登录必须改密（prod 策略开启时服务端强制）
+            user.setMustChangePassword(1);
+            user.setPasswordChangedAt(null);
             user.setNickname(row.getNickname());
             user.setEmail(row.getEmail());
             user.setPhone(row.getPhone());
@@ -463,8 +484,16 @@ public class SystemUserService {
         return new ImportResult(success, errors);
     }
 
-    /** 单批插入（独立事务）：捕获逐行唯一键冲突等异常，失败行记录原因不整批回滚。 */
-    @Transactional
+    /**
+     * 单批插入：无事务边界，逐行独立提交（每行一条 INSERT，由连接池 autocommit 落库）。
+     * 捕获单行唯一键冲突等异常记录失败明细，失败行不影响同批其他行。
+     *
+     * <p>注意：本方法原标注 {@code @Transactional} 但由 importUsers 同 Bean 自调用，Spring AOP
+     * 代理不生效（注解形同虚设），从未真正提供过"批内单事务"语义——注释曾声称"每批独立事务"
+     * 与事实不符。当前删除注解并把语义如实表述为逐行独立提交；分批(500/批)仅用于把失败明细
+     * 与预检行号对齐，不构成事务边界。若未来确需批内原子性，应拆为独立 Bean 或经
+     * TransactionTemplate 显式开启事务，而非依赖自调用代理。
+     */
     protected int insertBatch(List<SysUserDO> batch, List<RowError> errors) {
         int success = 0;
         for (SysUserDO user : batch) {

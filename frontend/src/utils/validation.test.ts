@@ -14,7 +14,7 @@ describe('isStrongPassword', () => {
   })
 
   it('rejects password missing one of the four classes', () => {
-    // R4-1.40：大写/小写/数字/特殊字符四类缺一不可
+    // 大写/小写/数字/特殊字符四类缺一不可
     expect(isStrongPassword('Admin123')).toBe(false) // 缺特殊字符
     expect(isStrongPassword('admin@123')).toBe(false) // 缺大写
     expect(isStrongPassword('ADMIN@123')).toBe(false) // 缺小写

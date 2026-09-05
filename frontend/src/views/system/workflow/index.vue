@@ -594,7 +594,7 @@ function openReject(record: WorkflowVo) {
   approvalAction.value = 'reject'
   approvalRemark.value = ''
   approvalTarget.value = record
-  // R4-1.40：驳回复用 selectedNodeId 存待办 taskId，精确定位当前待办（多待办场景）
+  // 驳回复用 selectedNodeId 存待办 taskId，精确定位当前待办（多待办场景）
   selectedNodeId.value = record.currentTaskId
   approvalModalOpen.value = true
 }

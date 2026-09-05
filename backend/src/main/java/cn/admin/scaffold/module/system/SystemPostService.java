@@ -72,7 +72,7 @@ public class SystemPostService {
     }
 
     public void delete(Long id) {
-        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, post_code) 唯一键冲突——删除前释放编码唯一键
+        // 逻辑删除 + (tenant_id, post_code) 唯一键冲突——删除前释放编码唯一键
         SysPostDO post = postMapper.selectById(id);
         if (post != null) {
             post.setPostCode(UniqueKeyRelease.releaseCode(post.getPostCode()));

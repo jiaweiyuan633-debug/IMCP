@@ -47,7 +47,7 @@ const barRef = ref<HTMLDivElement>()
 let pieChart: ReturnType<typeof init> | null = null
 let barChart: ReturnType<typeof init> | null = null
 
-// R4-1.26：失败分类色值（与 AI 任务页 orange/red/purple 语义一致，转为 ECharts 色值）；未知分类沿用图表默认色
+// 失败分类色值（与 AI 任务页 orange/red/purple 语义一致，转为 ECharts 色值）；未知分类沿用图表默认色
 const errorTypeColor: Record<string, string> = {
   timeout: '#fa8c16',
   non_retryable: '#f5222d',
@@ -85,7 +85,7 @@ function renderCharts() {
   pieChart = init(pieRef.value, appStore.darkTheme ? 'dark' : undefined)
   barChart = init(barRef.value, appStore.darkTheme ? 'dark' : undefined)
 
-  // R4-1.26：失败任务按 error_type 分层（超时/不可重试/重试耗尽 + other 兜底），各桶之和等于 aiTaskFailed
+  // 失败任务按 error_type 分层（超时/不可重试/重试耗尽 + other 兜底），各桶之和等于 aiTaskFailed
   const failedByType = stats.value.aiTaskFailedByErrorType ?? []
   const failedSlices = failedByType.map((item) => ({
     name: errorTypeLabel(item.name),

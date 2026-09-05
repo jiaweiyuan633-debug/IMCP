@@ -22,7 +22,7 @@ class FileContentControllerTest {
 
     @Test
     void fileContentUsesPrivateCacheControlMatchingTokenTtl() {
-        // R3-1.2：文件受访问令牌保护（URL 携带绑定用户的 token），是私有资源，
+        // 文件受访问令牌保护（URL 携带绑定用户的 token），是私有资源，
         // 禁止公共代理/CDN 缓存；max-age 与令牌有效期对齐，缓存命中时令牌必然仍有效
         SysFileDO file = new SysFileDO();
         file.setId(1L);

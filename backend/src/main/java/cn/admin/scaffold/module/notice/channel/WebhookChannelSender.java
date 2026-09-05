@@ -62,7 +62,7 @@ public class WebhookChannelSender implements MessageChannelSender {
             if (!StringUtils.hasText(url)) {
                 return "Webhook URL 未配置";
             }
-            // R4-1.13：与告警 Webhook 同源 SSRF 防护，发送前按"静态+DNS 解析"复核，拒绝内网目标。
+            // 与告警 Webhook 同源 SSRF 防护，发送前按"静态+DNS 解析"复核，拒绝内网目标。
             String error = SsrfUrlValidator.validateOutboundHttpUrlWithDns(url);
             if (error != null) {
                 return "Webhook URL 不合法: " + error;

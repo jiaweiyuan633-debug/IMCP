@@ -14,10 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * 渠道配置敏感字段加解密（R4-1.37 批次10）。
+ * 渠道配置敏感字段加解密。
  *
  * <p>sys_channel_config.config_json 此前整体明文落库（SMTP 密码、短信网关 apiKey、钉钉加签
- * secret 等），虽然批8 已在回显打码、日志脱敏，但数据库泄露即密钥泄露。本组件按
+ * secret 等），虽然回显已打码、日志已脱敏，但数据库泄露即密钥泄露。本组件按
  * {@link LogMaskUtils} 的敏感键清单对 config_json 中命中的字段值做 AES-256-GCM 加密
  * （{@link SecretCipher}，"enc:" 前缀），实现「回显打码的字段 = 落库加密的字段」，两套语义天然对齐：
  * <ul>
@@ -28,7 +28,7 @@ import org.springframework.util.StringUtils;
  *       无需先解密，前端仍见 ****** 占位。</li>
  * </ul>
  *
- * <p>边界：webhook/url 等地址字段不加密（回显需保留供前端编辑，与批8 打码语义一致），
+ * <p>边界：webhook/url 等地址字段不加密（回显需保留供前端编辑，与打码语义一致），
  * 其 URL 内携带的 access_token/sign 由 {@link LogMaskUtils#sanitize} 在日志侧脱敏。
  * JSON 非法或加密失败时原样放行（保持既有行为，发送路径由 sender 校验报错）。
  */

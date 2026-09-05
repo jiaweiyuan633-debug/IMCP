@@ -1,7 +1,7 @@
 # GitHub Git Data API 建库推送（github.com 直连被路由封锁时的替代通路）
 #
 # 背景：本机 github.com:443 不可达（20.205.243.166 被墙），但 api.github.com:443 可达；
-# 用 Git Data API 把本地 main（含全部历史批次的当前树）以“单根提交 + 全量树”推为远端
+# 用 Git Data API 把本地 main（当前全量树，含全部历史改动）以“单根提交 + 全量树”推为远端
 # main/dev 两个 ref，触发 .github/workflows/ci.yml（push main/dev）。
 #
 # 用法：
@@ -14,7 +14,8 @@
 param(
     [string]$Repo = 'jiaweiyuan633-debug/IMCP',
     [string]$Branch = 'main',
-    [switch]$AlsoDev = $true
+    [switch]$AlsoDev = $true,
+    [switch]$UseLocalShas = $false   # 对象已在远端（上次已上传）时用本地 git 对象 sha，跳过重复上传
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,19 +50,29 @@ git -C $root ls-files -s | ForEach-Object { $parts = $_ -split '\s+'; $modes[$pa
 $files = git -C $root ls-files
 Write-Host ("files=" + $files.Count + "  author=" + $id[0] + " <" + $id[1] + ">")
 
-Write-Host '== 上传 blobs（全量文件内容） =='
+Write-Host '== 确定 blob sha（复用已上传对象） =='
 $blobSha = @{}
 $i = 0
-foreach ($f in $files) {
-    $p = Join-Path $root ($f -replace '/', '\')
-    $bytes = [System.IO.File]::ReadAllBytes($p)
-    $b64 = [Convert]::ToBase64String($bytes)
-    $r = Invoke-Api POST "$api/git/blobs" @{ content = $b64; encoding = 'base64' }
-    $blobSha[$f] = $r.sha
-    $i++
-    if ($i % 100 -eq 0) { Write-Host ("  uploaded $i / " + $files.Count) }
+if ($UseLocalShas) {
+    foreach ($f in $files) {
+        $sha = git -C $root rev-parse "HEAD:$f"
+        $blobSha[$f] = $sha.Trim()
+        $i++
+    }
+    Write-Host ("local shas resolved: " + $blobSha.Count)
+} else {
+    Write-Host '== 上传 blobs（全量文件内容） =='
+    foreach ($f in $files) {
+        $p = Join-Path $root ($f -replace '/', '\')
+        $bytes = [System.IO.File]::ReadAllBytes($p)
+        $b64 = [Convert]::ToBase64String($bytes)
+        $r = Invoke-Api POST "$api/git/blobs" @{ content = $b64; encoding = 'base64' }
+        $blobSha[$f] = $r.sha
+        $i++
+        if ($i % 100 -eq 0) { Write-Host ("  uploaded $i / " + $files.Count) }
+    }
+    Write-Host ("blobs done: " + $blobSha.Count)
 }
-Write-Host ("blobs done: " + $blobSha.Count)
 
 Write-Host '== 递归构建 trees =='
 $treeCache = @{}
@@ -71,7 +82,12 @@ function Build-Tree([string]$prefix) {
     $entries = @()
     $childDirs = @{}
     foreach ($f in $files) {
-        $rel = if ($prefix) { $f.Substring($prefix.Length + 1) } else { $f }
+        if ($prefix) {
+            if (-not $f.StartsWith($prefix + '/')) { continue }
+            $rel = $f.Substring($prefix.Length + 1)
+        } else {
+            $rel = $f
+        }
         if (-not $rel) { continue }
         $slash = $rel.IndexOf('/')
         if ($slash -lt 0) {
@@ -97,7 +113,7 @@ function Build-Tree([string]$prefix) {
 $rootTree = Build-Tree ''
 
 Write-Host '== 创建提交 =='
-$message = 'feat: 批次9（R4-1.55/56）——spotbugs enforce 硬门禁清零 + 包名品牌化 cn.admin.scaffold + 集群落地检查产物'
+$message = 'feat: 启用 spotbugs enforce 门禁并完成包名品牌化（cn.admin.scaffold）'
 $commit = Invoke-Api POST "$api/git/commits" @{
     message = $message
     tree    = $rootTree

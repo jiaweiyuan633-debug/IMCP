@@ -43,7 +43,7 @@ spec:
               app: {{ .Release.Name }}-backend
       ports:
         - port: 8000
-    # 批次3（R4-1.49）：Prometheus 抓取 /metrics——此前 policy 只放行 backend 入站，
+    # Prometheus 抓取 /metrics——此前 policy 只放行 backend 入站，
     # monitoring 命名空间的 Prometheus 访问 ai:8000/metrics 被 default-deny 拒绝，
     # 与 main.py 精心设计的 /metrics 端点矛盾（指标必抓不到）。按 namespace 放行
     # monitoring 命名空间（prometheus.yml 部署位置），可按实际命名空间调整。

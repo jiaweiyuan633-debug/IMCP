@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** R4-1.13：出站 Webhook URL 的 SSRF 防护校验。 */
+/** 出站 Webhook URL 的 SSRF 防护校验。 */
 class SsrfUrlValidatorTest {
 
     // ---------- 静态校验：合法地址 ----------

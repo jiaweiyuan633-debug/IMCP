@@ -27,7 +27,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.22：sys_oauth_config 平台级租户守卫。配置为平台级设置，仅租户 1 管理员可管理；
+ * sys_oauth_config 平台级租户守卫。配置为平台级设置，仅租户 1 管理员可管理；
  * 非平台租户调用任一 CRUD 必须抛 FORBIDDEN 且不触碰 mapper。
  */
 @ExtendWith(MockitoExtension.class)
@@ -77,7 +77,7 @@ class OauthConfigServiceTest {
     void createForcesPlatformTenantOwnershipAndEncryptsSecret() {
         // create 未显式设置 tenant_id 时靠 DB 默认落 1；现显式固化，防止路由歧义。
         TenantContext.setTenantId(1L);
-        // R4-1.28：appSecret 落库前必须加密（明文永不入库）
+        // appSecret 落库前必须加密（明文永不入库）
         when(secretCipher.encrypt("secret")).thenReturn("enc:cipher");
         oauthConfigService.create(request());
         ArgumentCaptor<SysOauthConfigDO> captor = ArgumentCaptor.forClass(SysOauthConfigDO.class);

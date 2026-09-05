@@ -43,7 +43,7 @@ public class AiController {
     /**
      * AI 回调请求体上限（字节）。回调语义为状态回传 + 结果摘要，不应携带大体积内容；
      * 原实现 {@code getInputStream().readAllBytes()} 无界整读，而 {@code /api/ai/callback/**}
-     * 为 permitAll 且 HMAC 校验在整读之后——未认证者可 POST 任意巨大 body 触发 OOM（R4-1.44）。
+     * 为 permitAll 且 HMAC 校验在整读之后——未认证者可 POST 任意巨大 body 触发 OOM。
      */
     private static final int MAX_CALLBACK_BODY = 1024 * 1024;
 
@@ -64,7 +64,7 @@ public class AiController {
         if (userId == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
-        // R4-1.9：票据即身份，透传 userId —— 连接时在请求线程完成访问校验与租户捕获
+        // 票据即身份，透传 userId —— 连接时在请求线程完成访问校验与租户捕获
         // （AiTaskStreamService.stream → AiTaskService.openStream），轮询线程据此恢复上下文。
         return taskStreamService.stream(id, userId);
     }
@@ -124,7 +124,7 @@ public class AiController {
             @RequestHeader("X-Ai-Timestamp") String timestamp,
             @RequestHeader("X-Ai-Signature") String signature) throws IOException {
         // 读取原始请求体用于 HMAC 校验（校验内容与 AI 侧签名字节必须一致），再反序列化业务 DTO。
-        // readNBytes(MAX+1) 有界读：超限即拒，避免 permitAll 端点被巨型 body 打 OOM（R4-1.44）
+        // readNBytes(MAX+1) 有界读：超限即拒，避免 permitAll 端点被巨型 body 打 OOM
         byte[] body = servletRequest.getInputStream().readNBytes(MAX_CALLBACK_BODY + 1);
         if (body.length > MAX_CALLBACK_BODY) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "AI 回调请求体过大");

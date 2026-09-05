@@ -112,7 +112,7 @@ public class DataScopeHelper {
         if (deptId == null) {
             return List.of();
         }
-        // 批次4（R4-1.50）：单条 ancestors LIKE 查询替代全表载入内存扫描——原实现
+        // 单条 ancestors LIKE 查询替代全表载入内存扫描——原实现
         // selectList(null) 每请求拉全量部门表再逐行 contains 匹配祖先串，部门表大时
         // 每次数据权限计算都是一次全表扫描 + 内存遍历
         // 直接子部门的 ancestors 以 {deptId} 结尾（如研发部祖先 '0,1'），单用 `% ,{id},%`

@@ -161,7 +161,7 @@ function contentUrl(record: FileVo): string {
   return record.contentUrl || record.url
 }
 
-// R4-1.43：扩展名判断统一走 contentUrl(record)（contentUrl||url 兜底），避免 record.url
+// 扩展名判断统一走 contentUrl(record)（contentUrl||url 兜底），避免 record.url
 // 缺失时 .split 抛 TypeError 导致表格渲染崩溃
 function isImage(record: FileVo | null): boolean {
   if (!record) {
@@ -200,7 +200,7 @@ async function openPreview(record: FileVo) {
   }
 }
 
-// R4-1.43：文件名外链不再用列表缓存的 accessToken（TTL 1h 后失效点击必 403），点击时现取令牌
+// 文件名外链不再用列表缓存的 accessToken（TTL 1h 后失效点击必 403），点击时现取令牌
 async function onOpenLink(record: FileVo) {
   try {
     const url = await withFileToken(contentUrl(record))

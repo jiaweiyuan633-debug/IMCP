@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {{comment}}接口：分页、详情、新增、编辑、删除。
+ * {{comment}}接口：分页（GET 基路径）、详情、新增、编辑、删除。
  */
 @RestController
 @RequestMapping("/api/{{module}}/{{kebab}}")
@@ -28,7 +28,7 @@ public class {{Entity}}Controller {
 
     private final {{Entity}}Service {{entity}}Service;
 
-    @GetMapping("/page")
+    @GetMapping
     @PreAuthorize("hasAuthority('{{permPrefix}}:list')")
     public Result<PageResult<{{Entity}}Vo>> page({{Entity}}Query query) {
         return Result.success({{entity}}Service.page(query));

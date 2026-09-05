@@ -84,7 +84,7 @@ public class AuthService {
             throw new BusinessException(ResultCode.CAPTCHA_ERROR);
         }
         String username = request.getUsername().trim();
-        // R1-1.7：登录查询必须跨租户——此时租户上下文尚未就位，租户拦截器注入默认 tenant_id=1
+        // 登录查询必须跨租户——此时租户上下文尚未就位，租户拦截器注入默认 tenant_id=1
         // 会把非租户 1 用户挡在门外。selectByUsername 豁免租户拦截器，按用户名（+ 可选租户）定位。
         List<SysUserDO> candidates = userMapper.selectByUsername(username, request.getTenantId());
         if (candidates.size() > 1) {
@@ -112,7 +112,7 @@ public class AuthService {
             recordLoginFailure(username, request.getTenantId());
             throw new BusinessException(ResultCode.TOTP_REQUIRED);
         }
-        // R4-1.39：失败计数按租户维度落键，成功登录须同时清空请求租户键与用户实际租户键
+        // 失败计数按租户维度落键，成功登录须同时清空请求租户键与用户实际租户键
         clearLoginFailures(username, request.getTenantId(), user.getTenantId());
         return completeLogin(user, httpRequest);
     }
@@ -133,7 +133,7 @@ public class AuthService {
                 user.getTenantId(), roles, perms);
         String refreshToken = jwtUtil.createRefreshToken(refreshJti, user.getId(), user.getUsername(),
                 user.getTenantId());
-        tokenService.saveAccessToken(accessJti, refreshJti);
+        tokenService.saveAccessToken(accessJti, refreshJti, String.valueOf(user.getId()));
         tokenService.saveRefreshToken(refreshJti, String.valueOf(user.getId()));
         tokenService.saveOnlineUser(accessJti, OnlineUserVo.builder()
                 .userId(user.getId())
@@ -168,7 +168,7 @@ public class AuthService {
         }
         Claims claims = jwtUtil.parse(refreshToken);
         String refreshJti = claims.getId();
-        // R4-1.44：原子消费（GETDEL）替代 hasKey+delete 两步——并发用同一被窃 refresh token
+        // 原子消费（GETDEL）替代 hasKey+delete 两步——并发用同一被窃 refresh token
         // 刷新时，原实现两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设；消费返回
         // null 即拒绝（不存在/已被并发消费）。消费先行也使「用户被禁用/删除后用旧 token 反复
         // 刷新探测」不再成立：首次失败即作废该令牌。
@@ -178,7 +178,7 @@ public class AuthService {
         }
 
         Long userId = Long.valueOf(claims.getSubject());
-        // R1-1.7：refresh token 携带 tenantId，查询用户前先就位租户上下文，
+        // refresh token 携带 tenantId，查询用户前先就位租户上下文，
         // 避免 selectById 被租户拦截器注入默认 tenant_id=1 查不到非租户 1 用户。
         Long tokenTenantId = asLong(claims.get("tenantId"));
         if (tokenTenantId != null) {
@@ -204,7 +204,7 @@ public class AuthService {
                 user.getTenantId(), roles, perms);
         String newRefreshToken = jwtUtil.createRefreshToken(newRefreshJti, userId, user.getUsername(),
                 user.getTenantId());
-        tokenService.saveAccessToken(accessJti, newRefreshJti);
+        tokenService.saveAccessToken(accessJti, newRefreshJti, String.valueOf(userId));
         tokenService.saveRefreshToken(newRefreshJti, String.valueOf(userId));
 
         return LoginResponse.builder()
@@ -249,6 +249,10 @@ public class AuthService {
         user.setMustChangePassword(0);
         user.setPasswordChangedAt(LocalDateTime.now());
         userMapper.updateById(user);
+        // 本人改密后吊销该用户全部既有会话（含当前会话与全部 refresh 链）：旧口令签发的令牌
+        // 一律作废，被窃 token 无法再续期；事务提交成功后才执行，回滚不误杀会话。
+        // 客户端收到 200 后需以新口令重新登录。
+        tokenService.revokeAllUserSessionsAfterCommit(user.getId());
     }
 
     public void updateProfile(ProfileUpdateRequest request) {
@@ -324,10 +328,12 @@ public class AuthService {
     }
 
     /**
-     * 密码策略判定：是否强制用户改密（批次1·安全阻断）。
+     * 密码策略判定：是否强制用户改密（安全阻断）。
      *
-     * <p>仅在 {@code SecurityProperties.forcePasswordChange} 开启时生效（生产默认开启，
-     * 本地 dev/test 关闭以保持 admin/admin123 的开发与 CI 体验）。两种触发条件：
+     * <p>仅当 {@code SecurityProperties.forcePasswordChange} 开启时生效（生产默认开启，
+     * 本地 dev/test 关闭以保持 admin/admin123 的开发与 CI 体验）。判定规则收敛到
+     * {@link SecurityProperties#isPasswordChangeRequired}（登录/刷新/me 响应与
+     * PasswordPolicyEnforcementFilter 服务端拦截共用同一口径）。两种触发条件：
      * <ol>
      *   <li>V63 迁移标记的 {@code must_change_password=1}（仍使用默认种子口令的存量账号）；</li>
      *   <li>密码过期：{@code password_changed_at} 距今超过 {@code passwordExpireDays} 天
@@ -335,18 +341,7 @@ public class AuthService {
      * </ol>
      */
     private boolean mustChangePassword(SysUserDO user) {
-        if (!securityProperties.isForcePasswordChange()) {
-            return false;
-        }
-        boolean flagged = user.getMustChangePassword() != null && user.getMustChangePassword() == 1;
-        if (flagged) {
-            return true;
-        }
-        int expireDays = securityProperties.getPasswordExpireDays();
-        if (expireDays <= 0 || user.getPasswordChangedAt() == null) {
-            return false;
-        }
-        return user.getPasswordChangedAt().plusDays(expireDays).isBefore(LocalDateTime.now());
+        return securityProperties.isPasswordChangeRequired(user.getMustChangePassword(), user.getPasswordChangedAt());
     }
 
     private List<MenuVo> buildMenuTree(List<SysMenuDO> menus) {
@@ -412,7 +407,7 @@ public class AuthService {
     }
 
     /**
-     * 登录失败锁定检查。R4-1.39 键带租户维度：此前只按用户名（login:fail:&lt;username&gt;），
+     * 登录失败锁定检查。失败键带租户维度：若只按用户名（login:fail:&lt;username&gt;），
      * 匿名攻击者 5 次错密码即可锁定任意真实账号 10 分钟（账号级 DoS），且租户 A 被锁会
      * 连带锁掉租户 B 同名账号。未指定租户的失败归 "*" 桶，只影响未指定租户的登录探测。
      */

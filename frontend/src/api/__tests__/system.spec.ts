@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * R4-1.32：system API 契约测试——覆盖 CRUD 全动词 + 文件导出（axios blob）/
+ * system API 契约测试——覆盖 CRUD 全动词 + 文件导出（axios blob）/
  * 导入（FormData）/下载（fetch）三条特殊路径，锁定 URL、方法与载荷形状。
  */
 

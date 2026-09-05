@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.common.annotation.FieldAudit;
 import cn.admin.scaffold.module.device.dto.DeviceQuery;
 import cn.admin.scaffold.module.device.dto.DeviceSaveRequest;
@@ -68,6 +69,14 @@ public class DeviceService {
     }
 
     public void delete(Long id) {
+        // 逻辑删除前先释放 device_code 唯一键（(tenant_id, device_code)）：删除后同编码设备可立即重建。
+        // 遥测数据(device_telemetry)按 device_id 关联且纯追加，保留作历史，不随删除清理。
+        DeviceDO device = deviceMapper.selectById(id);
+        if (device == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        device.setDeviceCode(UniqueKeyRelease.releaseCode(device.getDeviceCode()));
+        deviceMapper.updateById(device);
         deviceMapper.deleteById(id);
     }
 

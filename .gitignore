@@ -34,6 +34,18 @@ Thumbs.db
 .env
 *.local
 
+# 环境与凭据文件（.env.* 覆盖 production/本地 env；示例文件 .env.example 仍显式提交）
+.env.*
+!.env.example
+!.env.production
+*.key
+*.pem
+*.p12
+*.jks
+
+# 日志
+*.log
+
 # Local MySQL dev data
 .mysql-dev/
 

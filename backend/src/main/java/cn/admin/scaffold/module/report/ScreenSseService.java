@@ -38,7 +38,7 @@ public class ScreenSseService {
     }
 
     /**
-     * R4-1.3：每租户并发连接上限，超限回收最旧连接。默认 5，可用
+     * 每租户并发连接上限，超限回收最旧连接。默认 5，可用
      * app.screen.max-connections-per-tenant 覆盖；配置 {@code <=0} 表示不限制。
      * 连接为 NO_TIMEOUT 长连接且回收仅依赖 30s 定时广播的发送失败，单账号可循环
      * 取票开流无限堆积（每连接占用一个异步 Servlet 请求 + SseEmitter，且放大每轮

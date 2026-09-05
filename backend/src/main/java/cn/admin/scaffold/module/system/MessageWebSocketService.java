@@ -28,7 +28,7 @@ public class MessageWebSocketService {
     private int maxConnectionsPerUser = DEFAULT_MAX_CONNECTIONS_PER_USER;
 
     /**
-     * R4-1.14：每用户并发连接上限，超限回收最旧连接。默认 5，可用
+     * 每用户并发连接上限，超限回收最旧连接。默认 5，可用
      * app.websocket.max-connections-per-user 覆盖；配置 {@code <=0} 表示不限制。
      * 连接为长连接且本服务无心跳/探测回收，单账号可循环取票开流无限堆积（每连接占用
      * 一条 TCP 连接 + WebSocketSession 对象，且放大每轮消息推送开销），构成资源耗尽面。
@@ -59,7 +59,7 @@ public class MessageWebSocketService {
                 oldest.close(CloseStatus.POLICY_VIOLATION.withReason("超出单用户连接数上限"));
             } catch (Exception ignored) {
                 // 连接已被并发关闭（close 幂等/可重试），移除逻辑幂等，无需处理；
-                // 留 debug 日志便于排查异常回收路径（批次9·R4-1.55 消除静默吞异常）
+                // 留 debug 日志便于排查异常回收路径（避免静默吞异常）
                 log.debug("关闭超限连接失败 userId={}", userId, ignored);
             }
         }

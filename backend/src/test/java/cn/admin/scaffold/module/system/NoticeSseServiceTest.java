@@ -34,7 +34,7 @@ class NoticeSseServiceTest {
         return user;
     }
 
-    /** 每个待连接用户的租户 = 其 id（connect 需按库表定位租户，R4-1.10）。 */
+    /** 每个待连接用户的租户 = 其 id（connect 需按库表定位租户）。 */
     private static NoticeSseService serviceWithUsers(Long... userIds) {
         SysUserMapper userMapper = mock(SysUserMapper.class);
         for (Long userId : userIds) {
@@ -51,7 +51,7 @@ class NoticeSseServiceTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         NoticeSseService service = spy(new NoticeSseService(redisTemplate, new ObjectMapper(), mock(SysUserMapper.class)));
         service.publishAll(1L, notice);
-        // R4-1.10：Redis 频道消息携带权威目标租户信封；本地投递交给 Redis 监听器（含本实例），
+        // Redis 频道消息携带权威目标租户信封；本地投递交给 Redis 监听器（含本实例），
         // 发布方不再重复投递（两个 publishLocal 重载都不触发）
         String expected = new ObjectMapper().writeValueAsString(new NoticeSseService.NoticeBroadcast(1L, notice));
         verify(redisTemplate).convertAndSend("notice:sse", expected);
@@ -145,7 +145,7 @@ class NoticeSseServiceTest {
         assertThat(frames.get()).isEqualTo(3);
     }
 
-    // ---------- R4-1.10：广播按租户过滤，公告内容不跨租户泄露 ----------
+    // ---------- 广播按租户过滤，公告内容不跨租户泄露 ----------
 
     /**
      * 用已关闭连接作「陷阱」：纯单元测试（无 HTTP 响应）下 complete() 不触发 onCompletion 回调，

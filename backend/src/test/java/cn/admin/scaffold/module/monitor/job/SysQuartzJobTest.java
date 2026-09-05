@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.18 回归测试：Quartz 执行线程无租户上下文，任务必须以自身 tenant_id 就位租户上下文。
+ * 回归测试：Quartz 执行线程无租户上下文，任务必须以自身 tenant_id 就位租户上下文。
  *
  * <p>背景：sys_job 在租户白名单内，旧代码在 {@link SysQuartzJob#execute} 里先
  * {@code jobMapper.selectById(jobId)}——Quartz 触发线程 TenantContext 为空，拦截器注入默认

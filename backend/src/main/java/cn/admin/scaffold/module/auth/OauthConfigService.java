@@ -8,6 +8,7 @@ import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
 import cn.admin.scaffold.common.SecretCipher;
 import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.auth.dto.OauthConfigQuery;
 import cn.admin.scaffold.module.auth.dto.OauthConfigSaveRequest;
 import cn.admin.scaffold.module.auth.entity.SysOauthConfigDO;
@@ -96,6 +97,13 @@ public class OauthConfigService {
 
     public void delete(Long id) {
         requirePlatformTenant();
+        // 逻辑删除前先释放 provider 唯一键（(tenant_id, provider)）：删除后同 provider 可重新配置
+        SysOauthConfigDO config = oauthConfigMapper.selectById(id);
+        if (config == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        config.setProvider(UniqueKeyRelease.releaseCode(config.getProvider()));
+        oauthConfigMapper.updateById(config);
         oauthConfigMapper.deleteById(id);
     }
 

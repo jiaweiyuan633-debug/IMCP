@@ -21,7 +21,7 @@ public class AiTaskDO {
     private String status;
     private String paramsJson;
     private String errorMsg;
-    /** 失败原因分类：timeout / non_retryable / retries_exhausted（R4-1.20）。 */
+    /** 失败原因分类：timeout / non_retryable / retries_exhausted。 */
     private String errorType;
     private Integer retryCount;
     private Integer maxRetry;

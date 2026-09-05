@@ -8,7 +8,7 @@ import org.testcontainers.DockerClientFactory;
 /**
  * 集成测试的 Docker 前置条件：Docker 不可用时把整个测试类标记为「跳过」（disabled），
  * 而不是让 {@link AbstractIntegrationTest} 的 {@code @SpringBootTest} 尝试加载容器上下文
- * 后报 context 加载失败（R4-1.36 批次9 修复）。
+ * 后报 context 加载失败（收集阶段前置禁用修复）。
  *
  * <p>此前跳依赖 {@code @DynamicPropertySource} 内的 {@code Assumptions}，但该异常发生在
  * Spring TestContext 加载阶段，会被当作 context 加载失败记为 error（而非 skipped），

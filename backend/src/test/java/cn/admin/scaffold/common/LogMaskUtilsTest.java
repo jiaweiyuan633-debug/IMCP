@@ -52,7 +52,7 @@ class LogMaskUtilsTest {
     void masksNewlyAddedSensitiveFields() {
         Payload payload = new Payload("admin", "plain-password", "real@example.com", "13800138000",
                 Map.of("appSecret", "s1", "clientSecret", "s2", "secretKey", "s3", "configValue", "s4",
-                        // R4-1.41：MCP Server authToken（批13 加密落库的凭据）操作日志回显必须打码
+                        // MCP Server authToken（加密落库的凭据）操作日志回显必须打码
                         "authToken", "mcp-bearer-token"));
 
         String json = LogMaskUtils.toMaskedJson(payload, objectMapper);
@@ -131,7 +131,7 @@ class LogMaskUtilsTest {
         assertEquals("SMTP timeout", LogMaskUtils.sanitize("SMTP timeout"));
     }
 
-    /** R4-1.37：敏感键判定（渠道配置加密与回显打码共用同一清单）。 */
+    /** 敏感键判定（渠道配置加密与回显打码共用同一清单）。 */
     @Test
     void isSensitiveFieldMatchesBlacklistKeysOnly() {
         assertTrue(LogMaskUtils.isSensitiveField("password"));
@@ -144,7 +144,7 @@ class LogMaskUtilsTest {
         assertFalse(LogMaskUtils.isSensitiveField(null));
     }
 
-    // ---------- R4-1.38：@OperLog.maskFields 额外字段整值打码 ----------
+    // ---------- @OperLog.maskFields 额外字段整值打码 ----------
 
     /** maskFields 命中的键（大小写不敏感、嵌套覆盖）整值打码，其余字段保留。 */
     @Test

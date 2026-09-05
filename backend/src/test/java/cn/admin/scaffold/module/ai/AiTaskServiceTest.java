@@ -141,7 +141,7 @@ class AiTaskServiceTest {
             assertEquals(11L, id);
         }
 
-        // R4-1.40：create 提交后置 QUEUED 改条件更新（前置 status=PENDING），避免与并发回调互踩
+        // create 提交后置 QUEUED 改条件更新（前置 status=PENDING），避免与并发回调互踩
         @SuppressWarnings("rawtypes")
         ArgumentCaptor<AbstractWrapper> wrapperCaptor = ArgumentCaptor.forClass(AbstractWrapper.class);
         verify(taskMapper).update(isNull(), wrapperCaptor.capture());
@@ -150,7 +150,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.40：cancel 同样用条件更新（前置 status ∈ PENDING/QUEUED/RUNNING），
+     * cancel 同样用条件更新（前置 status ∈ PENDING/QUEUED/RUNNING），
      * 影响 0 行即被并发抢占终态，取消无效静默返回——不得用无条件 updateById 覆盖终态。
      */
     @Test
@@ -187,7 +187,7 @@ class AiTaskServiceTest {
         config.setApiKey("secret");
         when(configMapper.selectOne(any())).thenReturn(config);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-        // R4-1.40：apiKey 落库为密文，回调 HMAC 校验前先解密回明文
+        // apiKey 落库为密文，回调 HMAC 校验前先解密回明文
         when(secretCipher.decrypt("secret")).thenReturn("secret");
         // handleCallback 用条件 UPDATE 抢占终态，mock 需返回 1 才能继续走结果入库与通知
         when(taskMapper.update(isNull(), any(AbstractWrapper.class))).thenReturn(1);
@@ -223,7 +223,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.20：AI 侧失败分类（reason=timeout）必须随回调契约透传并落库 ai_task.error_type。
+     * AI 侧失败分类（reason=timeout）必须随回调契约透传并落库 ai_task.error_type。
      * 若回退到修复前契约（回调不携带 reason），条件 UPDATE 的 set 参数中找不到 error_type 值，
      * 后端系统记录无从区分瞬时超时与确定性错误，此断言即失败。
      */
@@ -267,10 +267,10 @@ class AiTaskServiceTest {
         assertTrue(params.containsValue("timeout"), "error_type 未随条件 UPDATE 落库, params=" + params);
     }
 
-    // ---------- R4-1.23：列表按失败分类（error_type）过滤 ----------
+    // ---------- 列表按失败分类（error_type）过滤 ----------
 
     /**
-     * R4-1.20 落库的 error_type 分类需在任务列表可查，否则前端只能看到 status=FAILED
+     * 落库的 error_type 分类需在任务列表可查，否则前端只能看到 status=FAILED
      * 而无法区分瞬时超时（值得重试）与确定性错误（重试无意义）。断言过滤条件注入 wrapper。
      */
     @Test
@@ -306,10 +306,10 @@ class AiTaskServiceTest {
         assertThat(wrapper.getSqlSegment()).doesNotContain("error_type");
     }
 
-    // ---------- R4-1.24：列表展示名批量解析（serviceName / createdByName） ----------
+    // ---------- 列表展示名批量解析（serviceName / createdByName） ----------
 
     /**
-     * R4-1.24：列表须把已暴露的 serviceCode / createdBy 解析为可读展示名，否则前端只能看到
+     * 列表须把已暴露的 serviceCode / createdBy 解析为可读展示名，否则前端只能看到
      * 无意义的服务编码与用户 ID。断言：服务名取自 ai_service_config.name，创建人姓名取自
      * sys_user.nickname，且两者均为单次批量查询（无 N+1）。
      */
@@ -345,7 +345,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.24：服务被删或创建人被逻辑删除等未命中场景必须优雅降级——服务名回退编码，
+     * 服务被删或创建人被逻辑删除等未命中场景必须优雅降级——服务名回退编码，
      * 姓名保持空（前端以 '-' 兜底），不得抛异常或污染其他行。
      */
     @Test
@@ -368,10 +368,10 @@ class AiTaskServiceTest {
         assertThat(vo.getCreatedByName()).isNull();
     }
 
-    // ---------- R4-1.25：死信任务批量重试（终态失败 → AI 重新入队） ----------
+    // ---------- 死信任务批量重试（终态失败 → AI 重新入队） ----------
 
     /**
-     * R4-1.25：FAILED 终态任务重试须调用 AI 侧 retry 重新入队，并把本库状态条件更新回
+     * FAILED 终态任务重试须调用 AI 侧 retry 重新入队，并把本库状态条件更新回
      * QUEUED、清空 error/errorType。断言 aiTaskManager.retry 收到配置与任务号，
      * 且条件更新（前置 status=FAILED）的 set 参数含 QUEUED，避免与并发回调互踩。
      */
@@ -405,7 +405,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.25：非 FAILED 终态（如 SUCCEEDED）与已不存在的任务不应触发重试——
+     * 非 FAILED 终态（如 SUCCEEDED）与已不存在的任务不应触发重试——
      * 重试语义仅针对死信失败，成功/取消/运行中任务重试无意义且会破坏状态机。
      */
     @Test
@@ -428,7 +428,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.25：服务禁用（enabled=0）或 AI 调用异常（服务不可用/AI 侧任务已过期）的任务
+     * 服务禁用（enabled=0）或 AI 调用异常（服务不可用/AI 侧任务已过期）的任务
      * 记为单条失败并收集失败 ID 供前端提示，不中断整批其余任务的重试。
      */
     @Test
@@ -465,7 +465,7 @@ class AiTaskServiceTest {
     }
 
     /**
-     * R4-1.25：AI 已受理但条件更新影响 0 行（任务被并发重试/回调抢先处理）时计为跳过，
+     * AI 已受理但条件更新影响 0 行（任务被并发重试/回调抢先处理）时计为跳过，
      * 不得重复入队或覆盖并发回调已写入的终态。
      */
     @Test
@@ -487,7 +487,7 @@ class AiTaskServiceTest {
         assertThat(result.getFailed()).isZero();
     }
 
-    // ---------- R4-1.9：SSE 流连接访问校验（openStream） ----------
+    // ---------- SSE 流连接访问校验（openStream） ----------
 
     private static SysUserDO activeUser(Long id, Long tenantId) {
         SysUserDO user = new SysUserDO();

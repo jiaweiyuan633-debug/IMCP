@@ -43,11 +43,11 @@ async function doUpload({ file }: { file: File }) {
 
 async function resolveUrl(url: string): Promise<string> {
   try {
-    // R4-1.43：统一走 withFileToken（现取令牌 + origin 拼接），与文件列表/导入导出共享同一实现
+    // 统一走 withFileToken（现取令牌 + origin 拼接），与文件列表/导入导出共享同一实现
     return await withFileToken(url)
   } catch {
     // 令牌签发失败时不再保留无 token 的原 URL：FileAccessFilter 对 /files、/uploads 一律
-    // 要求令牌，无令牌请求必然 403，保留只会产生裂图与错误请求（R4-1.42）
+    // 要求令牌，无令牌请求必然 403，保留只会产生裂图与错误请求
     return ''
   }
 }

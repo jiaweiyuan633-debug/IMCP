@@ -1,5 +1,6 @@
 package cn.admin.scaffold.security;
 
+import cn.admin.scaffold.config.SecurityProperties;
 import cn.admin.scaffold.module.system.ApiPermRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -26,6 +27,7 @@ class ApiPermAuthorizationFilterTest {
 
     private ApiPermRegistry registry;
     private ObjectMapper objectMapper;
+    private SecurityProperties securityProperties;
     private ApiPermAuthorizationFilter filter;
     private MockHttpServletResponse response;
     private FilterChain chain;
@@ -34,7 +36,8 @@ class ApiPermAuthorizationFilterTest {
     void setUp() {
         registry = mock(ApiPermRegistry.class);
         objectMapper = new ObjectMapper();
-        filter = new ApiPermAuthorizationFilter(registry, objectMapper);
+        securityProperties = new SecurityProperties();
+        filter = new ApiPermAuthorizationFilter(registry, securityProperties, objectMapper);
         response = new MockHttpServletResponse();
         chain = mock(FilterChain.class);
     }
@@ -112,5 +115,31 @@ class ApiPermAuthorizationFilterTest {
         filter.doFilter(request("POST", "/api/system/user/1"), response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void strictModeRejectsUnmatchedEndpointWhenAuthenticated() throws Exception {
+        // 严格模式（opt-in）：已认证请求命不中任何规则即 403，把"规则漏配"从仅认证放行变为显式拒绝
+        when(registry.resolve(anyString(), anyString())).thenReturn(null);
+        securityProperties.setApiPermStrict(true);
+        login(true);
+
+        filter.doFilter(request("GET", "/api/system/menu/tree"), response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        verify(chain, never()).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void strictModeKeepsAuthSelfServiceEndpointsReachable() throws Exception {
+        // 个人自助端点有意不登记资源权限，严格模式下恒定豁免，不被误杀
+        when(registry.resolve(anyString(), anyString())).thenReturn(null);
+        securityProperties.setApiPermStrict(true);
+        login(true);
+
+        filter.doFilter(request("GET", "/api/auth/me"), response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        verify(chain).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 }

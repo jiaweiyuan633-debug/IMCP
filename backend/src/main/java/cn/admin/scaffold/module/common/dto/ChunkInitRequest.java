@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 分片上传初始化请求（批次2c）。
+ * 分片上传初始化请求。
  */
 @Data
 public class ChunkInitRequest {

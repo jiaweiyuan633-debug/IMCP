@@ -40,7 +40,7 @@ class FileAccessServiceTest {
 
     @Test
     void publicTokenAcceptedByAnonymousAndLoggedInUser() {
-        // R2-1.4：匿名上传/系统任务签发公开资源令牌（boundUserId 为空）。
+        // 匿名上传/系统任务签发公开资源令牌（boundUserId 为空）。
         // 登录用户打开同一分享链接不应被拒——否则「匿名可看、登录反被拒」，破坏 URL 分享语义。
         String token = fileAccessService.issue("/files/123", null);
         assertTrue(token.split("\\.", 3)[1].isEmpty());

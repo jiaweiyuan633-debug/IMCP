@@ -183,6 +183,7 @@ class ImportExportTemplateServiceTest {
     @Test
     void deleteAllowedWhenNoPendingJobs() {
         when(jobMapper.selectCount(any())).thenReturn(0L);
+        when(templateMapper.selectById(10L)).thenReturn(existingTemplate(10L));
 
         service.delete(10L);
 

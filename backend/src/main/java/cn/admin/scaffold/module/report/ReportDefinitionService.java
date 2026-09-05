@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.report.dto.ReportDefinitionQuery;
 import cn.admin.scaffold.module.report.dto.ReportDefinitionSaveRequest;
 import cn.admin.scaffold.module.report.dto.ReportExecuteRequest;
@@ -39,13 +40,13 @@ public class ReportDefinitionService {
     /** dataSource 中的命名占位 :param。 */
     private static final Pattern NAMED_PARAM_PATTERN = Pattern.compile(":(\\w+)");
 
-    /** 报表执行参数上限：SQL 占位符数量远小于此，防超量参数 DoS（R4-1.37）。 */
+    /** 报表执行参数上限：SQL 占位符数量远小于此，防超量参数 DoS。 */
     private static final int MAX_PARAMS = 64;
 
     /** 单个参数 key 长度上限。 */
     private static final int MAX_PARAM_KEY_LENGTH = 64;
 
-    /** 单个字符串参数值长度上限：值绑定为 SQL 参数，超大字符串无业务意义（R4-1.37）。 */
+    /** 单个字符串参数值长度上限：值绑定为 SQL 参数，超大字符串无业务意义。 */
     private static final int MAX_STRING_PARAM_LENGTH = 5000;
 
     private final ReportDefinitionMapper reportDefinitionMapper;
@@ -93,6 +94,14 @@ public class ReportDefinitionService {
     }
 
     public void delete(Long id) {
+        // 逻辑删除前先释放 code 唯一键（(tenant_id, code)）：删除后同名编码可立即重建。
+        // 逻辑删除行以 deleted=1 保留（审计可追溯），code 后缀 #del# 时间戳与删除前快照区分。
+        ReportDefinitionDO definition = reportDefinitionMapper.selectById(id);
+        if (definition == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        definition.setCode(UniqueKeyRelease.releaseCode(definition.getCode()));
+        reportDefinitionMapper.updateById(definition);
         reportDefinitionMapper.deleteById(id);
     }
 
@@ -139,7 +148,7 @@ public class ReportDefinitionService {
     }
 
     /**
-     * 执行参数防御校验（R4-1.37）：参数直接绑定进 SQL 查询，虽经参数化无注入风险，仍需防 DoS 与
+     * 执行参数防御校验：参数直接绑定进 SQL 查询，虽经参数化无注入风险，仍需防 DoS 与
      * 类型混淆——超量参数（数量上限）、超长/非法参数名、非基础类型值（集合/对象/数组）一律拒绝。
      * ReportSqlGuard 已拦截危险函数与敏感列，此处补上参数侧纵深。
      */

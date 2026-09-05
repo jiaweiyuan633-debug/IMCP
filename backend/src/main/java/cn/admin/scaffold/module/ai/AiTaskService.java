@@ -138,7 +138,7 @@ public class AiTaskService {
             if (StringUtils.hasText(aiBaseUrl)) {
                 config.setBaseUrl(aiBaseUrl);
             }
-            // R4-1.40：apiKey 落库为 SecretCipher 密文，提交前解密为明文供 Bearer 鉴权；存量明文原样放行
+            // apiKey 落库为 SecretCipher 密文，提交前解密为明文供 Bearer 鉴权；存量明文原样放行
             config.setApiKey(secretCipher.decrypt(config.getApiKey()));
             aiTaskManager.submit(
                     config,
@@ -146,7 +146,7 @@ public class AiTaskService {
                     request.getBizType(),
                     request.getParams() == null ? Map.of() : request.getParams(),
                     task.getCallbackUrl());
-            // R4-1.40：置 QUEUED 改条件更新（前置 PENDING）——与 cancel 并发时防止无条件覆盖已取消任务
+            // 置 QUEUED 改条件更新（前置 PENDING）——与 cancel 并发时防止无条件覆盖已取消任务
             // （cancel 已把 PENDING→CANCELLED，此处影响 0 行则保持取消态，AI 侧孤儿任务由回调忽略兜底）
             taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
                     .eq(AiTaskDO::getId, task.getId())
@@ -184,7 +184,7 @@ public class AiTaskService {
     }
 
     /**
-     * R4-1.24：列表展示名批量解析（避免按行 N+1 查询）。
+     * 列表展示名批量解析（避免按行 N+1 查询）。
      * <p>把已随 VO 暴露的 serviceCode / createdBy 解析为可读展示名：
      * 服务名来自 ai_service_config.name（租户内批量查询），创建人姓名来自 sys_user
      * （租户内 selectBatchIds，优先 nickname、回退 username）。均按 code/id 去重后
@@ -240,7 +240,7 @@ public class AiTaskService {
     }
 
     /**
-     * R4-1.9：SSE 轮询专用读取（跳过 SecurityContext 数据范围校验）。
+     * SSE 轮询专用读取（跳过 SecurityContext 数据范围校验）。
      * 连接建立时已在请求线程经 {@link #openStream} 完成访问校验并捕获租户；
      * 轮询线程无 SecurityContext/TenantContext，若复用 detail() 的 SecurityUtils 校验
      * 必然抛 UNAUTHORIZED 使流立即失败。调用方（AiTaskStreamService）须先就位
@@ -271,7 +271,7 @@ public class AiTaskService {
     }
 
     /**
-     * R4-1.9：SSE 流连接前的访问校验（请求线程执行）。
+     * SSE 流连接前的访问校验（请求线程执行）。
      * <p>流端点为 permitAll + 一次性票据鉴权，EventSource 无法携带 Authorization 头，
      * 请求线程既无 SecurityContext 也无租户头（TenantFilter 不再信任请求头，默认租户 1）。
      * 故先按票据 userId 跨租户定位用户（以库表租户为权威来源，与 JwtAuthenticationFilter
@@ -304,7 +304,7 @@ public class AiTaskService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
         checkDataScope(task);
-        // R4-1.40：check-then-act 存在竞态——cancel 读到非终态后、写回前若回调/扫描器已抢占终态，
+        // check-then-act 存在竞态——cancel 读到非终态后、写回前若回调/扫描器已抢占终态，
         // 无条件 updateById 会把终态覆盖回 CANCELLED（如任务实际成功却被标记取消）。改条件更新：
         // 仅当任务仍处于非终态时才置取消，影响 0 行说明已被并发抢占为终态，取消无效静默返回。
         taskMapper.update(null, new LambdaUpdateWrapper<AiTaskDO>()
@@ -318,7 +318,7 @@ public class AiTaskService {
     }
 
     /**
-     * R4-1.25：批量重试终态失败任务（死信恢复入口）。
+     * 批量重试终态失败任务（死信恢复入口）。
      * <p>逐条处理：仅 FAILED 终态且服务仍可用（enabled=1）的任务会被重试——先调用 AI 侧
      * retry 重新入队，再条件更新把本库状态从 FAILED 置回 QUEUED 并清空 error/errorType。
      * 条件更新以 status=FAILED 为前置，避免与并发重试/已抢先到达的成功回调互踩：影响 0 行
@@ -350,7 +350,7 @@ public class AiTaskService {
                 continue;
             }
             try {
-                // R4-1.40：apiKey 落库为密文，重试前解密为明文供 Bearer 鉴权
+                // apiKey 落库为密文，重试前解密为明文供 Bearer 鉴权
                 config.setApiKey(secretCipher.decrypt(config.getApiKey()));
                 aiTaskManager.retry(config, task.getTaskNo());
             } catch (BusinessException exception) {
@@ -389,7 +389,7 @@ public class AiTaskService {
         TenantContext.setTenantId(task.getTenantId());
         AiServiceConfigDO config = configMapper.selectOne(new LambdaQueryWrapper<AiServiceConfigDO>()
                 .eq(AiServiceConfigDO::getCode, task.getServiceCode()));
-        // R4-1.40：apiKey 落库为密文，HMAC 校验前解密（config==null 短路，不触发解密）
+        // apiKey 落库为密文，HMAC 校验前解密（config==null 短路，不触发解密）
         if (config == null || !validCallbackHmac(secretCipher.decrypt(config.getApiKey()), rawBody, timestamp, signature)) {
             throw new BusinessException(ResultCode.AI_CALLBACK_INVALID);
         }

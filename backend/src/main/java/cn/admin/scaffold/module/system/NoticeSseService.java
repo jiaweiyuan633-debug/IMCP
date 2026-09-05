@@ -38,14 +38,14 @@ public class NoticeSseService {
         this.userMapper = userMapper;
     }
 
-    /** 一条 SSE 连接及其所属租户（R4-1.10）：广播按租户过滤，公告内容不再跨租户实时泄露。 */
+    /** 一条 SSE 连接及其所属租户：广播按租户过滤，公告内容不跨租户实时泄露。 */
     record Connection(SseEmitter emitter, Long tenantId) {}
 
     /** Redis 频道消息信封：携带权威目标租户（发布线程租户），接收端据此过滤，不信任 payload 内字段。 */
     record NoticeBroadcast(Long tenantId, SysNoticeDO payload) {}
 
     /**
-     * R4-1.2：每用户并发连接上限，超限回收最旧连接。默认 5，可用
+     * 每用户并发连接上限，超限回收最旧连接。默认 5，可用
      * app.notice-sse-max-connections-per-user 覆盖；配置 {@code <=0} 表示不限制。
      * 连接为 NO_TIMEOUT 长连接且无心跳外置上限，单账号可循环开流无限堆积
      * （每连接占用一个异步 Servlet 请求 + SseEmitter），构成资源耗尽面。
@@ -56,9 +56,9 @@ public class NoticeSseService {
     }
 
     /**
-     * 建立公告实时推送流。R4-1.10：SSE 端点为 permitAll + 一次性票据鉴权，请求线程租户恒为
+     * 建立公告实时推送流。SSE 端点为 permitAll + 一次性票据鉴权，请求线程租户恒为
      * 默认 1（TenantFilter 不信任请求头），连接所属租户以用户库表为权威来源定位
-     * （与 R4-1.9 AI 任务 SSE 同一模式）；用户已删除/不存在则拒绝建连——否则无法确定
+     * （与 AI 任务 SSE 同一模式）；用户已删除/不存在则拒绝建连——否则无法确定
      * 租户，广播过滤无从谈起。
      */
     public SseEmitter connect(Long userId) {
@@ -94,7 +94,7 @@ public class NoticeSseService {
     }
 
     /**
-     * 按租户广播公告（R4-1.10）。
+     * 按租户广播公告。
      * <p>仅通过 Redis 频道广播，由各实例（含本实例）的 {@link NoticeSseRedisListener} 在本地投递，
      * 避免本实例「本地推送 + Redis 回环推送」造成重复投递。Redis 不可用时降级为本实例本地推送。
      *
@@ -139,7 +139,7 @@ public class NoticeSseService {
     }
 
     /**
-     * R4-1.1：长连接心跳。公告为事件驱动——无新公告时连接长时间空闲，反向代理
+     * 长连接心跳。公告为事件驱动——无新公告时连接长时间空闲，反向代理
      * （Nginx proxy_read_timeout 默认 60s）会切断空闲 SSE 连接导致推送静默失效；
      * 且客户端异常断开/网络分区时容器回调可能不触发，僵死连接随运行时间在内存中堆积。
      * 心跳注释帧定期保活，发送失败即回收该连接。间隔可配置，默认 30s。

@@ -25,7 +25,7 @@ import org.mockito.ArgumentCaptor;
 /**
  * 通用 Webhook 渠道发送器：SSRF 防护（拒绝内网目标）+ 请求构造验证。
  *
- * <p>原测试起本地 127.0.0.1 HttpServer 充当 webhook 目标，R4-1.13 加入 SSRF 防护后
+ * <p>原测试起本地 127.0.0.1 HttpServer 充当 webhook 目标，加入 SSRF 防护后
  * 该地址被正确拒绝，故改为 mock RestClient 验证请求构造（离线可跑、无端口依赖）。
  */
 class WebhookChannelSenderTest {

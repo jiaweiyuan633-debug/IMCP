@@ -10,6 +10,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.config import settings
 from app.llm.retry import retry_llm_call
 from app.pii import StreamMasker, detect, mask
+from app.pii.outbound import (
+    mask_outbound_messages,
+    mask_outbound_texts,
+    should_mask_outbound,
+)
 from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
@@ -23,6 +28,7 @@ from app.schemas.ai import (
     VectorUpsertRequest,
 )
 from app.schemas.task import DeadLetterEntry, TaskCreateRequest, TaskStatusResponse
+from app.vectors.store import NamespaceTooLargeError
 
 router = APIRouter(prefix="/api/v1", tags=["core"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -131,14 +137,18 @@ async def retry_task(request: Request, task_id: str) -> TaskStatusResponse:
     dependencies=[Depends(require_api_token)],
 )
 async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
-    # R4-1.31：非任务路径（同步调用）无 TaskManager 重试，LLM 可重试异常（网络/5xx）须退避重试
+    # 非任务路径（同步调用）无 TaskManager 重试，LLM 可重试异常（网络/5xx）须退避重试
     provider = _resolve_provider(request, payload.provider)
     messages = [m.model_dump() for m in payload.messages]
-    # 批次3（R4-1.49）：出站 PII 脱敏——mask_pii=True 时 user 消息中的手机号/身份证等
-    # 先脱敏再发往外部 LLM（PIPL/等保对敏感数据出域的控制）；detect/mask 为 CPU 密集，
-    # 移入线程池避免阻塞事件循环
-    if payload.mask_pii:
-        messages = await asyncio.to_thread(_mask_outbound_messages, messages, settings.pii_mask_char)
+    # 出站 PII 脱敏——发给外部 LLM 的 user 消息中的手机号/身份证等先脱敏
+    # （PIPL/等保对敏感数据出域的控制）。mask_pii 为调用方开关；服务端强制
+    # 开关 PII_MASK_REQUIRED 开启时 mask_pii=false 也不绕过。detect/mask 是
+    # CPU 密集的同步函数，放线程池执行避免阻塞事件循环。
+    mask_enabled = should_mask_outbound(settings, provider, payload.mask_pii)
+    if mask_enabled:
+        messages = await asyncio.to_thread(
+            mask_outbound_messages, messages, settings.pii_mask_char
+        )
     content = await retry_llm_call(
         provider.chat,
         messages,
@@ -148,9 +158,9 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
         max_attempts=settings.llm_retry_max_attempts,
         base_delay=settings.llm_retry_base_seconds,
     )
-    # R4-1.34：PII 强制——模型输出默认脱敏，复述的敏感信息不出站；命中数随响应透出
+    # 输出侧同样处理：模型回复若复述了敏感信息，脱敏后再返回；命中数随响应透出
     pii_count = 0
-    if payload.mask_pii:
+    if mask_enabled:
         detected = await asyncio.to_thread(detect, content)
         if detected:
             content = await asyncio.to_thread(mask, content, settings.pii_mask_char)
@@ -163,18 +173,6 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:
     )
 
 
-def _mask_outbound_messages(messages: list[dict], mask_char: str) -> list[dict]:
-    """对出站消息中的 user 内容执行 PII 脱敏（同步函数，供 asyncio.to_thread 调用）。"""
-    from app.pii import mask as mask_pii
-
-    result: list[dict] = []
-    for message in messages:
-        if message.get("role") == "user" and message.get("content"):
-            message = {**message, "content": mask_pii(str(message["content"]), mask_char)}
-        result.append(message)
-    return result
-
-
 @router.post(
     "/chat/stream",
     dependencies=[Depends(require_api_token)],
@@ -185,15 +183,22 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
     内部服务消费方（后端代理）通过 Authorization 头鉴权；
     浏览器 EventSource 无法带自定义头，须经后端 /api 代理转发。
     注：流式已开始产出即无法安全重试（用户已看到部分内容），上游故障由消费方决定是否重连。
-    R4-1.34：启用 PII 强制时经 StreamMasker 逐段脱敏（跨分片 PII 不泄漏），
-    分片边界可能与上游不同，消费方应按 delta 拼装全文。
+    PII 强制开启时，入站 user 消息先脱敏再发给 provider，输出经 StreamMasker
+    逐段脱敏（跨分片 PII 不泄漏），分片边界可能与上游不同，消费方应按 delta 拼装全文。
     """
     provider = _resolve_provider(request, payload.provider)
-    masker = StreamMasker(settings.pii_mask_char) if payload.mask_pii else None
+    messages = [m.model_dump() for m in payload.messages]
+    # 入站出域脱敏与 /chat 一致（此前流式路径缺省未脱敏，PII 可原样出域）
+    mask_enabled = should_mask_outbound(settings, provider, payload.mask_pii)
+    if mask_enabled:
+        messages = await asyncio.to_thread(
+            mask_outbound_messages, messages, settings.pii_mask_char
+        )
+    masker = StreamMasker(settings.pii_mask_char) if mask_enabled else None
 
     async def event_stream() -> Any:
         async for delta in provider.stream(
-            [m.model_dump() for m in payload.messages],
+            messages,
             model=payload.model,
             temperature=payload.temperature,
             max_tokens=payload.max_tokens,
@@ -221,7 +226,13 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
 )
 async def embed(request: Request, payload: EmbedRequest) -> EmbedResponse:
     provider = _resolve_provider(request, payload.provider)
-    vectors = await provider.embed(payload.texts, model=payload.model)
+    # 待向量化文本同样出域到外部 provider：脱敏开关判定与 chat 共用同一出口
+    texts = payload.texts
+    if should_mask_outbound(settings, provider, payload.mask_pii):
+        texts = await asyncio.to_thread(
+            mask_outbound_texts, texts, settings.pii_mask_char
+        )
+    vectors = await provider.embed(texts, model=payload.model)
     return EmbedResponse(
         vectors=vectors,
         dim=len(vectors[0]) if vectors else 0,
@@ -236,7 +247,11 @@ async def embed(request: Request, payload: EmbedRequest) -> EmbedResponse:
 )
 async def vector_upsert(request: Request, payload: VectorUpsertRequest) -> dict[str, Any]:
     provider = _resolve_provider(request, payload.provider)
-    vector = (await provider.embed([payload.text]))[0]
+    # text → embed 前脱敏（同一出口），保证向量库不落入原文
+    text = payload.text
+    if should_mask_outbound(settings, provider, payload.mask_pii):
+        text = await asyncio.to_thread(mask, text, settings.pii_mask_char)
+    vector = (await provider.embed([text]))[0]
     await request.app.state.vector_store.upsert(payload.namespace, payload.doc_id, vector, payload.payload)
     return {"namespace": payload.namespace, "doc_id": payload.doc_id, "dim": len(vector)}
 
@@ -251,12 +266,20 @@ async def vector_search(request: Request, payload: VectorSearchRequest) -> Vecto
         if not payload.text:
             raise HTTPException(status_code=400, detail="text 或 vector 至少提供一个")
         provider = _resolve_provider(request, payload.provider)
-        query_vector = (await provider.embed([payload.text]))[0]
+        # 查询文本经外部 provider 向量化前同样脱敏
+        text = payload.text
+        if should_mask_outbound(settings, provider, payload.mask_pii):
+            text = await asyncio.to_thread(mask, text, settings.pii_mask_char)
+        query_vector = (await provider.embed([text]))[0]
     else:
         query_vector = payload.vector
-    hits = await request.app.state.vector_store.search(
-        payload.namespace, query_vector, top_k=payload.top_k, threshold=payload.threshold
-    )
+    try:
+        hits = await request.app.state.vector_store.search(
+            payload.namespace, query_vector, top_k=payload.top_k, threshold=payload.threshold
+        )
+    except NamespaceTooLargeError as exc:
+        # 命名空间超精确检索上限：属容量类客户端错误，返回 422 而非 500
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return VectorSearchResponse(namespace=payload.namespace, hits=[VectorHit(**hit) for hit in hits])
 
 

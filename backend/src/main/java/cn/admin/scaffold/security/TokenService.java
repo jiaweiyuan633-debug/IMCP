@@ -7,7 +7,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -22,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -35,6 +38,9 @@ public class TokenService {
     private static final String BLACKLIST_KEY = "login:blacklist:";
     private static final String ONLINE_KEY = "login:online:";
     private static final String PERMS_KEY = "auth:perms:";
+    /** 每用户会话集合：成员为 access jti，供「按用户吊销全部会话」（改密/重置/停用/删除）精确寻址，
+     *  替代全局 KEYS 通配扫描；与 login:token:/login:refresh: 保持最终一致（登出/吊销时删除成员）。 */
+    private static final String SESSION_SET_PREFIX = "auth:sessions:user:";
 
     /** 权限缓存基础 TTL 与抖动上限（批8e）：TTL = 基础值 + 随机 [0, 抖动上限]。 */
     private static final long PERMS_TTL_BASE_MINUTES = 30;
@@ -54,11 +60,31 @@ public class TokenService {
         evictAllPermissions();
     }
 
+    /** 双参版（无 userId，不登记 per-user 会话集合），兼容 SSO 旧调用；见三参版说明。 */
     public void saveAccessToken(String accessJti, String refreshJti) {
+        saveAccessToken(accessJti, refreshJti, null);
+    }
+
+    /**
+     * 保存 access token 并登记到 per-user 会话集合（按用户吊销全部会话的依据）。
+     *
+     * <p>登出/吊销时从集合移除成员；集合 TTL 对齐 refresh token 有效期，即使个别成员漏删
+     * 也会随集合过期自愈，不产生永久残留。
+     */
+    public void saveAccessToken(String accessJti, String refreshJti, String userId) {
         redisTemplate.opsForValue().set(
                 ACCESS_KEY + accessJti,
                 refreshJti,
                 Duration.ofMinutes(properties.getAccessTokenExpireMinutes()));
+        if (StringUtils.hasText(userId)) {
+            registerSession(accessJti, userId);
+        }
+    }
+
+    private void registerSession(String accessJti, String userId) {
+        String key = SESSION_SET_PREFIX + userId;
+        redisTemplate.opsForSet().add(key, accessJti);
+        redisTemplate.expire(key, Duration.ofDays(properties.getRefreshTokenExpireDays()));
     }
 
     public void saveRefreshToken(String refreshJti, String userId) {
@@ -79,8 +105,8 @@ public class TokenService {
      *
      * <p>返回 null 说明 token 不存在或已被并发消费，调用方应拒绝本次刷新。原
      * {@code hasRefreshToken + revokeRefreshToken} 两步存在 check-then-act 竞态：并发用同一
-     * 被窃 refresh token 刷新时，两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设
-     * （R4-1.44）。GETDEL 需要 Redis ≥ 6.2（部署基线为 Redis 7）。
+     * 被窃 refresh token 刷新时，两个请求均通过存在性检查后各自签发新令牌对，轮换形同虚设。
+     * GETDEL 需要 Redis ≥ 6.2（部署基线为 Redis 7）。
      */
     public String consumeRefreshToken(String refreshJti) {
         String key = REFRESH_KEY + refreshJti;
@@ -97,17 +123,64 @@ public class TokenService {
         return new String(raw, StandardCharsets.UTF_8);
     }
 
+    /**
+     * 吊销单个 access token（登出/强制下线）：删除 access+refresh 键、写入黑名单、清理在线记录，
+     * 并从 per-user 会话集合移除成员。refresh token 键可能已被原子消费（轮换后旧 refresh 不存在），
+     * 此时无法反查属主，成员由 revokeAllUserSessions 删除集合整体自愈，不影响正确性。
+     */
     public void revokeAccessToken(String accessJti) {
-        String refreshJti = redisTemplate.opsForValue().get(ACCESS_KEY + accessJti);
-        redisTemplate.delete(ACCESS_KEY + accessJti);
-        if (refreshJti != null) {
+        String accessKey = ACCESS_KEY + accessJti;
+        String refreshJti = redisTemplate.opsForValue().get(accessKey);
+        if (refreshJti != null && StringUtils.hasText(refreshJti)) {
+            String ownerUserId = redisTemplate.opsForValue().get(REFRESH_KEY + refreshJti);
             redisTemplate.delete(REFRESH_KEY + refreshJti);
+            if (ownerUserId != null) {
+                redisTemplate.opsForSet().remove(SESSION_SET_PREFIX + ownerUserId, accessJti);
+            }
         }
-        redisTemplate.opsForValue().set(
-                BLACKLIST_KEY + accessJti,
-                "1",
-                Duration.ofMinutes(properties.getAccessTokenExpireMinutes()));
+        boolean existed = Boolean.TRUE.equals(redisTemplate.hasKey(accessKey));
+        redisTemplate.delete(accessKey);
+        if (existed) {
+            // access 键已不存在（过期/并发已删）时无需写黑名单：hasValidAccessToken 要求键存在
+            redisTemplate.opsForValue().set(
+                    BLACKLIST_KEY + accessJti,
+                    "1",
+                    Duration.ofMinutes(properties.getAccessTokenExpireMinutes()));
+        }
         removeOnlineUser(accessJti);
+    }
+
+    /**
+     * 按用户吊销全部会话：遍历 per-user 会话集合逐个吊销 access/refresh/在线记录并写黑名单，
+     * 最后删除集合本身（精确寻址，替代全局 KEYS 扫描）。供本人改密（含当前会话，强制重登）、
+     * 管理员重置口令/停用/删除等路径调用。
+     *
+     * <p>与并发刷新存在极窄竞态：SMEMBERS 快照后、新签发的令牌对可能未被吊销，将保留至其自然
+     * 过期（access ≤ 2h / refresh ≤ 7d）。对改密/停用场景，旧口令已失效或账号已禁用，残留会话
+     * 无法继续业务操作（认证链每请求校验账号状态），风险可控；后续若需严格即时性，可在签发路径
+     * 增加会话代际号并随请求比对。
+     */
+    public void revokeAllUserSessions(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return;
+        }
+        String setKey = SESSION_SET_PREFIX + userId;
+        Set<String> members = redisTemplate.opsForSet().members(setKey);
+        redisTemplate.delete(setKey);
+        if (members == null || members.isEmpty()) {
+            return;
+        }
+        for (String accessJti : members) {
+            revokeAccessToken(accessJti);
+        }
+    }
+
+    /** 事务提交后按用户吊销全部会话（事务内先落库、提交成功后再吊销，避免回滚导致误杀会话）。 */
+    public void revokeAllUserSessionsAfterCommit(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        evictAfterCommit(() -> revokeAllUserSessions(String.valueOf(userId)));
     }
 
     public void saveOnlineUser(String accessJti, OnlineUserVo onlineUser) {
@@ -127,9 +200,9 @@ public class TokenService {
     }
 
     public List<OnlineUserVo> listOnlineUsers() {
-        Set<String> keys = redisTemplate.keys(ONLINE_KEY + "*");
+        Set<String> keys = scanKeys(ONLINE_KEY + "*");
         List<OnlineUserVo> onlineUsers = new ArrayList<>(16);
-        if (keys == null) {
+        if (keys == null || keys.isEmpty()) {
             return onlineUsers;
         }
         for (String key : keys) {
@@ -160,13 +233,31 @@ public class TokenService {
                     "仅允许清理白名单缓存前缀：" + String.join(", ", CACHE_DELETE_ALLOWED_PREFIXES));
         }
         if (key.endsWith("*")) {
-            Set<String> keys = redisTemplate.keys(key);
+            Set<String> keys = scanKeys(key);
             if (keys != null && !keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         } else {
             redisTemplate.delete(key);
         }
+    }
+
+    /**
+     * SCAN 分批遍历匹配 key（替代阻塞式 KEYS）：KEYS 在 key 量大时会长时间阻塞 Redis 主线程，
+     * 生产禁止使用。count 仅为单批提示值，遍历完整性由游标保证。
+     */
+    private Set<String> scanKeys(String pattern) {
+        Set<String> keys = new HashSet<>(64);
+        redisTemplate.execute((RedisCallback<Set<String>>) connection -> {
+            try (Cursor<byte[]> cursor = connection.scan(
+                    ScanOptions.scanOptions().match(pattern).count(500).build())) {
+                while (cursor.hasNext()) {
+                    keys.add(new String(cursor.next(), StandardCharsets.UTF_8));
+                }
+            }
+            return keys;
+        });
+        return keys;
     }
 
     public List<String> getCachedPermissions(Long userId) {
@@ -188,7 +279,7 @@ public class TokenService {
                 Duration.ofMinutes(PERMS_TTL_BASE_MINUTES).plusMillis(jitterMillis));
     }
 
-    // ---------- 批次2（R4-1.48）：角色缓存（与 perms 同 TTL 抖动、同失效时机）----------
+    // ---------- 角色缓存（与 perms 同 TTL 抖动、同失效时机）----------
     // 此前 JwtAuthenticationFilter 每请求直查 sys_user_role 取角色编码——sys_user 是全库最热表，
     // 高 QPS 下每个请求 2 次 DB 往返（角色 + 用户行）。角色随权限一并进 Redis 缓存，
     // 角色变更走既有 evictUserPermissions/evictPermissionsByUserIds 失效点（同一 key 前缀）。
@@ -234,7 +325,7 @@ public class TokenService {
     }
 
     public void evictAllPermissions() {
-        Set<String> keys = redisTemplate.keys(PERMS_KEY + "*");
+        Set<String> keys = scanKeys(PERMS_KEY + "*");
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
@@ -266,7 +357,7 @@ public class TokenService {
     }
 
     /**
-     * 事务提交后失效单个用户权限缓存（R4-1.12）。
+     * 事务提交后失效单个用户权限缓存。
      *
      * <p>在事务提交前删除 Redis 键存在竞态：并发请求在 evict 之后、commit 之前读库
      * （仍是旧角色）会把旧权限重新缓存（TTL 30 分钟），撤销的权限最长残留 30 分钟。
@@ -279,7 +370,7 @@ public class TokenService {
         evictAfterCommit(() -> redisTemplate.delete(PERMS_KEY + userId));
     }
 
-    /** 批量版：事务提交后失效指定用户的权限缓存（R4-1.12，语义同上）。 */
+    /** 批量版：事务提交后失效指定用户的权限缓存（语义同上）。 */
     public void evictPermissionsByUserIdsAfterCommit(Collection<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return;

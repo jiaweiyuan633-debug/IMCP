@@ -19,7 +19,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/** R4-1.13：保存告警规则时对 Webhook 地址做 SSRF 静态校验。 */
+/** 保存告警规则时对 Webhook 地址做 SSRF 静态校验。 */
 @ExtendWith(MockitoExtension.class)
 class AlertRuleServiceTest {
 

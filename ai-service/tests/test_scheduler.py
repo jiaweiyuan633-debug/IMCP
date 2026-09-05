@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -38,7 +39,7 @@ class SelectiveFailingTaskManager(FakeTaskManager):
 
 
 class ConflictTaskManager(FakeTaskManager):
-    """create_task 恒抛 409（同名任务已存在）——验证调度器按幂等成功处理（批次3）。"""
+    """create_task 恒抛 409（同名任务已存在）——验证调度器按幂等成功处理。"""
 
     async def create_task(self, request, request_id=None):
         self.calls.append((request, request_id))
@@ -49,7 +50,7 @@ class ConflictTaskManager(FakeTaskManager):
 
 @pytest.mark.asyncio
 async def test_run_loop_treats_409_as_idempotent_success() -> None:
-    """批次3：create_task 抛 409（同名任务已存在）按幂等成功处理——run_count 推进、
+    """create_task 抛 409（同名任务已存在）按幂等成功处理——run_count 推进、
     fail_count 清零、正常重排，而非按失败退避。"""
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     settings = Settings(scheduler_poll_seconds=0.01)
@@ -122,7 +123,7 @@ async def test_register_writes_spec_and_due() -> None:
     info = await scheduler.register(
         "job", "interval:1", "text_summary", {"content": "hi"}
     )
-    # 批次3：spec 新增 fail_count（失败退避状态）
+    # spec 新增 fail_count（失败退避状态）
     assert set(info) == {
         "id", "name", "schedule", "biz_type", "params", "enabled", "next_run_at", "run_count", "fail_count",
     }
@@ -214,7 +215,7 @@ async def test_run_loop_tolerates_enqueue_failure() -> None:
     await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, ok_info["id"], 1)
     await scheduler.stop()
 
-    # 两个调度都尝试过入队，失败的未推进 run_count 但 fail_count 递增并重排（批次3）
+    # 两个调度都尝试过入队，失败的未推进 run_count 但 fail_count 递增并重排
     assert len(fake_tm.calls) == 2
     fail_spec = json.loads(await redis.hget(settings.scheduler_spec_key, fail_info["id"]))
     ok_spec = json.loads(await redis.hget(settings.scheduler_spec_key, ok_info["id"]))
@@ -229,7 +230,7 @@ async def test_run_loop_tolerates_enqueue_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_run_loop_claim_is_atomic_under_two_instances() -> None:
-    """R4-1.30：多副本领取互斥——同一批到期项只被一个实例入队，杜绝调度任务重复触发。
+    """多副本领取互斥——同一批到期项只被一个实例入队，杜绝调度任务重复触发。
 
     修复前 run_loop 的 zrangebyscore（只读）+ zrem 不判返回值：两实例可读到同一批
     到期项并各自 _process_due → 同名任务 create_task 两次（调度重复触发）。
@@ -283,3 +284,115 @@ async def test_register_invalid_cron_field_raises() -> None:
     scheduler = Scheduler(redis, Settings())
     with pytest.raises(ValueError):
         await scheduler.register("job", "cron:0 9 * * 7", "text_summary", {})
+
+
+# ---------- 崩溃一致性：对账补排 + 循环容错 ----------
+
+
+@pytest.mark.asyncio
+async def test_reconcile_reschedules_enabled_spec_missing_due() -> None:
+    """崩溃窗口（spec 已写、due 未写）对账补排：enabled 补排、disabled 跳过。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    scheduler = Scheduler(redis, settings)
+    enabled_id = (await scheduler.register("job", "interval:3600", "text_summary", {}))["id"]
+    disabled_id = (
+        await scheduler.register("off", "interval:3600", "text_summary", {}, enabled=False)
+    )["id"]
+    # 模拟「zrem 出队后崩溃 / register 中途崩溃」：spec 在、due 缺失
+    await redis.zrem(settings.scheduler_due_key, enabled_id, disabled_id)
+    assert not await redis.zrange(settings.scheduler_due_key, 0, -1)
+
+    rescheduled = await scheduler.reconcile_due()
+
+    assert rescheduled == 1  # 仅 enabled 补排
+    due = dict(await redis.zrange(settings.scheduler_due_key, 0, -1, withscores=True))
+    assert enabled_id in due
+    assert due[enabled_id] > time.time()  # 补排到未来触发点
+    assert disabled_id not in due
+
+
+@pytest.mark.asyncio
+async def test_start_reconciles_then_loop_enqueues() -> None:
+    """start 前对账补排缺失条目，随后 run_loop 正常触发入队。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    fake_tm = FakeTaskManager()
+    scheduler = Scheduler(redis, settings)
+    scheduler.attach_task_manager(fake_tm)
+    info = await scheduler.register("job", "interval:1", "text_summary", {})
+    await redis.zrem(settings.scheduler_due_key, info["id"])
+
+    await scheduler.start()
+    await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, info["id"], 1)
+    await scheduler.stop()
+    assert len(fake_tm.calls) >= 1
+
+
+@pytest.mark.asyncio
+async def test_run_loop_survives_transient_redis_error() -> None:
+    """Redis 抖动不杀死调度循环：退避后继续消费到期条目。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    fake_tm = FakeTaskManager()
+    scheduler = Scheduler(redis, settings)
+    scheduler.attach_task_manager(fake_tm)
+    info = await scheduler.register("job", "interval:1", "text_summary", {})
+    await redis.zadd(settings.scheduler_due_key, {info["id"]: 0})
+
+    real_zrange = redis.zrangebyscore
+    attempts = {"n": 0}
+
+    async def flaky_zrangebyscore(*args, **kwargs):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise ConnectionError("模拟 Redis 抖动")
+        return await real_zrange(*args, **kwargs)
+
+    redis.zrangebyscore = flaky_zrangebyscore  # type: ignore[method-assign]
+
+    await scheduler.start()
+    await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, info["id"], 1)
+    assert attempts["n"] >= 1
+    assert len(fake_tm.calls) >= 1
+    await scheduler.stop()
+
+
+@pytest.mark.asyncio
+async def test_run_loop_requeues_failed_item_and_continues() -> None:
+    """单条处理遇 Redis 故障：该调度按退避写回 due，其余调度照常入队，循环不退出。"""
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    settings = Settings(scheduler_poll_seconds=0.01)
+    fake_tm = FakeTaskManager()
+    scheduler = Scheduler(redis, settings)
+    scheduler.attach_task_manager(fake_tm)
+    ok_info = await scheduler.register("ok", "interval:1", "text_summary", {})
+    fail_info = await scheduler.register("fail", "interval:1", "text_summary", {})
+    await redis.zadd(settings.scheduler_due_key, {ok_info["id"]: 0, fail_info["id"]: 0})
+
+    real_hget = redis.hget
+    triggered = {"done": False}
+
+    async def flaky_hget(*args, **kwargs):
+        # 对 fail 调度读取 spec 时抛一次连接错误（模拟处理中途 Redis 抖动）
+        if (
+            not triggered["done"]
+            and len(args) >= 2
+            and args[0] == settings.scheduler_spec_key
+            and args[1] == fail_info["id"]
+        ):
+            triggered["done"] = True
+            raise ConnectionError("模拟 Redis 抖动")
+        return await real_hget(*args, **kwargs)
+
+    redis.hget = flaky_hget  # type: ignore[method-assign]
+
+    await scheduler.start()
+    await _wait_for_spec_run_count(redis, settings.scheduler_spec_key, ok_info["id"], 1)
+    await scheduler.stop()
+
+    # ok 调度正常入队推进；fail 调度被写回 due（score 在未来）
+    assert len(fake_tm.calls) >= 1
+    due = dict(await redis.zrange(settings.scheduler_due_key, 0, -1, withscores=True))
+    assert fail_info["id"] in due
+    assert due[fail_info["id"]] > 0

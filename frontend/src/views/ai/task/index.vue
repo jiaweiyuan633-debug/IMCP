@@ -44,7 +44,7 @@
         <template v-else-if="column.key === 'actions'">
           <a-space>
             <a @click="openDetail(record)">{{ t('page.aiDetail') }}</a>
-            <!-- R4-1.25：仅 FAILED 终态提供重试（死信恢复）；其他状态重试无意义 -->
+            <!-- 仅 FAILED 终态提供重试（死信恢复）；其他状态重试无意义 -->
             <a v-if="record.status === 'FAILED'" v-permission="'ai:task:retry'" @click="onRetry([record.id])">{{ t('page.aiRetry') }}</a>
             <a v-permission="'ai:task:cancel'" @click="onCancel(record)">{{ t('page.aiCancel') }}</a>
           </a-space>
@@ -121,7 +121,7 @@ const bizTypeOptions = [
   { label: 'Keyword Extract', value: 'keyword_extract' },
 ]
 
-// R4-1.23：失败分类（R4-1.20 回调落库 error_type）——瞬时超时值得重试，确定性错误重试无意义
+// 失败分类（回调落库 error_type）——瞬时超时值得重试，确定性错误重试无意义
 const errorTypeOptions = [
   { label: t('page.aiErrorTypeTimeout'), value: 'timeout' },
   { label: t('page.aiErrorTypeNonRetryable'), value: 'non_retryable' },
@@ -167,7 +167,7 @@ const creating = ref(false)
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const detail = ref<AiTaskVo | null>(null)
-// R4-1.25：批量重试选中行（行选择状态与表格双向关联）
+// 批量重试选中行（行选择状态与表格双向关联）
 const selectedRowKeys = ref<number[]>([])
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -327,7 +327,7 @@ function onCancel(record: AiTaskVo) {
   })
 }
 
-// R4-1.25：死信任务重试——单条直接执行，批量经确认弹窗；结果按分类汇总提示
+// 死信任务重试——单条直接执行，批量经确认弹窗；结果按分类汇总提示
 async function onRetry(ids: number[]) {
   const res = await retryAiTasks(ids)
   message.success(t('page.aiRetryDone', { succeeded: res.succeeded, skipped: res.skipped, failed: res.failed }))

@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 
 /**
- * R4-1.33：应用偏好持久化契约测试——暗黑主题从 localStorage 恢复并在切换时写回。
+ * 应用偏好持久化契约测试——暗黑主题从 localStorage 恢复并在切换时写回。
  */
 describe('app store 主题持久化', () => {
   beforeEach(() => {

@@ -32,7 +32,7 @@ public class ServerMonitorService {
             cachedAt = now;
         }
         // 返回深拷贝快照：调用方（监控页轮询 / 告警判定）仅应消费不可变观测数据，
-        // 不持有 5s 缓存实例的引用，杜绝通过返回值改写共享缓存（批次9·R4-1.55）。
+        // 不持有 5s 缓存实例的引用，杜绝通过返回值改写共享缓存。
         return defensiveCopy(snapshot);
     }
 

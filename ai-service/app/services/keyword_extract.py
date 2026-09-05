@@ -5,7 +5,7 @@ from collections import Counter
 class KeywordExtractService:
 
     async def run(self, params: dict) -> dict:
-        # 批次3（R4-1.49）：移除 force_fail/delay_seconds 演示后门（同 text_summary）
+        # force_fail/delay_seconds 演示后门已移除，不再响应此类参数（同 text_summary）
         content = str(params.get("content", "")).strip()
         if not content:
             raise ValueError("content is required")

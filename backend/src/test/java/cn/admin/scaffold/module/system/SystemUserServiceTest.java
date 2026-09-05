@@ -107,7 +107,7 @@ class SystemUserServiceTest {
     }
 
     /**
-     * R4-1.40：创建用户须持久化头像字段——此前 UserSaveRequest 缺 avatar 字段，
+     * 创建用户须持久化头像字段——此前 UserSaveRequest 缺 avatar 字段，
      * 前端已上传且 DB 列/VO 均存在，但 create 从未把值写库导致编辑后头像丢失。
      */
     @Test
@@ -142,7 +142,7 @@ class SystemUserServiceTest {
         verify(userRoleMapper).deleteByUserId(7L);
         verify(userRoleMapper).insert(eq(7L), eq(2L));
         verify(userRoleMapper).insert(eq(7L), eq(3L));
-        // 批次2：角色变更同时失效角色+权限缓存（否则旧角色编码残留）
+        // 角色变更同时失效角色+权限缓存（否则旧角色编码残留）
         verify(tokenService).evictUserRolesAndPermissionsAfterCommit(7L);
     }
 
@@ -162,7 +162,7 @@ class SystemUserServiceTest {
 
     @Test
     void deleteUserEvictsPermissions() {
-        // R4-1.31：删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
+        // 删除用户后残留权限缓存（TTL 30 分钟）无意义且占位，一并失效
         SysUserDO user = new SysUserDO();
         user.setId(7L);
         when(userMapper.selectById(7L)).thenReturn(user);
@@ -178,7 +178,7 @@ class SystemUserServiceTest {
 
     @Test
     void updateStatusEvictsPermissions() {
-        // R4-1.31：禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照会残留旧权限
+        // 禁用/重新启用均清除权限缓存——重新启用后若缓存为禁用前旧快照会残留旧权限
         SysUserDO user = new SysUserDO();
         user.setId(7L);
         when(userMapper.selectById(7L)).thenReturn(user);
@@ -190,7 +190,7 @@ class SystemUserServiceTest {
         verify(tokenService).evictUserPermissionsAfterCommit(7L);
     }
 
-    // ---------- R4-1.39：写路径数据范围校验 ----------
+    // ---------- 写路径数据范围校验 ----------
 
     /** 非 admin 编辑数据范围外的用户：按 id 直查绕过 page 过滤的路径必须被归属校验拦下。 */
     @Test

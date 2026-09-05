@@ -2,7 +2,7 @@ import { getFileAccessToken } from '@/api/common'
 import { API_BASE_URL } from '@/utils/env'
 
 /**
- * 文件访问 URL 统一工具（R4-1.43）：收敛 FileUpload / 文件列表 / 导入导出三处重复的
+ * 文件访问 URL 统一工具：收敛 FileUpload / 文件列表 / 导入导出三处重复的
  * 「取令牌 + 拼 origin」逻辑，并统一基于 API_BASE_URL（已去尾部 /），消除行为分叉。
  */
 

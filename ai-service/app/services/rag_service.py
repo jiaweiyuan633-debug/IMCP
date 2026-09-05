@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.pii import mask
+from app.pii.outbound import should_mask_outbound
 from app.rag import RagPipeline
 from app.services.base import BaseTaskService
 from app.services.context import ServiceContext
@@ -16,7 +18,14 @@ from app.services.context import ServiceContext
 class RagIngestService(BaseTaskService):
     def __init__(self, context: ServiceContext) -> None:
         self.context = context
-        self.pipeline = RagPipeline(context.vectors, context.embedder())
+        self.pipeline = RagPipeline(context.vectors, context.embedder(), self._mask_text())
+
+    def _mask_text(self):
+        """出域脱敏回调：发给外部 embedding provider 的文档/query 先脱敏（见 app.pii.outbound）。"""
+        provider = self.context.providers.default()
+        if should_mask_outbound(self.context.settings, provider, True):
+            return lambda text: mask(text, self.context.settings.pii_mask_char)
+        return None
 
     async def run(self, params: dict[str, Any]) -> dict[str, Any]:
         tenant_id = int(params.get("tenant_id"))
@@ -36,7 +45,13 @@ class RagIngestService(BaseTaskService):
 class RagRetrieveService(BaseTaskService):
     def __init__(self, context: ServiceContext) -> None:
         self.context = context
-        self.pipeline = RagPipeline(context.vectors, context.embedder())
+        self.pipeline = RagPipeline(context.vectors, context.embedder(), self._mask_text())
+
+    def _mask_text(self):
+        provider = self.context.providers.default()
+        if should_mask_outbound(self.context.settings, provider, True):
+            return lambda text: mask(text, self.context.settings.pii_mask_char)
+        return None
 
     async def run(self, params: dict[str, Any]) -> dict[str, Any]:
         tenant_id = int(params.get("tenant_id"))

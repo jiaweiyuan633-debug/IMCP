@@ -8,6 +8,7 @@ import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
 import cn.admin.scaffold.common.SecretCipher;
 import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.auth.dto.OauthClientQuery;
 import cn.admin.scaffold.module.auth.dto.OauthClientSaveRequest;
 import cn.admin.scaffold.module.auth.entity.SysOauthClientDO;
@@ -90,7 +91,11 @@ public class OauthClientService {
     }
 
     public void delete(Long id) {
-        requireOwned(id);
+        // requireOwned 已确认租户归属；删除前释放 client_id 唯一键（(tenant_id, client_id)），
+        // 删除后同 client_id 可重新注册（已签发的授权码/票据在 Redis 且短 TTL，随其自然过期）
+        SysOauthClientDO client = requireOwned(id);
+        client.setClientId(UniqueKeyRelease.releaseCode(client.getClientId()));
+        oauthClientMapper.updateById(client);
         oauthClientMapper.deleteById(id);
     }
 

@@ -50,7 +50,7 @@ public class ImportExportJobService {
     private final DataScopeHelper dataScopeHelper;
 
     /**
-     * 任务记录分页（R4-1.37 行级数据权限）：非管理员仅可见自己创建的任务（created_by 命中
+     * 任务记录分页（行级数据权限）：非管理员仅可见自己创建的任务（created_by 命中
      * 当前用户可见集合），管理员经 DataScopeAspect.isAdmin 短路不受限；受控表映射已在
      * V61 迁移中注册到 sys_data_permission，后续按权限矩阵调整无需发版。
      */
@@ -95,7 +95,7 @@ public class ImportExportJobService {
     }
 
     /**
-     * 任务详情（R4-1.38 数据权限单条路径补漏）：page 已按 created_by 行级过滤，但 view/download
+     * 任务详情（数据权限单条路径补漏）：page 已按 created_by 行级过滤，但 view/download
      * 原只校验租户，非管理员可遍历/猜测 id 读取他人任务详情甚至下载导出成果。统一收口到
      * {@link #getOwnedOrThrow} 的归属校验，保证"列表可见 = 单条可读/可下载"。
      */
@@ -127,7 +127,7 @@ public class ImportExportJobService {
                            String queryJson) {
         ImportExportJobDO job = new ImportExportJobDO();
         job.setTenantId(TenantContext.getTenantId());
-        // R4-1.38：创建人填充——批10 注册的 created_by 数据权限过滤此前因实体未声明该列而落空
+        // 创建人填充——数据权限按创建人过滤此前因实体未声明该列而落空
         // （created_by 全 NULL，IN 条件永不命中），导致非管理员连自己创建的任务都看不到。
         job.setCreatedBy(SecurityUtils.tryGetUserId());
         job.setTemplateId(template.getId());
@@ -157,7 +157,7 @@ public class ImportExportJobService {
     }
 
     /**
-     * 单条任务归属校验（R4-1.38）：租户不匹配视为不存在；非管理员进一步校验创建人是否在当前
+     * 单条任务归属校验：租户不匹配视为不存在；非管理员进一步校验创建人是否在当前
      * 用户可见集合（与 page 的 @DataScope 同一语义，admin 短路），越权抛 FORBIDDEN。
      * view/download 共用，杜绝"page 受控但按 id 直查绕过"。
      */

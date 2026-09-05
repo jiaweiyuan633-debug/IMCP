@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * MCP Server 配置安全单测（R4-1.40 批次13）。
+ * MCP Server 配置安全单测。
  *
  * <p>覆盖两点：①保存时静态 SSRF 校验（URL 指向内网/保留 IP 字面量直接拒绝，不落库）；
  * ②authToken 落库加密（SecretCipher，编辑留空保留原密文）。

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 渠道配置敏感字段加解密（R4-1.37 批次10）：
+ * 渠道配置敏感字段加解密：
  * 命中敏感清单的字段值加密、enc: 前缀幂等、发送前解密、非法 JSON 原样放行。
  */
 class ChannelConfigCipherTest {

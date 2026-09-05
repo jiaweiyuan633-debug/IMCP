@@ -80,17 +80,34 @@ class KNNClassifier:
         return obj
 
 
-async def train_model(redis, name: str, labels: list[str], docs: list[str]) -> dict:
-    """训练 KNN 模型并序列化持久化到 Redis key ``ai:ml:model:{name}``。"""
+def train_model_sync(name: str, labels: list[str], docs: list[str]) -> tuple[str, dict]:
+    """同步执行训练并序列化模型，返回 (payload_json, 训练摘要)。
+
+    fit 与 JSON 序列化均为 CPU 密集工作（线程内无法被取消），与 Redis 写入分离，
+    由调用方决定放入哪个执行线程（见 app.core.threads.run_cpu / train_model）。
+    """
     model = KNNClassifier().fit(labels, docs)
     payload = json.dumps(model.to_json(), ensure_ascii=False)
-    await redis.set(f"ai:ml:model:{name}", payload)
-    return {
+    summary = {
         "name": name,
         "label_count": len(set(labels)),
         "vocab_size": len(model.vectorizer.vocabulary),
         "samples": len(docs),
     }
+    return payload, summary
+
+
+async def train_model(redis, name: str, labels: list[str], docs: list[str]) -> dict:
+    """训练 KNN 模型并持久化到 Redis key ``ai:ml:model:{name}``。
+
+    CPU 密集的 fit/序列化在线程池执行，Redis 写入回到事件循环 await——
+    协程本身始终被调用方 await，不会出现「协程被当作线程任务提交后永不执行」。
+    """
+    from app.core.threads import run_cpu
+
+    payload, summary = await run_cpu(train_model_sync, name, labels, docs)
+    await redis.set(f"ai:ml:model:{name}", payload)
+    return summary
 
 
 async def load_model(redis, name: str) -> KNNClassifier | None:

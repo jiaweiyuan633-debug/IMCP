@@ -1,9 +1,9 @@
-# Prometheus 告警规则（P1-10 可观测性）
+# Prometheus 告警规则
 #
 # 与 prometheus.yml 同目录挂载；触发后由 AlertManager 收敛并路由（见 alertmanager.yml）。
 # 阈值为脚手架基线，对接真实业务后应按 SLO 与容量规划调整。
 #
-# 批次6（R4-1.52）修正：
+# 规则修正说明：
 # - 5xx/延迟规则聚合维度 by(service) 改为 by(application, instance, uri)——Micrometer
 #   指标无 service 标签，原规则按不存在的标签聚合退化为全局聚合，无法定位实例/接口；
 # - Redis/MySQL 规则引用未启用的 exporter job（prometheus.yml 中处于注释状态），
@@ -77,7 +77,7 @@ groups:
           summary: "后端 Tomcat 线程池接近饱和"
           description: "忙碌线程占比超过 90%，请求可能排队等待，检查线程泄漏或慢请求。"
 
-      # 批次6：发件箱死信堆积（后端事务发件箱投递失败滞留）
+      # 发件箱死信堆积（后端事务发件箱投递失败滞留）
       - alert: OutboxDeadLetterAccumulating
         expr: |
           sum(max_over_time(outbox_dispatch_failure_total[5m])) > 0
@@ -88,7 +88,7 @@ groups:
           summary: "发件箱投递持续失败"
           description: "事务发件箱近 15 分钟持续有投递失败，检查回调端点/网络/下游服务。"
 
-      # 批次6：AI 死信队列堆积（ai-service 任务失败入死信）
+      # AI 死信队列堆积（ai-service 任务失败入死信）
       - alert: AiDeadLetterQueueGrowth
         expr: |
           sum(ai_task_failed_total{reason="retries_exhausted"}) - sum(ai_task_failed_total{reason="retries_exhausted"} offset 1h) > 10
@@ -101,7 +101,7 @@ groups:
 
   - name: admin-scaffold-infrastructure
     rules:
-      # 批次6：以下 Redis/MySQL 规则依赖对应 exporter 已部署且 prometheus.yml 中已取消注释。
+      # 以下 Redis/MySQL 规则依赖对应 exporter 已部署且 prometheus.yml 中已取消注释。
       # 未部署 exporter 时请删除对应规则（否则规则对不存在的序列恒为空，静默漏报）。
       - alert: RedisDown
         expr: up{job="redis-exporter"} == 0
@@ -130,7 +130,7 @@ groups:
           summary: "Redis 内存使用率超过 85%"
           description: "Redis 接近 maxmemory，触发淘汰策略可能影响缓存命中与会话。（需启用 redis-exporter）"
 
-      # 批次6：PVC 磁盘水位（需 kube-state-metrics，kube-prometheus-stack 自带）
+      # PVC 磁盘水位（需 kube-state-metrics，kube-prometheus-stack 自带）
       - alert: PersistentVolumeAlmostFull
         expr: |
           kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85

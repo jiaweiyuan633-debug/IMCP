@@ -45,7 +45,7 @@ public class AiPythonClient {
         if (RequestIdHolder.get() != null) {
             headers.set("X-Request-Id", RequestIdHolder.get());
         }
-        // R4-1.44：投递前 DNS 复核（对齐告警 Webhook/通用渠道/MCP）——保存时静态校验
+        // 投递前 DNS 复核（对齐告警 Webhook/通用渠道/MCP）——保存时静态校验
         // 兜不住"主机名指向内网 IP"与"保存后 DNS 变更"，解析复核任一地址落内部网段即拒
         assertSafeOutboundUrl(config);
         try {
@@ -60,7 +60,7 @@ public class AiPythonClient {
     }
 
     /**
-     * R4-1.25：手动重试终态失败任务，调用 AI 侧 POST /api/v1/tasks/{taskNo}/retry。
+     * 手动重试终态失败任务，调用 AI 侧 POST /api/v1/tasks/{taskNo}/retry。
      * AI 侧语义：任务置回 QUEUED、清空 error/reason 重新入队（保留已耗重试次数——
      * 重试给任务再一次执行机会而非重置完整重试预算）。404（AI 侧任务已过期/缺失）
      * 等调用错误统一映射为业务异常，由调用方按单条失败处理，不中断整批。
@@ -73,7 +73,7 @@ public class AiPythonClient {
         if (RequestIdHolder.get() != null) {
             headers.set("X-Request-Id", RequestIdHolder.get());
         }
-        // R4-1.44：投递前 DNS 复核，同 createTask
+        // 投递前 DNS 复核，同 createTask
         assertSafeOutboundUrl(config);
         try {
             restTemplate.postForEntity(
@@ -85,7 +85,7 @@ public class AiPythonClient {
         }
     }
 
-    /** 出站 AI 服务地址投递前 DNS 复核（R4-1.44，对齐告警 Webhook/通用渠道/MCP Server）。 */
+    /** 出站 AI 服务地址投递前 DNS 复核（对齐告警 Webhook/通用渠道/MCP Server）。 */
     private void assertSafeOutboundUrl(AiServiceConfigDO config) {
         String ssrfError = SsrfUrlValidator.validateOutboundHttpUrlWithDns(config.getBaseUrl());
         if (ssrfError != null) {

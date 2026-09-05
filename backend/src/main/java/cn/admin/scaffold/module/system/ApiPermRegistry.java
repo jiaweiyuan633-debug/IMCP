@@ -1,5 +1,6 @@
 package cn.admin.scaffold.module.system;
 
+import cn.admin.scaffold.common.PathNormalizer;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.admin.scaffold.module.system.entity.SysApiPermDO;
 import cn.admin.scaffold.module.system.mapper.SysApiPermMapper;
@@ -63,11 +64,20 @@ public class ApiPermRegistry {
         }
     }
 
-    /** 解析请求所需权限：无匹配规则返回 null（放行，仅要求已认证）。 */
+    /**
+     * 解析请求所需权限：无匹配规则返回 null（放行，仅要求已认证）。
+     *
+     * <p>匹配前对请求路径归一化（去矩阵参数/URL 解码/折叠重复斜杠/去尾斜杠//api/v1 前缀重写），
+     * 防止同一接口的多态路径写法绕过或漏配规则，与 ApiPermAuthorizationFilter 的可观测告警共用同口径。
+     */
     public String resolve(String requestMethod, String path) {
         String method = requestMethod == null ? "*" : requestMethod;
+        String normalizedPath = PathNormalizer.normalize(path);
+        if (normalizedPath == null) {
+            return null;
+        }
         for (Rule rule : rules) {
-            if (matches(rule, method, path)) {
+            if (matches(rule, method, normalizedPath)) {
                 return rule.permCode();
             }
         }

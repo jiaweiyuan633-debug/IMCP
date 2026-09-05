@@ -49,7 +49,7 @@ class MonitorServiceTest {
     @InjectMocks
     private MonitorService service;
 
-    // ---------- R4-1.26：AI 任务失败分类(error_type)分层统计 ----------
+    // ---------- AI 任务失败分类(error_type)分层统计 ----------
 
     @Test
     void statsGroupsFailedTasksByErrorType() {

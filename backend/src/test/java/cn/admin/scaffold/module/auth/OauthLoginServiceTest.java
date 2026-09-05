@@ -33,11 +33,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.19 回归测试：匿名绑定端点必须以绑定凭证携带的配置租户定位平台账号。
+ * 回归测试：匿名绑定端点必须以绑定凭证携带的配置租户定位平台账号。
  *
  * <p>背景：{@link OauthLoginService#bind} 为匿名端点（无租户上下文），旧代码
  * {@code userMapper.selectOne(eq(username))} 会被租户拦截器注入默认 tenant_id=1，
- * 租户 2 的平台账号按用户名永远查不到、绑定必失败。修复后改走 R1-1.7 的跨租户辅助方法
+ * 租户 2 的平台账号按用户名永远查不到、绑定必失败。修复后改走跨租户辅助方法
  * {@code selectByUsername(username, bindData.getTenantId())}，租户来源与
  * findBinding/bindToUser 一致。本测试断言绑定查询按凭证租户定位、绑定行落到正确租户。
  */
@@ -91,7 +91,7 @@ class OauthLoginServiceTest {
         assertThat(row.getProvider()).isEqualTo("github");
         assertThat(row.getOpenId()).isEqualTo("gh-123");
         assertThat(result.getAccessToken()).isEqualTo("at-1");
-        // R4-1.29：绑定成功必须清除失败计数，解锁账号
+        // 绑定成功必须清除失败计数，解锁账号
         verify(redisTemplate).delete("oauth:bind:fail:2:zhangsan");
     }
 
@@ -122,7 +122,7 @@ class OauthLoginServiceTest {
 
     @Test
     void bindRejectsWhenFailureCountLocked() {
-        // R4-1.29：同一 (租户,用户名) 失败计数达阈值后绑定被直接拒绝，且不触碰用户查询（防单账号爆破）
+        // 同一 (租户,用户名) 失败计数达阈值后绑定被直接拒绝，且不触碰用户查询（防单账号爆破）
         stubBindToken("tok-1");
         when(valueOps.get("oauth:bind:fail:2:zhangsan")).thenReturn("5");
 
@@ -136,7 +136,7 @@ class OauthLoginServiceTest {
 
     @Test
     void bindRejectsWhenIpRateLimited() {
-        // R4-1.29：IP 级限流在消费绑定凭证之前触发（防撒网爆破），无需有效凭证即可拒绝
+        // IP 级限流在消费绑定凭证之前触发（防撒网爆破），无需有效凭证即可拒绝
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn("203.0.113.9");
         when(valueOps.increment("oauth:bind:rate:203.0.113.9")).thenReturn(21L);

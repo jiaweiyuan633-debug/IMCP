@@ -1,8 +1,68 @@
-# 接口文档
+# API 接口约定
 
-## 统一约定
+本文定义 Java 后端（`backend`）HTTP API 的**通用约定**：请求前缀、认证方式、统一
+响应与错误码、分页、限流、SSE 认证，以及 OpenAPI 契约的获取方式。它是给“新加入的
+下游开发者 / 前端 / 第三方集成方”的导读，**不是完整接口清单**——单接口路径、参数与
+出参以运行时 OpenAPI 契约为准（见文末）。
 
-Java 后端统一响应结构：
+## 请求前缀与版本化
+
+- 控制器统一挂在 `/api/**` 下（如 `/api/auth/login`、`/api/system/user`）。
+- `/api/v1/**` 与 `/api/**` 等价：`ApiVersionFilter`（`common/ApiVersionFilter.java`）
+  在请求入口把 `/api/v1/` 前缀改写为 `/api/` 再路由。新客户端建议使用
+  `/api/v1/**`，旧地址持续可用。
+- 前缀不是模块名一部分的静态资源（`/uploads`、`/files/**` 文件访问等）不在本约定内。
+
+## 认证方式
+
+### Access Token
+
+除登录、验证码、AI 回调等公开端点外，受保护接口需携带请求头：
+
+```
+Authorization: Bearer <accessToken>
+```
+
+- `accessToken` 为 JWT，有效期默认 120 分钟（`JWT_ACCESS_EXPIRE_MINUTES`），
+  服务端同时在 Redis 中维护会话；登出/改密/停用会吊销相关令牌。
+- 未携带或过期返回 HTTP 401，响应体为统一 `Result`（见下）。
+
+### Refresh Token（httpOnly Cookie）
+
+- 登录成功时服务端把 `refreshToken` 写入 **httpOnly Cookie**（默认名
+  `admin_refresh_token`，`SameSite=Lax`；生产 HTTPS 下 `Secure` 由
+  `REFRESH_COOKIE_SECURE` 控制）。前端脚本无法读取该 Cookie，降低 XSS 窃取长期
+  凭证的风险；登录响应体的 `refreshToken` 字段保留供脚本/兼容客户端使用。
+- 刷新：`POST /api/auth/refresh`。服务端**优先读取 httpOnly Cookie**；无 Cookie 时
+  回退请求体 `refreshToken`（兼容旧客户端/脚本）。
+- 登出：`POST /api/auth/logout` 同时清除 refresh Cookie。
+- Cookie 名/路径/SameSite/Secure 均可通过 `app.security.refresh-*` 配置（见
+  `backend/src/main/resources/application.yml`）。
+
+### 两步验证与口令策略
+
+- TOTP：`/api/auth/totp/*` 提供状态查询、开启（`setup`）、启用、关闭。
+- 强制改密：生产配置 `app.security.force-password-change` 开启时，默认口令首登或
+  密码过期（`password-expire-days`，默认 90 天）后登录响应携带
+  `mustChangePassword=true`，客户端须引导用户先改密。
+- 密码相关端点：`PUT /api/auth/password`（修改密码）、`PUT /api/auth/profile`
+  （个人资料）。
+
+### SSE 流式接口的认证
+
+`EventSource`/浏览器无法为 SSE 请求附加 `Authorization` 头，因此流式端点采用
+**一次性 Ticket** 模式：
+
+1. `GET /api/ai/ticket`、`GET /api/system/notice/ticket` 等取票（需正常鉴权）；
+2. 携带 `?ticket=...` 连接流式端点（如 `/api/ai/tasks/{id}/stream`、
+   `/api/system/notice/stream`）。
+
+票据即身份（服务端换取 userId），并有每用户并发连接上限与心跳保活，防止单账号
+无限开流耗尽资源。
+
+## 统一响应结构
+
+绝大多数接口返回统一信封 `Result<T>`：
 
 ```json
 {
@@ -13,212 +73,102 @@ Java 后端统一响应结构：
 }
 ```
 
-常见错误码：
+- `requestId`：链路标识。服务端接受入站 `X-Request-Id`，缺省自动生成 UUID，
+  回显于响应体并在响应头 `X-Request-Id` 透出（日志中 `[%X{requestId}]` 一致贯穿）。
+- **HTTP 状态与业务码的关系**：业务校验类错误返回 **HTTP 200 + `code != 0`**
+  （如参数错误 1001、数据不存在 1002），前端按 `Result.code` 统一处理；HTTP 层
+  语义错误（未认证 401、无权限 403、资源不存在 404、方法不支持 405、超限 413/429、
+  服务端 500 等）直接使用对应状态码，响应体仍为同一 `Result` 结构。完整映射以
+  `GlobalExceptionHandler` 为准。
 
-| code | 说明 |
-| --- | --- |
-| `0` | 成功 |
-| `401` | 未登录或登录已过期 |
-| `403` | 无权限访问 |
-| `1001` | 参数错误 |
-| `1002` | 数据不存在 |
-| `1003` | 用户名或密码错误 |
-| `1004` | 账号已被禁用 |
-| `1005` | 原密码错误 |
-| `1006` | 用户名已存在 |
-| `1007` | 角色编码已存在 |
-| `1008` | 存在下级部门，不能删除 |
-| `1009` | 岗位编码已存在 |
-| `1010` | AI 服务不可用 |
-| `1011` | AI 服务未启用或不存在 |
-| `1012` | 字典类型已存在 |
-| `1013` | 参数键名已存在 |
-| `1014` | 登录过于频繁或账号已锁定 |
-| `1015` | 需要两步验证 |
-| `1016` | 租户用户数量已达上限 |
-| `1017` | AI 任务已达每日上限 |
-| `1018` | 租户存储空间不足 |
-| `1019` | 验证码错误 |
-| `1020` | 动态验证码错误 |
-| `1021` | AI 回调签名无效 |
-| `1022` | 非法回调状态 |
-| `1023` | 当前流程已结束 |
-| `1024` | 流程定义不可用 |
-| `1025` | 流程定义没有可进入的起始节点 |
-| `1026` | 文件未通过安全检查 |
-| `1027` | 病毒扫描服务不可用 |
-| `1028` | 设备编码已存在 |
-| `1029` | Prompt 模板编码已存在 |
-| `1030` | 请勿重复提交 |
-| `1031` | 系统繁忙，请稍后重试 |
-| `1032` | 报表编码已存在 |
-| `1033` | 报表数据源仅支持只读查询 |
-| `1034` | 物模型类型已存在 |
-| `1035` | 导入导出模板编码已存在 |
-| `1036` | 表单编码已存在 |
-| `1037` | 表单定义无效 |
-| `1038` | 表单数据校验不通过 |
-| `429` | 请求过于频繁 |
-| `500` | 系统繁忙，请稍后重试 |
+## 错误码约定
 
-分页接口统一返回 `PageResult`，包含 `list/total/pageNum/pageSize`。除登录等公开接口外，请求头需携带 `Authorization: Bearer <accessToken>`。
+错误码集中在后端枚举 `ResultCode`（源码：
+`backend/src/main/java/cn/admin/scaffold/common/ResultCode.java`），分两类：
 
-接口同时提供版本化前缀 `/api/v1/**`，与 `/api/**` 行为一致；新客户端建议使用 `/api/v1/**`。
+- **HTTP 语义码**（与 HTTP 状态一致）：`401` 未登录或已过期、`403` 无权限、
+  `404` 资源不存在、`405` 方法不支持、`413` 上传超限、`415` 媒体类型不支持、
+  `429` 请求过于频繁、`500` 系统繁忙。
+- **业务码**（`1001` 起，HTTP 200 + 业务码返回）常用分组：
 
-## 认证与个人中心
-
-| 方法 | 路径 | 说明 |
+| 分组 | code 段 | 典型含义 |
 | --- | --- | --- |
-| GET | `/api/auth/login-config` | 登录配置（验证码开关） |
-| GET | `/api/auth/captcha` | 图形验证码 |
-| POST | `/api/auth/login` | 登录，返回 accessToken/refreshToken；refreshToken 同时写入 httpOnly Cookie（批次1） |
-| POST | `/api/auth/refresh` | 刷新 Token：优先读取 httpOnly Cookie，无 Cookie 时回退请求体 refreshToken |
-| POST | `/api/auth/logout` | 退出登录（同时清除 refresh Cookie） |
-| GET | `/api/auth/me` | 当前用户、权限、菜单树 |
-| PUT | `/api/auth/password` | 修改密码（成功后清除"必须改密"标记并记录改密时间） |
-| PUT | `/api/auth/profile` | 编辑个人资料（昵称、邮箱、手机号、头像等） |
-| GET/POST | `/api/auth/totp/*` | 两步验证状态、开启、启用、关闭 |
+| 参数与数据 | 1001 / 1002 | 参数错误 / 数据不存在 |
+| 账号 | 1003–1006 | 用户名或密码错误 / 账号禁用 / 原密码错误 / 用户名已存在 |
+| 唯一性冲突 | 1007、1009、1012–1013、1028–1029、1032、1034–1036、1039 | 角色/岗位/字典/参数/设备/Prompt/报表/物模型/模板/表单/大屏等编码或类型已存在 |
+| 组织与租户 | 1008、1016、1018 | 存在下级部门不能删除 / 租户用户数上限 / 存储空间不足 |
+| AI 服务 | 1010–1011、1017、1021–1022 | AI 服务不可用或未启用 / 每日上限 / 回调签名无效 / 非法回调状态 |
+| 认证与风控 | 1014、1015、1019–1020、1040 | 登录过于频繁或账号锁定 / 需两步验证 / 图形或动态验证码错误 / 跨租户同名需指定租户 |
+| 工作流 | 1023–1025 | 流程已结束 / 定义不可用 / 无起始节点 |
+| 文件安全 | 1026–1027 | 未通过安全检查 / 病毒扫描不可用 |
+| 通用 | 1030–1031 | 请勿重复提交 / 系统繁忙（分布式锁超时） |
+| 报表 / 表单 | 1033、1037–1038 | 数据源仅支持只读 / 表单定义无效 / 表单数据校验不通过 |
 
-> **认证安全说明（批次1）**：
-> 1. `refreshToken` 已迁移至 **httpOnly + SameSite=Lax Cookie**（生产 https 下带 Secure），前端脚本无法读取，降低 XSS 窃取长期凭证风险；响应体字段保留供脚本/兼容客户端使用。
-> 2. 登录响应新增 `mustChangePassword` 标记：默认口令首登或密码过期时返回 `true`，前端强制跳转 `/change-password` 改密后才可进入系统（仅生产 profile 开启，本地 dev/test 保持默认口令可直接登录）。
-> 3. 密码过期策略：`password_changed_at` 距今超过 `app.security.password-expire-days`（默认 90 天）即进入强制改密流程。
+> 维护约定：新增错误码必须同步修改 `ResultCode` 枚举与前端语言包
+> `frontend/src/locales/zh-CN.ts`、`frontend/src/locales/en-US.ts`；历史码不删除、
+> 不改变语义（错误码分组规约见 `docs/architecture-conventions.md`）。
 
-> **认证性能与调度安全（批次2）**：
-> 1. 角色编码随权限一并缓存（Redis `auth:roles:{userId}`，30min±抖动 TTL），认证链路由每请求 2 次 DB 查询降为 0（用户行仍每请求校验以保证禁用即时生效）；角色变更/删除经事务提交后双失效。
-> 2. Quartz 任务 `invokeTarget` 增加格式白名单（`\A[a-zA-Z0-9_.]+\z`）与**可调用方法注册表**（仅 `JobInvokeUtil.register` 显式登记的方法可被调度触发），未登记即拒绝——修复任意 Bean 无参方法可被触发的越权面；cron 表达式保存前校验，非法拒绝入库（create/update 已事务化，scheduleJob 失败回滚）。
+## 分页
 
-## 系统管理
+分页接口统一返回 `PageResult`，字段为：
 
-| 模块 | 方法/路径 | 说明 |
+```json
+{
+  "records": [],
+  "total": 0,
+  "pageNum": 1,
+  "pageSize": 20
+}
+```
+
+- 分页请求参数一般为 `pageNum` / `pageSize`（具体以接口为准）；
+- 结果集合字段是 **`records`**（不是 `list`），与后端 `PageResult` 类一一对应。
+
+## 限流
+
+- 全局接口限流：注册在 `/api/**` 上的拦截器（`common/ApiRateLimitInterceptor.java`）
+  按**身份桶**计数——已登录按 `user:{userId}`，匿名按 socket 源地址 `ip:{remoteAddr}`；
+  每身份每分钟上限默认 300（`API_RATE_LIMIT_PER_MINUTE`），超限返回 HTTP 429 +
+  `code=429`。
+- 限流身份**从不信任 `X-Forwarded-For`**（客户端可控）。默认
+  `forward-headers-strategy=none` 时匿名按反代出口 IP 计数（全站共享桶，更严不更松）；
+  只有部署在会正确覆盖/重写该头的可信反向代理之后，才应显式注入
+  `SERVER_FORWARD_HEADERS_STRATEGY`。
+- 登录接口另有失败阶梯锁定（Redis `login:fail:*`，键含租户维度），命中返回
+  `code=1014`。
+- SSE/长连接有每用户并发上限与心跳（见 `application.yml` `app.notice-sse-*` /
+  `app.ai-task-sse-*` / `app.screen.*` / `app.websocket.*` 等配置）。
+
+## 模块导读（以运行时 OpenAPI 为准）
+
+下表只列模块入口前缀，帮助定位；具体端点见运行时契约。
+
+| 模块 | 前缀 | 覆盖能力 |
 | --- | --- | --- |
-| 用户 | `/api/system/user` | 分页查询、新增、编辑、删除、状态、角色授权 |
-| 用户导入导出 | `/api/system/user/export`、`/api/system/user/import` | Excel 导入导出 |
-| 角色 | `/api/system/role` | CRUD、角色选项、菜单授权、数据权限 |
-| 菜单 | `/api/system/menu/tree` | 菜单与按钮权限树，含新增、编辑、删除 |
-| 部门 | `/api/system/dept/tree` | 部门树，含新增、编辑、删除 |
-| 岗位 | `/api/system/post` | CRUD、岗位选项 |
-| 字典 | `/api/system/dict/type`、`/api/system/dict/data` | 字典类型与数据，`/data/type/{dictType}` 获取字典项 |
-| 参数 | `/api/system/config` | 参数配置 CRUD |
-| 通知公告 | `/api/system/notice` | 公告 CRUD、最新公告、未读数、单条已读、全部已读 |
-| 通知实时推送 | `/api/system/notice/stream` | SSE 实时通知流 |
-| 通知推送 Ticket | `/api/system/notice/ticket` | 获取一次性 SSE Ticket |
-| 消息中心 | `/api/system/message` | 分页、最新消息、详情、未读数、已读/全部已读、发送 |
-| 消息待办 | `/api/system/message/todos` | 消息待办任务（对接 Warm-Flow） |
-| 消息聚合 | `/api/system/message/feed` | 铃铛聚合：消息 + 公告统一推送（含 bizType/bizId 深链） |
-| 租户 | `/api/system/tenant` | 租户 CRUD |
-| 租户内用户 | `/api/system/tenant/{tenantId}/users` | 租户管理员候选（当前租户内用户） |
-| 管理员候选 | `/api/system/tenant/admin-candidates` | 可担任租户管理员的跨租户候选 |
-| 文件管理 | `/api/system/file` | 文件分页、删除 |
-| 工作流引擎 | `/api/system/workflow-engine` | 发起、实例分页、待办、通过、拒绝、撤回、转办、审批日志 |
-| 工作流详情 | `/api/system/workflow-engine/{id}` | 详情出参：头部信息 + 表单回显(formData) + 完整流程轨迹(trace) + 当前待办节点 |
-| 流程定义 | `/api/system/workflow-engine/def` | 流程定义 CRUD、发布/取消发布、节点查询、定义选项 |
-| 当前节点 | `/api/system/workflow-engine/{id}/nodes` | 当前待办节点查询 |
+| 认证与个人中心 | `/api/auth`、`/api/auth/oauth` | 登录配置/验证码、登录、刷新、登出、当前用户、改密、资料、TOTP、OAuth2 登录 |
+| 系统管理 | `/api/system` | user、role、menu、dept、post、dict、config、notice、message、file、tenant、数据权限、API 权限 |
+| 工作流 | `/api/system/workflow-engine`（含 `/def`） | 流程定义/发布、发起、待办、审批、驳回/撤回/转办、日志、节点 |
+| 通知渠道与消息模板 | `/api/notice/channel`、`/api/notice/message-template` | 通知渠道配置、消息模板 |
+| 监控 | `/api/monitor` | 登录/操作日志、在线用户、缓存、看板统计、定时任务（`/job`、`/job/log`）、服务器监控、SQL 日志、字段审计、告警规则 |
+| AI 管理 | `/api/ai` | 服务配置、任务（创建/分页/详情/取消/重试/SSE 实时）、Prompt、知识库、对话 |
+| 通用与文件 | `/api/common`、`/api/common/file/chunk`、`/api/common/file/presign` | 上传、文件访问令牌、存储配额、分块上传、预签名直传；文件内容经受保护路径访问（`/files/{id}`、`/api/system/file/{id}/download`） |
+| 报表与大屏 | `/api/report`（`/definition`、`/screen/template`） | 报表定义与执行、大屏模板 |
+| 设备 | `/api/device`（`/thing-model`、`/telemetry`） | 设备、物模型、遥测 |
+| 导入导出 | `/api/import-export`（`/template`、`/job`） | 模板、异步导入导出任务与结果下载 |
+| 表单引擎 | `/api/form`（`/definition`、`/instance`） | 表单定义/发布、实例提交/审批 |
+| MCP | `/api/mcp` | MCP 只读工具端点 |
 
-## 业务模块（批次4）
+> 反向代理注意：文件上传体默认上限 20MB（`spring.servlet.multipart`），网关
+> `proxy-body-size` 需对齐，否则触发 413。
 
-### 报表定义化
+## OpenAPI 契约说明
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/report/definition/page` | 报表定义分页查询 |
-| POST | `/api/report/definition` | 新增报表定义（SQL 仅允许只读查询，校验后入库） |
-| PUT | `/api/report/definition` | 编辑报表定义 |
-| DELETE | `/api/report/definition/{id}` | 删除报表定义 |
-| GET | `/api/report/definition/{id}` | 报表定义详情 |
-| POST | `/api/report/definition/{id}/execute` | 执行报表查询（校验 SQL 只读，返回数据行） |
+- Java 后端通过 springdoc + Knife4j 自动生成：在线文档 `http://localhost:8080/doc.html`
+  （dev 环境），JSON 契约 `http://localhost:8080/v3/api-docs`；
+- Python AI 服务（FastAPI 自动生成）：`http://localhost:8000/docs`；
+- 真实契约以**运行时 `/v3/api-docs` 为准**，不要依据本文手写表格做实现；
+  契约快照的生成、入库与门禁见 [docs/api/openapi.md](./openapi.md)；
+- 刷新本地契约快照：`scripts/fetch-openapi.ps1`。
 
-### 设备物模型与遥测
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/device/thing-model/page` | 物模型分页查询 |
-| GET | `/api/device/thing-model/{id}` | 物模型详情 |
-| GET | `/api/device/thing-model/{id}/schema` | 物模型完整结构（属性/事件/服务三要素） |
-| POST | `/api/device/thing-model` | 新增物模型 |
-| PUT | `/api/device/thing-model` | 编辑物模型 |
-| DELETE | `/api/device/thing-model/{id}` | 删除物模型 |
-| POST | `/api/device/telemetry/report` | 设备遥测上报（批量，按物模型校验属性） |
-| GET | `/api/device/telemetry/latest` | 设备最新遥测快照 |
-| GET | `/api/device/telemetry/history` | 设备遥测历史分页 |
-
-### 导入导出中心
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/import-export/template/page` | 导入导出模板分页查询 |
-| POST | `/api/import-export/template` | 新增模板（按实体配置列映射与校验规则） |
-| PUT | `/api/import-export/template` | 编辑模板 |
-| DELETE | `/api/import-export/template/{id}` | 删除模板 |
-| POST | `/api/import-export/job/import` | 创建导入任务（模板 + 文件，异步执行） |
-| POST | `/api/import-export/job/export` | 创建导出任务（模板 + 查询条件，异步执行） |
-| GET | `/api/import-export/job/page` | 导入导出任务分页查询 |
-| GET | `/api/import-export/job/{id}` | 任务详情（进度、成功/失败数、错误信息） |
-| GET | `/api/import-export/job/{id}/download` | 下载任务结果文件（导出成品 / 导入失败明细） |
-
-导入导出通过 `ImportExportHandler` SPI 扩展实体；内置 `dict-data`（字典数据）处理器。
-
-### 低代码表单引擎
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/form/definition/page` | 表单定义分页查询 |
-| GET | `/api/form/definition/{id}` | 表单定义详情 |
-| GET | `/api/form/definition/{id}/schema` | 已发布表单的渲染结构（fields + layout） |
-| POST | `/api/form/definition` | 新增表单定义（schema 校验） |
-| PUT | `/api/form/definition` | 编辑表单定义（乐观锁） |
-| PUT | `/api/form/definition/{id}/publish` | 发布表单（草稿 → 已发布） |
-| DELETE | `/api/form/definition/{id}` | 删除表单定义 |
-| POST | `/api/form/instance/submit` | 提交表单（校验已发布定义 + 字段规则） |
-| GET | `/api/form/instance/page` | 表单实例分页查询 |
-| GET | `/api/form/instance/{id}` | 表单实例详情 |
-| PUT | `/api/form/instance/{id}/status` | 表单审批流转（SUBMITTED → APPROVED/REJECTED） |
-
-## 监控
-
-| 模块 | 方法/路径 | 说明 |
-| --- | --- | --- |
-| 登录日志 | `/api/monitor/login-log` | 分页查询 |
-| 操作日志 | `/api/monitor/oper-log` | 分页查询 |
-| 在线用户 | `/api/monitor/online` | 在线用户列表、强制下线 |
-| 缓存 | `/api/monitor/cache/{key}` | 查询、删除缓存 |
-| 看板统计 | `/api/monitor/stats` | 用户/部门/任务/日志等统计 |
-| 定时任务 | `/api/monitor/job` | 任务 CRUD、状态启停、手动执行 |
-| 任务日志 | `/api/monitor/job/log` | 定时任务执行日志（`JobLogVo` 类型契约） |
-| 服务器监控 | `/api/monitor/server` | CPU、内存、磁盘、JVM 等指标 |
-| SQL 监控 | `/api/monitor/sql-log` | 慢 SQL 与 SQL 执行日志（`SqlLogVo` 类型契约） |
-| 告警规则 | `/api/monitor/alert-rule` | 告警规则 CRUD、立即检查 |
-| 审计日志 | `/api/monitor/audit-log` | 审计日志分页查询 |
-
-## AI 与通用
-
-| 模块 | 方法/路径 | 说明 |
-| --- | --- | --- |
-| AI 配置 | `/api/ai/config` | 查询、编辑 AI 服务配置 |
-| AI 任务 | `/api/ai/tasks` | 创建、分页查询、详情、取消 |
-| AI 实时推送 | `/api/ai/tasks/{id}/stream` | SSE 实时任务状态推送 |
-| AI 推送 Ticket | `/api/ai/ticket` | 获取一次性 SSE Ticket |
-| AI 回调 | `/api/ai/callback/task` | Java 接收 Python 服务回调，带 Token 校验与幂等 |
-| 文件上传 | `/api/common/upload` | 本地或 MinIO 上传，20MB 上限 |
-| 文件访问 Token | `/api/common/file-token` | 获取上传文件签名访问 Token |
-
-Python 服务接口：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/health` | 健康检查 |
-| GET | `/api/v1/ping` | 连通性测试 |
-| POST | `/api/v1/tasks` | 创建异步任务 |
-| GET | `/api/v1/tasks/{task_id}` | 查询任务状态与结果 |
-| POST | `/api/v1/tasks/{task_id}/retry` | 失败重试 |
-| GET | `/api/v1/metrics` | Prometheus 指标 |
-
-## 在线文档
-
-- Java 后端：`http://localhost:8080/doc.html`
-- Python 服务：`http://localhost:8000/docs`
-- OpenAPI JSON：`http://localhost:8080/v3/api-docs`
-- 刷新本地契约：`scripts/fetch-openapi.ps1`
-
-接口契约以运行时 OpenAPI 为准，CI 会在每次提交时执行后端测试与覆盖率门槛、前端 lint/测试/构建、AI 测试与规范检查。
-
+CI 在每次提交执行后端 `mvn verify`（含测试与 JaCoCo 覆盖率门槛）、前端
+lint/test/build、AI 测试与规范检查（详见 `docs/runbook.md` 与 `.github/workflows/ci.yml`）。

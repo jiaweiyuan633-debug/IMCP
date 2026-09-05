@@ -21,7 +21,7 @@ public interface SysUserMapper extends BaseMapper<SysUserDO> {
     List<SysUserDO> selectAdminCandidates(@Param("tenantId") Long tenantId);
 
     /**
-     * 登录专用查询（R1-1.7）：按用户名（+ 可选租户）跨租户定位用户，绕过 TenantLine 拦截器。
+     * 登录专用查询：按用户名（+ 可选租户）跨租户定位用户，绕过 TenantLine 拦截器。
      * <p>登录时租户上下文尚未就位，拦截器注入默认 tenant_id=1 会使非租户 1 用户无法登录；
      * 又因用户名按 (tenant_id, username) 唯一（V33），未指定租户时跨租户可能同名多行。
      * tenantId 非 null 时精确限定租户（配合登录表单可选租户字段，规避多行）；
@@ -34,7 +34,7 @@ public interface SysUserMapper extends BaseMapper<SysUserDO> {
     List<SysUserDO> selectByUsername(@Param("username") String username, @Param("tenantId") Long tenantId);
 
     /**
-     * 按主键跨租户查询用户（R4-1.9 AI 任务 SSE 票据流程）：绕过 TenantLine 拦截器。
+     * 按主键跨租户查询用户（AI 任务 SSE 票据流程）：绕过 TenantLine 拦截器。
      * <p>SSE 流端点为 permitAll + 一次性票据鉴权，请求线程租户恒为 1（TenantFilter 不再信任
      * 请求头）；票据仅绑定 userId，须以用户库表租户为权威来源先定位用户（与
      * JwtAuthenticationFilter 认证后覆盖租户的逻辑一致），再按其租户上下文查询任务。

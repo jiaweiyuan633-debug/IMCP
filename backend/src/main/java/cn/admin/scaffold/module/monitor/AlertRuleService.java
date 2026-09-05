@@ -76,7 +76,7 @@ public class AlertRuleService {
 
     /**
      * 保存时静态校验 Webhook 地址（协议/主机/IP 字面量，不发起 DNS，避免保存依赖解析）。
-     * R4-1.13：告警触发时服务端会主动请求该地址，若不限制可被用作 SSRF 跳板打内网。
+     * 告警触发时服务端会主动请求该地址，若不限制可被用作 SSRF 跳板打内网。
      */
     private void checkWebhookUrl(String webhookUrl) {
         String error = SsrfUrlValidator.validateOutboundHttpUrl(webhookUrl);

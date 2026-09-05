@@ -46,7 +46,7 @@ export interface LoginForm {
   captchaId?: string
   captchaCode?: string
   totpCode?: string
-  /** 可选租户 ID：跨租户存在同名用户时精确定位（R1-1.7） */
+  /** 可选租户 ID：跨租户存在同名用户时精确定位 */
   tenantId?: number
 }
 

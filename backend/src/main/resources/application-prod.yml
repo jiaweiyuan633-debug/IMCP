@@ -14,7 +14,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    # 生产默认启用 JDBC TLS（useSSL=true）但允许回退（requireSSL=false）以免锁定尚无证书的现网；
+    # allowPublicKeyRetrieval=true 兼容 caching_sha2_password 首次认证。
+    # 注意：useSSL=true + requireSSL=false 是"尽力加密"而非强制——MySQL 服务端 CA 校验体系就绪后
+    # 应显式注入 DB_REQUIRE_SSL=true（并配合 serverSslCert 或受信 CA 库校验服务端证书）。
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=${DB_USE_SSL:true}&requireSSL=${DB_REQUIRE_SSL:false}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY:true}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver

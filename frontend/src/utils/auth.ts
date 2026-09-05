@@ -1,5 +1,5 @@
 const ACCESS_TOKEN_KEY = 'admin_access_token'
-// R4-1.47（批次1·P1-F3）：refresh token 不再落 localStorage——已迁移到后端 httpOnly Cookie
+// refresh token 不再落 localStorage——已迁移到后端 httpOnly Cookie
 // （XSS 无法读取，降低长期会话被脚本窃取的风险）。refresh 轮换由 /auth/refresh 自动完成，
 // 前端仅保留短时 access token 的内存 + localStorage 缓存（刷新页面后凭 cookie 静默续期）。
 // 登出广播哨兵键保留：写时间戳告知其他标签页「本标签页已登出」，

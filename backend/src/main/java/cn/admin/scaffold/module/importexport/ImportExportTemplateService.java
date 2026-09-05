@@ -7,6 +7,7 @@ import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
 import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.importexport.dto.TemplateQuery;
 import cn.admin.scaffold.module.importexport.dto.TemplateSaveRequest;
 import cn.admin.scaffold.module.importexport.entity.ImportExportJobDO;
@@ -93,6 +94,14 @@ public class ImportExportTemplateService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
                     "存在 " + pendingCount + " 个待处理任务引用该模板，请等待任务结束后删除");
         }
+        // 逻辑删除前先释放 code 唯一键（(tenant_id, code)）：删除后同名编码可立即重建。
+        // 任务表快照 template_code，不依赖定义行；引用校验已在上方按 template_id 完成。
+        ImportExportTemplateDO template = templateMapper.selectById(id);
+        if (template == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        template.setCode(UniqueKeyRelease.releaseCode(template.getCode()));
+        templateMapper.updateById(template);
         templateMapper.deleteById(id);
     }
 

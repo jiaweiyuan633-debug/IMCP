@@ -94,13 +94,13 @@ public class ChannelConfigService {
         }
         ChannelType type = parseType(config.getChannelType());
         MessageChannelSender sender = channelFactory.get(type);
-        // R4-1.37：敏感字段落库为 enc: 密文，发送前解密为明文再交给渠道 sender（sender 不感知密文）
+        // 敏感字段落库为 enc: 密文，发送前解密为明文再交给渠道 sender（sender 不感知密文）
         SysChannelConfigDO plainConfig = channelConfigCipher.decryptConfigOf(config);
 
         SysChannelLogDO log = new SysChannelLogDO();
         log.setChannelType(type.name());
         log.setChannelId(config.getId());
-        // R4-1.38：target/content 加密落库（PII 防护，列长已随 V62 扩列）。title 为定位信息不含正文，明文保留。
+        // target/content 加密落库（PII 防护，列长已扩列）。title 为定位信息不含正文，明文保留。
         log.setTarget(encryptSensitive(request.getTarget()));
         log.setTitle(request.getTitle());
         log.setContent(encryptSensitive(request.getContent()));
@@ -220,7 +220,7 @@ public class ChannelConfigService {
     }
 
     /**
-     * 回显解密（R4-1.38）：仅解密 "enc:" 密文；解密失败（密钥变更/损坏）与存量明文
+     * 回显解密：仅解密 "enc:" 密文；解密失败（密钥变更/损坏）与存量明文
      * （V62 之前的旧数据）统一 fail-closed 打码，不回显真实内容。
      */
     private String decryptOrMask(String stored) {

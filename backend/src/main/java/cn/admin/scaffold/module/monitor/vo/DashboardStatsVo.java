@@ -19,7 +19,7 @@ public class DashboardStatsVo {
     private long aiTaskSucceeded;
     private long aiTaskFailed;
     private long aiTaskRunning;
-    /** R4-1.26：FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败任务，各桶之和等于 aiTaskFailed。 */
+    /** FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败任务，各桶之和等于 aiTaskFailed。 */
     private List<NameValueVo> aiTaskFailedByErrorType;
 }
 

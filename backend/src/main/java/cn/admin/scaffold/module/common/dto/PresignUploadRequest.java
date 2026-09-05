@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 预签名直传签发请求（批次2c）。
+ * 预签名直传签发请求。
  */
 @Data
 public class PresignUploadRequest {

@@ -1,8 +1,8 @@
-# AlertManager 配置（P1-10 可观测性）
+# AlertManager 配置
 #
 # 与 prometheus.yml / prometheus-rules.yml 同目录挂载。
 #
-# 批次6（R4-1.52）：原 ops@example.com 为占位接收器——部署后告警无法触达，等于静默漏报。
+# 原 ops@example.com 为占位接收器——部署后告警无法触达，等于静默漏报。
 # 生产必须按真实通知渠道替换下方 receivers（二选一或同时）：
 #   1. 钉钉/企微/飞书/Slack 机器人：取消 webhook_configs 注释并填机器人 URL；
 #   2. 邮件：配置 email_configs 的 to 与全局 smtp 段。

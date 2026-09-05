@@ -19,7 +19,7 @@ public class NoticeSseRedisListener implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            // R4-1.10：Redis 频道消息携带权威目标租户信封（发布线程租户），
+            // Redis 频道消息携带权威目标租户信封（发布线程租户），
             // 各实例据此过滤本地连接，公告内容不再跨租户实时泄露
             NoticeSseService.NoticeBroadcast broadcast = objectMapper.readValue(
                     new String(message.getBody(), StandardCharsets.UTF_8),

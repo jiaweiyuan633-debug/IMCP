@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * R4-1.32：request 拦截器与泛型包装契约测试。
+ * request 拦截器与泛型包装契约测试。
  *
  * 通过 vi.mock 构造一个可编程的 axios 实例，捕获请求/响应拦截器处理器后直接驱动，
  * 覆盖：成功解包、blob 原样返回、业务码错误 reject、401 刷新重试、刷新失败跳登录、
- * 网络错误自动重试（R4-1.47 起仅幂等方法）、请求拦截器附加 token、泛型包装方法转发。
+ * 网络错误自动重试（仅幂等方法）、请求拦截器附加 token、泛型包装方法转发。
  */
 
 // 可编程 axios 实例 + 捕获的拦截器处理器
@@ -123,7 +123,7 @@ describe('request 拦截器', () => {
       config: { retried: false, headers: {} },
     })
 
-    // R4-1.47：setTokens 只持久化 access token（refresh token 走 httpOnly Cookie）
+    // setTokens 只持久化 access token（refresh token 走 httpOnly Cookie）
     expect(authMocks.setTokens).toHaveBeenCalledWith('at2')
     expect(instance.request).toHaveBeenCalledWith(
       expect.objectContaining({ retried: true, headers: { Authorization: 'Bearer at' } }),
@@ -171,7 +171,7 @@ describe('request 拦截器', () => {
     expect(result).toBe('网络重试后的数据')
   })
 
-  it('POST 网络错误不自动重试（幂等保护，R4-1.47）', async () => {
+  it('POST 网络错误不自动重试（幂等保护）', async () => {
     const error = {
       code: 'ERR_NETWORK',
       config: { retried: false, headers: {}, method: 'post' },

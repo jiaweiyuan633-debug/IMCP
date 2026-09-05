@@ -4,7 +4,8 @@
 # 严格校验拒绝（ERESOLVE）；pnpm 依据锁文件冻结安装可正常解析该树。
 FROM node:22-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# corepack 固定 pnpm 版本（与 package.json packageManager / CI pnpm 11.16.0 对齐）
+RUN corepack enable && corepack prepare pnpm@11.16.0 --activate
 # 官网依赖极少，pnpm 冻结锁文件安装
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile

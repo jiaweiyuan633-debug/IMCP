@@ -7,6 +7,9 @@ spec:
   project: default
   source:
     # TODO: 替换为实际私有 Git 仓库地址（Helm Chart 唯一来源，勿与原生清单混用）
+    # 替换 repoURL 后同步过一遍 values-prod.yaml 顶部「上线前必替换占位符清单」：
+    # 镜像 tag（<COMMIT_SHA>）、域名（ingress.host + corsAllowedOriginPatterns）、
+    # clusterIssuer；secret.* 由 helm.parameters / ESO / Vault 注入，勿写入本文件
     repoURL: https://github.com/your-org/admin-scaffold.git
     targetRevision: main
     path: k8s/helm/admin-scaffold

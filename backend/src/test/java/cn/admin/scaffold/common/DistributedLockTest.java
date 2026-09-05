@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.30：DistributedLock 租约语义回归。此前默认重载固定 10s 租约且 Redisson 对正值
+ * DistributedLock 租约语义回归。此前默认重载固定 10s 租约且 Redisson 对正值
  * 租约【不启动看门狗续期】，执行超过 10s 锁自动释放会放行并发（如大文件合并）；修复后
  * 默认 leaseTime=0 启用看门狗自动续期，锁不会因固定租约中途丢失。
  */

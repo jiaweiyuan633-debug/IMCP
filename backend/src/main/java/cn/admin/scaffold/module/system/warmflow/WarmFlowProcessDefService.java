@@ -293,7 +293,7 @@ public class WarmFlowProcessDefService {
     }
 
     private PageResult<WarmFlowProcessDefVO> pageOf(List<WarmFlowProcessDefVO> all, long pageNum, long pageSize) {
-        // R4-1.39：pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
+        // pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
         int from = PageUtil.fromIndex(pageNum, pageSize, all.size());
         int to = PageUtil.toIndex(pageNum, pageSize, all.size());
         long total = all.size();

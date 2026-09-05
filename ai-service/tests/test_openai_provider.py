@@ -182,7 +182,7 @@ async def test_missing_model_is_config_error() -> None:
         await provider.chat([{"role": "user", "content": "hi"}])
 
 
-# ---------- R4-1.34：连接复用与生命周期 ----------
+# ---------- 连接复用与生命周期 ----------
 
 
 @pytest.mark.asyncio

@@ -44,8 +44,13 @@ public class MinioFileStorage implements FileStorage {
         this.accessKey = accessKey;
         this.secretKey = secretKey;
         this.bucket = bucket;
-        // 与 TotpService/JwtProperties 同款 fail-fast 策略：仅 dev 允许默认凭据（本地 MinIO 快速演示），
+        // 空凭据在任何环境都不可用（构造出的 client 每次请求必然鉴权失败），一律 fail-fast；
+        // 与 TotpService/JwtProperties 同款策略：默认凭据 minioadmin 仅 dev 允许（本地 MinIO 快速演示），
         // 生产（显式启用 minio 存储而未注入独立密钥）启动即失败，杜绝默认口令桶对外泄露
+        if (accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException("MinIO 存储 access-key/secret-key 不能为空，"
+                    + "请通过 MINIO_ACCESS_KEY / MINIO_SECRET_KEY 注入");
+        }
         boolean isDev = environment != null && environment.acceptsProfiles(Profiles.of("dev"));
         if (!isDev && (DEFAULT_ACCESS_KEY.equals(accessKey) || DEFAULT_SECRET_KEY.equals(secretKey))) {
             throw new IllegalStateException("生产环境禁止使用 MinIO 默认凭据 minioadmin/minioadmin，"

@@ -5,7 +5,7 @@
   为 True 时返回真实 Tesseract 实例（构造失败同样回退 Mock）；
 - 其余情况（默认 mock / tesseract 不可用）返回确定性 MockOCRProvider。
 
-批次3（R4-1.49）：tesseract 探测/构造失败回退 Mock 时**必须告警**——此前静默回退，
+tesseract 探测/构造失败回退 Mock 时**必须告警**——此前静默回退，
 生产配置了 tesseract 却拿到假 OCR 结果且无任何日志（"无声数据造假"）；新增
 ``settings.ocr_fail_fast``，置 true 时失败直接抛异常（不静默降级）。
 """

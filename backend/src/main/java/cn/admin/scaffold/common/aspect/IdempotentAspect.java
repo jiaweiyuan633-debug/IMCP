@@ -19,7 +19,11 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
 
 /**
  * {@link Idempotent} 切面：基于 Redis SETNX 实现接口幂等。
@@ -37,6 +41,8 @@ public class IdempotentAspect {
     private static final String KEY_PREFIX = "idem:";
     /** 占位值：键已存在但尚未写入结果（returnCached 语义下的首次执行中）。 */
     private static final String PENDING = "P";
+    /** payload（SpEL 结果或整对象 JSON）超过该长度先 SHA-256 截断，避免超长 Redis key。 */
+    private static final int PAYLOAD_MAX_LENGTH = 200;
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -83,6 +89,7 @@ public class IdempotentAspect {
             sb.append(tenantId).append(':');
         }
         sb.append(signature.getDeclaringType().getSimpleName()).append('.').append(signature.getMethod().getName());
+        String payload;
         if (StringUtils.hasText(idempotent.key())) {
             StandardEvaluationContext context = new StandardEvaluationContext();
             String[] paramNames = parameterNameDiscoverer.getParameterNames(signature.getMethod());
@@ -96,14 +103,28 @@ public class IdempotentAspect {
                 log.warn("Idempotent key SpEL 解析失败，回退参数 JSON：{}", idempotent.key(), exception);
                 value = null;
             }
-            sb.append(':').append(String.valueOf(value));
+            payload = String.valueOf(value);
         } else {
             try {
-                sb.append(':').append(objectMapper.writeValueAsString(args));
+                payload = objectMapper.writeValueAsString(args);
             } catch (Exception exception) {
-                sb.append(':').append(args.length);
+                payload = String.valueOf(args.length);
             }
         }
-        return sb.toString();
+        // 超长 payload（含整对象 JSON 回退）SHA-256 截断：避免单 key 长度超 Redis 上限/浪费内存
+        if (payload.length() > PAYLOAD_MAX_LENGTH) {
+            payload = sha256Hex(payload);
+        }
+        return sb.append(':').append(payload).toString();
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            // JDK 必然提供 SHA-256
+            throw new IllegalStateException("SHA-256 不可用", exception);
+        }
     }
 }

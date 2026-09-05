@@ -89,7 +89,7 @@ public class MonitorService {
                         AiTaskStatus.PENDING.name(),
                         AiTaskStatus.QUEUED.name(),
                         AiTaskStatus.RUNNING.name()));
-        // R4-1.26：FAILED 任务按 error_type 分组，供大屏饼图区分失败构成（超时/不可重试/重试耗尽）。
+        // FAILED 任务按 error_type 分组，供大屏饼图区分失败构成（超时/不可重试/重试耗尽）。
         // selectMaps 的 GROUP BY 同样被 @DataScope 数据权限拦截器改写，与上方 selectCount 口径一致。
         // error_type 为空（历史数据 / AiTaskScanner 兜底置 FAILED 未写 error_type）归入 "other" 桶，保证各桶之和等于 aiTaskFailed。
         List<NameValueVo> failedByErrorType = new ArrayList<>();

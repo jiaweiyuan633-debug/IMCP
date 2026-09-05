@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 报表 SQL 守卫单元测试（批次4 修复 W1）：
+ * 报表 SQL 守卫单元测试（修复 W1）：
  * 覆盖结构性只读校验、表级白名单、危险函数、锁子句、租户注入与行数上限的全部绕过向量。
  */
 class ReportSqlGuardTest {
@@ -207,7 +207,7 @@ class ReportSqlGuardTest {
                 .isInstanceOf(BusinessException.class);
     }
 
-    // ---------- 敏感列 / 通配符（R1-1.2 列级黑名单）----------
+    // ---------- 敏感列 / 通配符（列级黑名单）----------
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -215,7 +215,7 @@ class ReportSqlGuardTest {
             "SELECT totp_secret FROM sys_user WHERE id = 1",
             "SELECT u.password FROM sys_user u WHERE u.id = 1",
             "SELECT u.totp_secret FROM sys_user u JOIN sys_device d ON d.id = u.id",
-            // R4-1.38：手机号/邮箱为 PII 列，报表读取同样禁止
+            // 手机号/邮箱为 PII 列，报表读取同样禁止
             "SELECT phone FROM sys_user",
             "SELECT email FROM sys_user WHERE id = 1",
             "SELECT u.phone, u.email FROM sys_user u",

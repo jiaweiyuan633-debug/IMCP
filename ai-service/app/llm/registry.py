@@ -43,7 +43,7 @@ class ProviderRegistry:
         return cast(Embedder, provider)
 
     async def aclose_all(self) -> None:
-        """应用关闭时释放全部提供方持有的连接池（R4-1.34）。
+        """应用关闭时释放全部提供方持有的连接池。
 
         仅对提供方公开 ``aclose`` 生命周期方法（OpenAICompatibleProvider 持久
         复用连接池；MockProvider 等无连接资源，跳过）。启动失败前也可能已构造
@@ -62,13 +62,20 @@ def build_registry(settings: Settings) -> ProviderRegistry:
         registry.register(
             name,
             OpenAICompatibleProvider(
-                base_url=config.get("base_url", ""),
-                api_key=config.get("api_key", ""),
-                default_model=config.get("model"),
-                embedding_model=config.get("embedding_model"),
-                timeout_seconds=int(config.get("timeout_seconds", settings.llm_timeout_seconds)),
+                base_url=config.base_url,
+                api_key=config.api_key,
+                default_model=config.model,
+                embedding_model=config.embedding_model,
+                timeout_seconds=config.timeout_seconds or settings.llm_timeout_seconds,
                 name=name,
             ),
         )
     registry.set_default(settings.llm_default_provider or "mock")
+    # 生产防呆（LLM_FAIL_FAST）：默认提供方解析为 mock（= 未配置任何真实
+    # LLM_PROVIDERS）即启动失败，防止生产静默跑 mock 假数据而不自知
+    if settings.llm_fail_fast and registry.default().name == "mock":
+        raise RuntimeError(
+            "LLM_FAIL_FAST=true 但默认提供方为 mock：请配置 LLM_PROVIDERS 并设置 "
+            "LLM_DEFAULT_PROVIDER，或关闭 LLM_FAIL_FAST（仅限本地开发）"
+        )
     return registry

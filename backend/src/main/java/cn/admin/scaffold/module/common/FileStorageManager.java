@@ -104,7 +104,7 @@ public class FileStorageManager {
                 .sha256(validation.sha256())
                 .scanStatus(entity.getScanStatus())
                 .contentUrl(contentUrl)
-                // R4-1.43：上传响应不再签发 accessToken——令牌生命周期收敛为「需要时经
+                // 上传响应不再签发 accessToken——令牌生命周期收敛为「需要时经
                 // /api/common/file-token 现取」，列表/上传缓存的令牌 TTL 过期后必 403
                 .build();
     }
@@ -141,7 +141,7 @@ public class FileStorageManager {
      * 按历史 {@code /uploads/{objectKey}} URL 校验文件归属并返回（供 file-token 签发前的跨租户校验）。
      * 存量文件 sys_file.url 即 {@code /uploads/{objectKey}}（与 {@link #resolveObjectKey} 的
      * 回退解析同源），精确匹配后校验租户，与 {@link #getOwnedOrThrow} 对 /files/{id} 的校验对齐——
-     * 否则任何人登录即可为任意 objectKey 签发令牌，猜中对象键即可跨租户读历史文件（R4-1.43）。
+     * 否则任何人登录即可为任意 objectKey 签发令牌，猜中对象键即可跨租户读历史文件。
      */
     public SysFileDO getOwnedByLegacyUrlOrThrow(String legacyUploadUrl) {
         SysFileDO file = fileMapper.selectOne(new LambdaQueryWrapper<SysFileDO>()
@@ -222,7 +222,7 @@ public class FileStorageManager {
     /**
      * 有界读回预签名直传对象：最多读入 maxSize+1 字节即截断，超限直接判为过大并清理对象。
      * 整读（readAllBytes）会把绕过 multipart 20MB 上限、直传对象存储的超大文件一次性装入堆，
-     * 构成 OOM 面；有界读使内存占用恒不大于 maxSize+1，且超限对象不再滞留存储（R4-1.15）。
+     * 构成 OOM 面；有界读使内存占用恒不大于 maxSize+1，且超限对象不再滞留存储。
      */
     private byte[] readBackBounded(String objectKey) {
         long maxSize = uploadProperties.getMaxSizeBytes();

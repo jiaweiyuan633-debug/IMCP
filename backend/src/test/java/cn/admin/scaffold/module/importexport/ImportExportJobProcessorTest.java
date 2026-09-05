@@ -40,7 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 导入导出任务处理器单元测试（批次4 修复 W3）：
+ * 导入导出任务处理器单元测试（修复 W3）：
  * 覆盖卡死任务回收、导入落库事务化、异常消息脱敏、导出筛选参数透传与行数上限。
  */
 @ExtendWith(MockitoExtension.class)

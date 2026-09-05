@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.device.dto.ThingModelQuery;
 import cn.admin.scaffold.module.device.dto.ThingModelSaveRequest;
 import cn.admin.scaffold.module.device.entity.DeviceDO;
@@ -101,6 +102,9 @@ public class ThingModelService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
                     "存在 " + refCount + " 台设备引用该物模型，请先解绑后再删除");
         }
+        // 引用校验通过后释放 device_type 唯一键（(tenant_id, device_type)）：删除后同名类型可立即重建
+        model.setDeviceType(UniqueKeyRelease.releaseCode(model.getDeviceType()));
+        thingModelMapper.updateById(model);
         thingModelMapper.deleteById(id);
     }
 

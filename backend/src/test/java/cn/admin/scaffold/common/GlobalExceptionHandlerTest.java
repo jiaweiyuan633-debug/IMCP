@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 /**
- * R4-1.31：HTTP 语义标准化——标准异常映射精确状态码（413/400/401/403/404/405/415），
+ * HTTP 语义标准化——标准异常映射精确状态码（413/400/401/403/404/405/415），
  * 业务异常保持 HTTP 200 + 业务码的既有契约。
  */
 class GlobalExceptionHandlerTest {
@@ -120,7 +120,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void jwtExceptionMapsTo401() {
-        // R4-1.39：refresh/logout 重放过期或伪造 JWT 此前落入兜底 500，语义应为 401
+        // refresh/logout 重放过期或伪造 JWT 此前落入兜底 500，语义应为 401
         @SuppressWarnings("unchecked")
         JwtException expired = new ExpiredJwtException(mock(JwsHeader.class), mock(Claims.class), "expired");
 

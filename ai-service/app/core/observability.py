@@ -1,4 +1,4 @@
-"""统一日志与跨服务 request_id 贯穿（R4-1.5）。
+"""统一日志与跨服务 request_id 贯穿。
 
 后端（Java）以 X-Request-Id 头贯穿全链路：RequestIdFilter 读取/生成请求 ID，
 写入 MDC（%X{requestId}）并在出站调用时转发给 AI 服务（AiPythonClient/LlmChatClient）。

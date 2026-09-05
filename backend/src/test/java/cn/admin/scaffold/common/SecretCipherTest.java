@@ -11,7 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.28：OAuth 凭据加解密组件。断言 AES-GCM 往返一致、"enc:" 前缀识别、
+ * OAuth 凭据加解密组件。断言 AES-GCM 往返一致、"enc:" 前缀识别、
  * 存量明文原样放行（避免强制数据迁移）、篡改密文 fail-closed、生产禁用开发默认密钥。
  */
 class SecretCipherTest {

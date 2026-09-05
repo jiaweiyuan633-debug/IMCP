@@ -62,7 +62,7 @@ def test_registry_tesseract_available_returns_tesseract(monkeypatch) -> None:
 
 
 def test_registry_tesseract_fail_fast_raises_when_unavailable(monkeypatch) -> None:
-    """批次3：ocr_fail_fast=True 且 tesseract 不可用时直接抛错（不静默回退 Mock）。"""
+    """ocr_fail_fast=True 且 tesseract 不可用时直接抛错（不静默回退 Mock）。"""
     from app.ocr import registry as registry_module
 
     monkeypatch.setattr(registry_module.TesseractOCRProvider, "is_available", lambda: False)
@@ -71,7 +71,7 @@ def test_registry_tesseract_fail_fast_raises_when_unavailable(monkeypatch) -> No
 
 
 def test_registry_tesseract_fail_fast_raises_on_construct_failure(monkeypatch) -> None:
-    """批次3：ocr_fail_fast=True 且构造失败时抛错。"""
+    """ocr_fail_fast=True 且构造失败时抛错。"""
     from app.ocr import registry as registry_module
 
     monkeypatch.setattr(

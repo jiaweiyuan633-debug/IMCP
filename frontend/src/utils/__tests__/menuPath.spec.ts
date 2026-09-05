@@ -3,7 +3,7 @@ import { fullPathOf, lastSegment, resolveMenuPath } from '@/utils/menuPath'
 import type { MenuNode } from '@/types'
 
 /**
- * R4-1.33：菜单路径解析工具契约测试。
+ * 菜单路径解析工具契约测试。
  * 该逻辑此前在 router/index、router/dynamic、BasicLayout、GlobalSearch 四处重复实现，
  * 收敛到 menuPath 后由本测试锁定语义，防止重名子目录归一等边界被后续改动破坏。
  */

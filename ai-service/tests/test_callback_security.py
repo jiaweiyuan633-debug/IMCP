@@ -1,4 +1,4 @@
-"""回调 URL SSRF 守卫测试（R1-1.3）：双模式放行/拒绝 + DNS 重绑定兜底 + 建单 fail-fast。"""
+"""回调 URL SSRF 守卫测试：双模式放行/拒绝 + DNS 重绑定兜底 + 建单 fail-fast。"""
 
 import socket
 from unittest.mock import patch

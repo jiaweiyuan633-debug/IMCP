@@ -203,7 +203,7 @@ class ChunkFileServiceTest {
 
     @Test
     void completeRejectsOversizedTaskBeforeMerge() throws Exception {
-        // R2-1.2：任务元数据来自 Redis，可能残留修复前构造的超大 totalSize 任务；
+        // 任务元数据来自 Redis，可能残留修复前构造的超大 totalSize 任务；
         // complete 必须先拒绝再合并，杜绝 new ByteArrayOutputStream((int) totalSize) 超大预分配
         stubTask(task(2, 5, 21L * 1024 * 1024));
         when(setOps.size("file:chunk:" + UPLOAD_ID + ":parts")).thenReturn(2L);
@@ -223,7 +223,7 @@ class ChunkFileServiceTest {
 
         service.uploadChunk(UPLOAD_ID, 0, new MockMultipartFile("c", new byte[5]));
 
-        // R4-1.16：写入新分片后顺延任务与已收分片集合的 TTL，慢速上传不被 init 起算的 2h 过期中断
+        // 写入新分片后顺延任务与已收分片集合的 TTL，慢速上传不被 init 起算的 2h 过期中断
         verify(redisTemplate).expire("file:chunk:" + UPLOAD_ID, Duration.ofHours(2));
         verify(redisTemplate).expire("file:chunk:" + UPLOAD_ID + ":parts", Duration.ofHours(2));
     }

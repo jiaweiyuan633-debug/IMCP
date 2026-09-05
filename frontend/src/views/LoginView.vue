@@ -71,7 +71,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
 const loading = ref(false)
-// R4-1.47（批次1）：移除预填 admin——生产包内置默认管理员名会辅助弱口令爆破
+// 移除预填 admin——生产包内置默认管理员名会辅助弱口令爆破
 const form = reactive<LoginForm>({
   username: '',
   password: '',
@@ -129,13 +129,13 @@ async function onSubmit() {
   loading.value = true
   try {
     const data = await userStore.login(form)
-    // R4-1.47（批次1）：默认口令/密码过期必须强制改密——登录成功但标记 mustChangePassword
+    // 默认口令/密码过期必须强制改密——登录成功但标记 mustChangePassword
     if (data.mustChangePassword || data.user?.mustChangePassword) {
       router.push('/change-password')
       return
     }
     const rawRedirect = route.query.redirect
-    // R4-1.47（批次1）：redirect 仅允许站内路径（单斜杠开头且非 // 协议相对 URL），
+    // redirect 仅允许站内路径（单斜杠开头且非 // 协议相对 URL），
     // 防止登录回跳被构造为外部地址/异常路径
     const redirect =
       typeof rawRedirect === 'string' && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')

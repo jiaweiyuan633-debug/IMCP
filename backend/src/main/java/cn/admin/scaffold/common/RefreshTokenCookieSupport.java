@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * refresh token 的 httpOnly Cookie 读写（批次1·P1-F3）。
+ * refresh token 的 httpOnly Cookie 读写。
  *
  * <p>把 refresh token 从前端 localStorage 迁移到 httpOnly Cookie：XSS 无法读取，降低长期
  * 会话被脚本窃取的风险。SameSite=Lax 兼容两种部署拓扑（localhost 跨端口 dev 直连与生产

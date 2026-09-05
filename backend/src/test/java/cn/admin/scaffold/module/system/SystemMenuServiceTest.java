@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.31：菜单变更权限缓存失效覆盖——权限编码（perm）变更或菜单删除须清空全部权限缓存
+ * 菜单变更权限缓存失效覆盖——权限编码（perm）变更或菜单删除须清空全部权限缓存
  * （影响面无法精确反查）；仅改名称/图标等不触发，避免无谓的全局缓存清空。
  */
 @ExtendWith(MockitoExtension.class)
@@ -73,8 +73,8 @@ class SystemMenuServiceTest {
 
     @Test
     void createIgnoresClientSuppliedIdAndReliesOnAutoIncrement() {
-        // R4-1.36 菜单 id 动态化：id 由数据库自增分配，前端传 id 亦被忽略，
-        // 避免各批次迁移手工 id 区间错位/覆盖。
+        // 菜单 id 动态化：id 由数据库自增分配，前端传 id 亦被忽略，
+        // 避免历史迁移中手工 id 区间错位/覆盖。
         MenuSaveRequest request = new MenuSaveRequest();
         request.setId(999L);
         request.setName("动态菜单");

@@ -112,7 +112,7 @@ public class FieldAuditAspect {
         }
         // JdbcTemplate 绑定当前事务连接：事务内业务未提交的更新在 after 快照中可见，
         // 保证 diff 基于真实变更而非过期状态。
-        // R4-1.11：租户表白名单表必须显式带租户条件——JdbcTemplate 直查绕开
+        // 租户表白名单表必须显式带租户条件——JdbcTemplate 直查绕开
         // MyBatis-Plus 租户拦截器，否则租户 A 拿租户 B 记录 ID 调 update
         // （业务更新被拦截器挡掉、0 行生效），before/after 快照会把租户 B 行全字段
         // JSON 写入租户 A 自己的 sys_field_audit_log，构成跨租户外带通道。

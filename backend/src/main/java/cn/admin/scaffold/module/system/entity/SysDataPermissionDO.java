@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 数据权限表-列映射配置（批次2b）。
+ * 数据权限表-列映射配置。
  * 将 DataScopeInnerInterceptor 中「受控表 -> 用户关联列」的硬编码映射下沉为运行时配置。
  */
 @Data

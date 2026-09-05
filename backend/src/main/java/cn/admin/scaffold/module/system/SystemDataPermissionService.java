@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 数据权限表-列映射配置（批次2b）：CRUD 后即时重载拦截器缓存，新增受控表无需发版。
+ * 数据权限表-列映射配置：CRUD 后即时重载拦截器缓存，新增受控表无需发版。
  */
 @Service
 @RequiredArgsConstructor

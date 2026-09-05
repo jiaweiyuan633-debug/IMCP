@@ -66,7 +66,7 @@ public class OperLogAspect {
     }
 
     /**
-     * R3-1.3：日志异步落库，主请求路径不再承担 2 次日志 INSERT。
+     * 日志异步落库，主请求路径不再承担 2 次日志 INSERT。
      * 上下文（租户/用户/请求信息）依赖 ThreadLocal，必须在调用线程提取完毕后
      * 才提交异步任务；异步线程只做纯落库与指标计数。
      * 队列拥堵时回退调用线程同步写（CallerRunsPolicy），日志不丢失。
@@ -146,7 +146,7 @@ public class OperLogAspect {
     private List<Object> filterArgs(Object[] args) {
         return Arrays.stream(args)
                 .filter(arg -> !(arg instanceof ServletRequest) && !(arg instanceof ServletResponse))
-                // R4-1.42：MultipartFile 只保留元信息，不序列化二进制内容——Jackson valueToTree
+                // MultipartFile 只保留元信息，不序列化二进制内容——Jackson valueToTree
                 // 会对 MultipartFile 调用 getBytes() 整读文件进堆并 base64 序列化（大文件每次上传
                 // 额外占一份完整文件内存），此前 CommonController/FileChunkController 的
                 // @OperLog 已把文件字节写入入参 JSON
@@ -163,7 +163,7 @@ public class OperLogAspect {
         return metadata;
     }
 
-    /** R4-1.38：按注解 maskFields 对入参/结果中的发送类正文与参数整体打码（见 @OperLog.maskFields）。 */
+    /** 按注解 maskFields 对入参/结果中的发送类正文与参数整体打码（见 @OperLog.maskFields）。 */
     private String toJson(Object value, String[] maskFields) {
         if (value == null) {
             return null;

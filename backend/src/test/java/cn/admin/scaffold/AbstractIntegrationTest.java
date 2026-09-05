@@ -18,7 +18,7 @@ import org.testcontainers.containers.MySQLContainer;
 import java.util.List;
 
 /**
- * 集成测试基类（批次1 可靠性纵深：Testcontainers 补测试金字塔中层）。
+ * 集成测试基类（可靠性纵深：Testcontainers 补测试金字塔中层）。
  *
  * <p>JVM 级单例 MySQL + Redis 容器，Flyway 自动在容器库执行 V1-V52 迁移；
  * 数据源与 Redis 连接通过 {@code @DynamicPropertySource} 指向容器，
@@ -29,7 +29,7 @@ import java.util.List;
  * 端口不变使 8 个 IT 类共享同一 Spring 上下文（Spring TestContext 按属性值缓存），提速约 8 倍。
  * 测试间共享库，用例须自建自清数据或使用不同唯一键。
  *
- * <p>无 Docker 环境自动跳过（R4-1.36 起由 {@link DockerExecutionCondition} 在收集阶段整体
+ * <p>无 Docker 环境自动跳过（由 {@link DockerExecutionCondition} 在收集阶段整体
  * disabled，Docker 可用但容器启动失败时再由 {@code @DynamicPropertySource} 的 assumption
  * 兜底跳过），不阻塞纯单元测试运行，也不阻塞 {@code mvn verify} 的 JaCoCo 门禁。
  *
@@ -90,11 +90,11 @@ public abstract class AbstractIntegrationTest {
     /**
      * 集成测试以管理员视角运行：统一注入 admin 登录上下文。
      *
-     * <p>R4-1.37 起部分 Service 方法（如 FormInstanceService.page / ImportExportJobService.page）
+     * <p>部分 Service 方法（如 FormInstanceService.page / ImportExportJobService.page）
      * 增加 {@code @DataScope} 注解，切面经 {@code SecurityUtils.getLoginUser()} 取当前用户判定
      * 是否 admin 短路——此前 IT 未注入登录上下文，调用带 @DataScope 的方法即抛「未登录或登录已
-     * 过期」，FormInstanceServiceIT / ImportExportJobServiceIT 从批10起实际处于失效状态（存量
-     * 缺陷，批次1 门禁修复）。admin 角色短路行级过滤，与既有 IT 的全量断言语义一致。
+     * 过期」，FormInstanceServiceIT / ImportExportJobServiceIT 曾处于失效状态（存量
+     * 缺陷，门禁修复）。admin 角色短路行级过滤，与既有 IT 的全量断言语义一致。
      */
     @BeforeEach
     void setAdminSecurityContext() {

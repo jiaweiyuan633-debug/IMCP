@@ -62,7 +62,7 @@ public class SystemNoticeService {
         notice.setId(null);
         notice.setCreatedBy(SecurityUtils.tryGetUserId());
         noticeMapper.insert(notice);
-        // R4-1.10：目标租户取发布线程 TenantContext（权威来源），不信任前端传的 tenantId；
+        // 目标租户取发布线程 TenantContext（权威来源），不信任前端传的 tenantId；
         // 公告在库内按租户隔离，实时推送必须同租户过滤，否则跨租户在线连接会收到公告内容
         noticeSseService.publishAll(TenantContext.getTenantId(), notice);
         return notice.getId();

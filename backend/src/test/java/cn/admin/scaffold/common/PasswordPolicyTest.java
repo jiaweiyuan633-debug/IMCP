@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 密码复杂度策略单测（R4-1.40 批次13）。
+ * 密码复杂度策略单测。
  *
  * <p>策略升级为「8-32 位，需同时包含大写/小写/数字/特殊字符」。四类字符缺一不可，
  * 长度上下限均须严格执行——只含字母+数字的弱口令（password、a1234567）必须被拒绝。

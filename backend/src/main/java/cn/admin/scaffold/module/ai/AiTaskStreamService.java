@@ -44,10 +44,10 @@ public class AiTaskStreamService {
     }
 
     /**
-     * R4-1.9：每用户并发连接上限，超限回收最旧连接。默认 5，可用
+     * 每用户并发连接上限，超限回收最旧连接。默认 5，可用
      * app.ai-task-sse-max-connections-per-user 覆盖；配置 {@code <=0} 表示不限制。
      * 票据可无限签发，无上限时单账号可循环取票开流，每条连接占用一个异步 Servlet 请求
-     * 外加共享调度池上一个 2s 轮询任务，构成资源耗尽面（同公告 SSE R4-1.2 的防护模式）。
+     * 外加共享调度池上一个 2s 轮询任务，构成资源耗尽面（与公告 SSE 同一防护模式）。
      */
     @Value("${app.ai-task-sse-max-connections-per-user:5}")
     public void setConnectionLimit(int connectionLimit) {
@@ -57,7 +57,7 @@ public class AiTaskStreamService {
     /**
      * 建立 AI 任务实时推送流。
      *
-     * <p>R4-1.9 根因修复：原实现在调度线程直接调用 detail()，其 checkDataScope 走
+     * <p>根因修复：原实现在调度线程直接调用 detail()，其 checkDataScope 走
      * SecurityUtils.getLoginUser()，而轮询线程 SecurityContextHolder 为空 → 必然抛
      * UNAUTHORIZED 使流在 2s 内 completeWithError，AI 任务实时推送整体不可用；且轮询
      * 线程 TenantContext 恒默认 1，非租户 1 任务 selectById 直接落空。现改为：连接时
@@ -75,7 +75,7 @@ public class AiTaskStreamService {
         emitter.onTimeout(() -> remove(userId, emitter));
         emitter.onError(error -> remove(userId, emitter));
         enforceConnectionLimit(userId);
-        // R4-1.4：先注册生命周期回调，再调度轮询任务，且首轮显式推延一个周期。
+        // 先注册生命周期回调，再调度轮询任务，且首轮显式推延一个周期。
         // 原实现 scheduleAtFixedRate 默认 initialDelay=0，首个 emit 可能抢在回调注册与
         // HTTP 响应初始化之前执行：若首轮即达终态 complete()，async 完成回调先触发而
         // onCompletion 委托尚未设置，ScheduledFuture 永不被取消，定时任务每 2s 空转查询

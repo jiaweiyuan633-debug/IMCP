@@ -144,7 +144,7 @@
             :closable="tab.path !== '/dashboard'"
           />
         </a-tabs>
-        <!-- R4-1.33：路由视图 keep-alive——切换 tab 时保留页面状态（表格分页/搜索条件/表单填写），
+        <!-- 路由视图 keep-alive——切换 tab 时保留页面状态（表格分页/搜索条件/表单填写），
              以 route.name 作缓存键（动态菜单路由 Menu-{id} 稳定），max 限制缓存总量防内存膨胀；
              关闭的 tab 不立即释放缓存，由 max 溢出淘汰，属可接受权衡 -->
         <router-view v-slot="{ Component: RouteComponent }">
@@ -239,7 +239,7 @@ let messageSocket: WebSocket | null = null
 let noticeRetryCount = 0
 const NOTICE_MAX_RETRY = 5
 let noticeDisposed = false
-// 批次5（R4-1.51）：消息 WebSocket 受控重连——与 SSE 同模式（指数退避/上限/卸载停连）
+// 消息 WebSocket 受控重连——与 SSE 同模式（指数退避/上限/卸载停连）
 let messageRetryCount = 0
 const MESSAGE_MAX_RETRY = 5
 let messageDisposed = false
@@ -268,7 +268,7 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('offline', onOffline)
   window.addEventListener('online', onOnline)
-  // R4-1.33：其他标签页登出/凭证被清除时同步登出本标签页，避免残留有效会话
+  // 其他标签页登出/凭证被清除时同步登出本标签页，避免残留有效会话
   unsubscribeAuthCleared = subscribeAuthCleared(() => {
     if (!userStore.isLoggedIn) {
       return
@@ -533,7 +533,7 @@ function scheduleNoticeReconnect() {
 }
 
 function startMessageSocket() {
-  // 批次5（R4-1.51）：WS 受控重连——此前 onclose/onerror 仅置空不重连，
+  // WS 受控重连——此前 onclose/onerror 仅置空不重连，
   // 消息实时推送一旦断开即永久失效；现与 noticeStream 一致：指数退避、有上限、
   // 组件卸载后不再重连
   if (messageSocket || messageDisposed || messageRetryCount >= MESSAGE_MAX_RETRY) {

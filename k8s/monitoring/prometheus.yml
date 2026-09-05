@@ -1,4 +1,4 @@
-# Prometheus 采集配置（P1-10 可观测性）
+# Prometheus 采集配置
 #
 # 供平台/运维团队直接挂载到 Prometheus 容器，或并入现有 Prometheus 联邦采集。
 # 启动命令示例：
@@ -10,7 +10,7 @@
 #     实际 Service 名为 <release>-backend / <release>-ai（templates/all.yaml）。
 # 若 Helm release 或命名空间不同，需同步修改下方 targets 的 FQDN。
 # 采集后端 /actuator/prometheus（Spring Boot Actuator + Micrometer）与
-# ai-service /metrics（prometheus_client，批次5·R4-1.51 修正：代码在根路径 /metrics，
+# ai-service /metrics（prometheus_client：代码在根路径 /metrics，
 # main.py 注释明确"标准 scrape 路径就是根 /metrics"，此前配置 /api/v1/metrics 致抓取
 # 404 → up{job="ai-service"}==0 上线即持续误报 AIServiceDown）。
 global:
@@ -30,7 +30,7 @@ scrape_configs:
       - targets: ["admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080"]
 
   # AI 服务：FastAPI + prometheus_client。
-  # 指标端点在根路径 /metrics（批次5·R4-1.51 修正：原 /api/v1/metrics 与代码不符，
+  # 指标端点在根路径 /metrics（原 /api/v1/metrics 与代码不符，
   # 抓取 404 会令 up{job="ai-service"}==0 误报 AIServiceDown）。
   - job_name: ai-service
     metrics_path: /metrics

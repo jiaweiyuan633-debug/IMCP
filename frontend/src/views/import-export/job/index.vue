@@ -308,7 +308,7 @@ async function onCreateExport() {
 async function onDownload(record: ImportExportJobVo) {
   try {
     const result = await getImportJobDownload(record.id)
-    // R4-1.43：origin 拼接统一走 absoluteFileUrl（基于 API_BASE_URL，已去尾部 /）
+    // origin 拼接统一走 absoluteFileUrl（基于 API_BASE_URL，已去尾部 /）
     window.open(absoluteFileUrl(result.url), '_blank')
   } catch {
     message.error(t('page.ieJobDownloadFailed'))

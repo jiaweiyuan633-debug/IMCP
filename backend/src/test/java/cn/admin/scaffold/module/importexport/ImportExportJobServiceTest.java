@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * 导入导出任务服务单测（R4-1.38）：创建任务填充 created_by（批10 数据权限落空的根因修复）
+ * 导入导出任务服务单测：创建任务填充 created_by（数据权限落空的根因修复）
  * + view/download 单条路径归属校验（page 受控但按 id 直查绕过）。
  */
 class ImportExportJobServiceTest {
@@ -114,7 +114,7 @@ class ImportExportJobServiceTest {
         assertThat(captor.getValue().getTenantId()).isEqualTo(1L);
     }
 
-    // ---------- 单条路径归属校验（view/download，R4-1.38） ----------
+    // ---------- 单条路径归属校验（view/download） ----------
 
     /** 非管理员查看自己的任务：放行。 */
     @Test

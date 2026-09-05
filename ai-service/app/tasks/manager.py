@@ -56,6 +56,7 @@ class TaskManager:
         self._services_loaded = services is not None
         self._workers: set[asyncio.Task[None]] = set()
         self._closing = False
+        self._callback_hmac_key_warned = False
         # 回调 URL SSRF 守卫：建单 fail-fast + 执行回调前重检
         self._callback_guard = CallbackUrlGuard(settings)
 
@@ -70,7 +71,7 @@ class TaskManager:
                 await asyncio.to_thread(self._callback_guard.validate, request.callback_url)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=f"非法回调地址: {exc}") from exc
-        # R4-1.34：超时治理——对 request.timeout 做上限裁剪。工作协程数量有限
+        # 超时治理——对 request.timeout 做上限裁剪。工作协程数量有限
         # （worker_count），客户端提交任意大的 timeout 会长时间占用一个协程、
         # 拖慢整条队列，且租约（= 超时 + 宽限）随超时等比放大、形同虚设。
         # 超上限值在此 clamp 到 max_timeout_seconds，保证任何任务最长执行可控。
@@ -98,7 +99,7 @@ class TaskManager:
             "created_at": now,
             "updated_at": now,
         }
-        # R4-1.30：去重原子化——SET NX 单命令判定「已存在」并落库，杜绝 check-then-set 竞态
+        # 去重原子化——SET NX 单命令判定「已存在」并落库，杜绝 check-then-set 竞态
         # （并发同 task_no 提交时，两个请求原本都经 _get 判空后各自覆盖写入产生重复任务，
         #  调度器多副本触发同名调度即命中此竞态）。NX 未写入说明同名任务已存在（含终态）→ 409。
         written = await self.redis.set(
@@ -106,7 +107,13 @@ class TaskManager:
         )
         if not written:
             raise HTTPException(status_code=409, detail=f"task already exists: {request.task_no}")
-        await self._enqueue_ready(request.task_no, request.priority)
+        try:
+            await self._enqueue_ready(request.task_no, request.priority)
+        except Exception:
+            # 补偿删除：入队失败时清除刚落库的任务，避免「QUEUED 但不在任何队列」的
+            # 孤儿（create_task 落库+入队两命令间崩溃的窗口由 recover_stale_tasks 兜底）
+            await self.redis.delete(KEY_PREFIX + request.task_no)
+            raise
         self._ensure_workers()
         ai_task_created_total.inc()
         return TaskStatusResponse(**data)
@@ -121,13 +128,19 @@ class TaskManager:
         data = await self._get(task_no)
         if data is None:
             raise HTTPException(status_code=404, detail="task not found")
+        prev = json.dumps(data, ensure_ascii=False)
         data["status"] = "QUEUED"
         data["error"] = None
-        # R4-1.20：手动重试重置失败分类，防止上一次失败的分类透传到后续回调
+        # 手动重试重置失败分类，防止上一次失败的分类透传到后续回调
         data["reason"] = None
         data["updated_at"] = _now()
         await self._save(task_no, data)
-        await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+        try:
+            await self._enqueue_ready(task_no, int(data.get("priority", 5)))
+        except Exception:
+            # 回滚到入队前的原状态（终态），不把任务留在「QUEUED 但不在队列」的中间态
+            await self.redis.set(KEY_PREFIX + task_no, prev)
+            raise
         self._ensure_workers()
         return TaskStatusResponse(**{k: v for k, v in data.items() if k in TaskStatusResponse.model_fields})
 
@@ -156,7 +169,7 @@ class TaskManager:
     async def close(self) -> None:
         """优雅停机：停止拉取并取消工作线程（运行中的任务被取消并记录为失败）。
 
-        批次3（R4-1.49）：取消前先把在途 RUNNING 任务标记为 requeue——原实现直接
+        取消前先把在途 RUNNING 任务标记为 requeue——原实现直接
         cancel，在途任务保持 RUNNING、租约仍在未来，新 Pod 启动扫描只回收已过期租约，
         且宽限过后仍无周期回收，滚动发布后任务可卡死近 1 小时。现在停机即回收，
         新实例启动后立即可重跑。
@@ -191,7 +204,7 @@ class TaskManager:
             request_id_var.set("")
             task_no: str | None = None
             try:
-                # 批次3（R4-1.49）：周期租约回收——原实现仅在启动时扫描一次，
+                # 周期租约回收——原实现仅在启动时扫描一次，
                 # 滚动发布/重启后租约过期的 RUNNING 任务会卡死直到下次 Pod 重启；
                 # 这里每 60s 由任一 worker 触发一次全局扫描（scan 幂等，多实例安全）
                 if time.monotonic() - last_recovery >= 60.0:
@@ -201,7 +214,7 @@ class TaskManager:
                 popped = await self.redis.zpopmin(ready_key)
                 if not popped:
                     failure_backoff = 0.0
-                    # 批次3：空队列退避指数化（0.02→0.05→0.1→…封顶 0.5s），
+                    # 空队列退避指数化（0.02→0.05→0.1→…封顶 0.5s），
                     # 原固定 20ms 忙轮询在扩副本后每秒产生大量无谓 Redis 命令
                     empty_backoff = min(empty_backoff * 2 + 0.02, 0.5)
                     await asyncio.sleep(empty_backoff)
@@ -227,7 +240,7 @@ class TaskManager:
         due = await self.redis.zrangebyscore(delayed_key, 0, now)
         if not due:
             return
-        # 批次3（R4-1.49）：检查 zrem 返回值——多实例同时读到同一批 due 时，
+        # 检查 zrem 返回值——多实例同时读到同一批 due 时，
         # 仅实际删除（>0）的实例拥有处置权，另一实例跳过，语义与 run_loop 对齐
         removed = await self.redis.zrem(delayed_key, *due)
         if not removed:
@@ -248,7 +261,7 @@ class TaskManager:
             return
         # 执行期间日志携带提交该任务的请求 ID，跨服务排障可串联调用方
         request_id_var.set(data.get("request_id") or "")
-        # R4-1.34：执行侧同样做上限裁剪——兼容修复前已入库的旧任务（未 clamp 的超大
+        # 执行侧同样做上限裁剪——兼容修复前已入库的旧任务（未 clamp 的超大
         # timeout 可能已在 Redis 中），保证任何任务执行与租约都受 max_timeout 约束
         timeout = min(
             float(data.get("timeout") or self.settings.default_timeout_seconds),
@@ -290,7 +303,7 @@ class TaskManager:
         data["status"] = "SUCCEEDED"
         data["result"] = result
         data["error"] = None
-        # R4-1.20：重试后成功的任务清除历史失败分类，避免陈旧 reason 透传到成功回调
+        # 重试后成功的任务清除历史失败分类，避免陈旧 reason 透传到成功回调
         data["reason"] = None
         data["updated_at"] = _now()
         ai_task_succeeded_total.inc()
@@ -300,7 +313,7 @@ class TaskManager:
 
     async def _schedule_retry(self, task_no: str, data: dict[str, Any]) -> None:
         ai_task_retried_total.inc()
-        # 批次3（R4-1.49）：指数退避 + 抖动——原固定 0.5s 重入队，LLM provider 限流时
+        # 指数退避 + 抖动——原固定 0.5s 重入队，LLM provider 限流时
         # 3 次重试在 1s 内打完直接加剧上游过载；现按 retry_count 指数退避（0.5*2^n，
         # 封顶 60s）+ 随机 ±20% 抖动防惊群
         import random
@@ -312,7 +325,7 @@ class TaskManager:
 
     async def _fail(self, task_no: str, data: dict[str, Any], reason: str = "unknown") -> None:
         data["status"] = "FAILED"
-        # R4-1.20：失败分类（timeout / non_retryable / retries_exhausted）随任务记录持久化，
+        # 失败分类（timeout / non_retryable / retries_exhausted）随任务记录持久化，
         # 供回调契约透传与 GET /tasks 读取。此前分类仅进死信与指标标签，后端系统记录无从得知
         data["reason"] = reason
         data["updated_at"] = _now()
@@ -329,7 +342,7 @@ class TaskManager:
         死信列表纯写入、无消费者，若只 rpush 不裁剪则随失败总数无界增长。
         rpush + ltrim 用事务（MULTI/EXEC）包住：两条命令原子生效，并发失败时
         列表不会出现中间态超长。仅保留最近 queue_dead_max_len 条，0 表示不裁剪。
-        记录带 reason（与 ai_task_failed_total 标签一致）以及 R4-1.21 富化的
+        记录带 reason（与 ai_task_failed_total 标签一致）以及富化的
         biz_type / retry_count / failed_at，供运维按时间/类型离线排查失败原因，
         并经 GET /api/v1/tasks/dead 查询、DELETE /api/v1/tasks/dead 清理。
         """
@@ -397,19 +410,23 @@ class TaskManager:
             )
 
     async def recover_stale_tasks(self, force: bool = False) -> int:
-        """启动自愈：回收租约已过期的 RUNNING 任务为 QUEUED 重新入队。
+        """启动自愈：回收两类遗留任务为 QUEUED 重新入队。
 
-        工作线程崩溃 / 进程被杀（OOM、滚动发布、k8s 重启）会让任务永久停留在
-        RUNNING：_execute 遇 RUNNING 直接跳过、无任何恢复路径，任务直至 24h TTL
-        才消失，期间既不重试也不回调，等于任务永久丢失。
+        1. 租约已过期的 RUNNING：工作线程崩溃 / 进程被杀（OOM、滚动发布、k8s 重启）
+           会让任务永久停留在 RUNNING：_execute 遇 RUNNING 直接跳过、无任何恢复
+           路径，任务直至 24h TTL 才消失，期间既不重试也不回调，等于任务永久丢失。
+           以租约判定归属：执行受 asyncio.wait_for 超时约束，存活的执行必在
+           lease_until（= 超时 + 宽限）前离开 RUNNING，故租约过期是确凿的崩溃遗留，
+           多实例下也不会误回收其它实例正在执行的任务。
+        2. 「QUEUED 但不在任何队列」的孤儿：create_task 落库与入队之间崩溃 /
+           入队补偿删除失败等窗口会留下 status=QUEUED 却不在 ready/delayed 的
+           记录，任何 worker 都无法消费。孤儿判定：zscore 查 ready 与 delayed
+           均不存在。非 force 时要求记录足够旧（updated_at 距今超过孤儿宽限），
+           避免误伤刚被 zpopmin 认领、尚未写 RUNNING 的在途任务。
 
-        以租约判定归属：执行受 asyncio.wait_for 超时约束，存活的执行必在
-        lease_until（= 超时 + 宽限）前离开 RUNNING，故租约过期是确凿的崩溃遗留，
-        多实例下也不会误回收其它实例正在执行的任务。无 lease_until 字段的记录
-        （本特性上线前遗留）同样按遗留回收。返回回收数量。
-
-        force=True（批次3·R4-1.49）：忽略租约直接回收——仅用于本实例优雅停机
-        （close 已取消全部 worker，在途 RUNNING 均属本实例且不会再推进）。返回回收数量。
+        force=True：忽略租约/时间戳直接回收——仅用于本实例优雅停机
+        （close 已取消全部 worker，在途 RUNNING/QUEUED 均属本实例且不会再推进）。
+        返回回收数量。
         """
         now = time.time()
         recovered = 0
@@ -419,12 +436,24 @@ class TaskManager:
             for key in keys:
                 task_no = key.removeprefix(KEY_PREFIX)
                 data = await self._get(task_no)
-                if data is None or data.get("status") != "RUNNING":
+                if data is None:
                     continue
-                if not force:
-                    lease_until = data.get("lease_until")
-                    if lease_until is not None and float(lease_until) > now:
-                        continue  # 租约未过期：可能仍被其它实例执行
+                status = data.get("status")
+                if status == "RUNNING":
+                    if not force:
+                        lease_until = data.get("lease_until")
+                        if lease_until is not None and float(lease_until) > now:
+                            continue  # 租约未过期：可能仍被其它实例执行
+                elif status == "QUEUED":
+                    # 孤儿判定：不在 ready 也不在 delayed 才回收
+                    in_ready = await self.redis.zscore(self.settings.queue_ready_key, task_no)
+                    in_delayed = await self.redis.zscore(self.settings.queue_delayed_key, task_no)
+                    if in_ready is not None or in_delayed is not None:
+                        continue
+                    if not force and not self._is_orphan_stale(data, now):
+                        continue  # 可能刚被认领在途，等下一轮再判定
+                else:
+                    continue  # 终态/其它状态不回收
                 data["status"] = "QUEUED"
                 data["error"] = "recovered after worker interruption"
                 data["updated_at"] = _now()
@@ -434,8 +463,25 @@ class TaskManager:
             if not cursor:
                 break
         if recovered:
-            logger.warning("AI task recovery: requeued %s stale RUNNING task(s)", recovered)
+            logger.warning("AI task recovery: requeued %s stale task(s)", recovered)
         return recovered
+
+    @staticmethod
+    def _is_orphan_stale(data: dict[str, Any], now: float) -> bool:
+        """孤儿宽限判定：updated_at 距今超过 stale_task_lease_grace_seconds 才算遗留。
+
+        无法解析时间戳的旧记录（本特性上线前遗留）按遗留处理。
+        """
+        raw = data.get("updated_at")
+        if not raw:
+            return True
+        try:
+            updated = datetime.fromisoformat(str(raw)).timestamp()
+        except (TypeError, ValueError):
+            return True
+        return now - updated > TaskManager._stale_grace_seconds
+
+    _stale_grace_seconds = 10.0  # 独立于租约宽限的孤儿时间戳宽限（秒）
 
     # ---------- 服务解析 ----------
 
@@ -489,14 +535,26 @@ class TaskManager:
             "result": data.get("result"),
             "error": data.get("error"),
             "retry_count": data.get("retry_count", 0),
-            # R4-1.20：失败分类（timeout / non_retryable / retries_exhausted）随回调透传，
+            # 失败分类（timeout / non_retryable / retries_exhausted）随回调透传，
             # 后端落 ai_task.error_type；成功路径已清空，成功回调为 null
             "reason": data.get("reason"),
         }
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        # 出站回调签名密钥：优先 CALLBACK_HMAC_KEY；未配置时回退 AUTH_TOKEN（与后端
+        # 现状一致——Java 侧 validCallbackHmac 用 AiServiceConfig.apiKey 验签，而该
+        # apiKey 同时是入站 Bearer 密钥，故拆分密钥前必须回退以免破坏跨端契约）。
+        # 共用密钥的隐患（任一侧泄漏危及另一侧）由时间戳防重放 + 回调 SSRF 白名单
+        # 缓解；后端拆分独立验签密钥后注入 CALLBACK_HMAC_KEY 即可平滑轮换。
+        signing_key = self.settings.callback_hmac_key or self.settings.auth_token
+        if not self.settings.callback_hmac_key and not self._callback_hmac_key_warned:
+            self._callback_hmac_key_warned = True
+            logger.warning(
+                "未配置 CALLBACK_HMAC_KEY，出站回调沿用 AUTH_TOKEN 签名（后端当前共用同一 "
+                "密钥验签，属兼容回退；生产拆分验签密钥后请注入新键）"
+            )
         timestamp = str(int(time.time()))
         signature = hmac.new(
-            self.settings.auth_token.encode("utf-8"),
+            signing_key.encode("utf-8"),
             timestamp.encode("utf-8") + b"\n" + body,
             hashlib.sha256,
         ).hexdigest()

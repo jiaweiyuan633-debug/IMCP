@@ -14,7 +14,7 @@ public class AiTaskVo {
     private String bizType;
     private Long bizId;
     private String serviceCode;
-    /** 服务展示名（R4-1.24 批量解析自 ai_service_config.name，未命中回退 serviceCode）。 */
+    /** 服务展示名（批量解析自 ai_service_config.name，未命中回退 serviceCode）。 */
     private String serviceName;
     private String status;
     private String paramsJson;
@@ -25,7 +25,7 @@ public class AiTaskVo {
     private Integer timeoutSeconds;
     private String callbackUrl;
     private Long createdBy;
-    /** 创建人姓名（R4-1.24 批量解析自 sys_user.nickname，未命中回退用户名，无则留空）。 */
+    /** 创建人姓名（批量解析自 sys_user.nickname，未命中回退用户名，无则留空）。 */
     private String createdByName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

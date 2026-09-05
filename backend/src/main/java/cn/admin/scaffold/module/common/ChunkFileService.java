@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 分片上传 + 秒传（批次2c）。
+ * 分片上传 + 秒传。
  *
  * <p>流程：init（建任务，sha256 命中已存文件则秒传直接返回）-> 逐片 uploadChunk（分片落临时目录，
  * Redis SET 记录已收片，重复上传幂等）-> complete（分布式锁内合并分片、校验 sha256 与总大小，
@@ -47,7 +47,7 @@ public class ChunkFileService {
     private static final String REDIS_KEY_PREFIX = "file:chunk:";
     private static final Duration TASK_TTL = Duration.ofHours(2);
     /**
-     * 孤儿分片目录判定阈值（R4-1.16）：距最后一次分片写入超过该时长即视为任务已放弃。
+     * 孤儿分片目录判定阈值：距最后一次分片写入超过该时长即视为任务已放弃。
      * 与 Redis 任务 TTL 对齐并留 30 分钟宽限，覆盖文件系统 mtime 精度与时钟偏差。
      */
     private static final Duration ORPHAN_DIR_MAX_AGE = TASK_TTL.plusMinutes(30);
@@ -74,7 +74,7 @@ public class ChunkFileService {
     }
 
     public ChunkInitResponse init(ChunkInitRequest request) {
-        // R2-1.2：init 即校验声明大小，杜绝认证攻击者声明超大 totalSize/chunkSize，
+        // init 即校验声明大小，杜绝认证攻击者声明超大 totalSize/chunkSize，
         // 让 complete 合并时 new ByteArrayOutputStream((int) totalSize) 做超大预分配触发堆 OOM（DoS）。
         checkSizeWithinLimit(request.getTotalSize(), "文件总大小");
         checkSizeWithinLimit(request.getChunkSize(), "分片大小");
@@ -131,7 +131,7 @@ public class ChunkFileService {
         }
         redisTemplate.opsForSet().add(partsKey(uploadId), String.valueOf(index));
         redisTemplate.expire(partsKey(uploadId), TASK_TTL);
-        // R4-1.16：上传活动顺延任务有效期——慢速上传不会被 init 起算的固定 2h 过期中断；
+        // 上传活动顺延任务有效期——慢速上传不会被 init 起算的固定 2h 过期中断；
         // 也保证「最近一次分片写入」成为活动上传的可靠信号，供孤儿目录清扫安全判龄。
         redisTemplate.expire(key(uploadId), TASK_TTL);
     }
@@ -143,7 +143,7 @@ public class ChunkFileService {
 
     private UploadResponse doComplete(String uploadId) {
         ChunkTask task = getTask(uploadId);
-        // R2-1.2：合并前复检 totalSize（任务元数据来自 Redis，可能残留修复前构造的超大任务），
+        // 合并前复检 totalSize（任务元数据来自 Redis，可能残留超大任务），
         // 确保 ByteArrayOutputStream 预分配不超上限，杜绝超大预分配导致的堆 OOM。
         checkSizeWithinLimit(task.totalSize(), "文件总大小");
         Long received = redisTemplate.opsForSet().size(partsKey(uploadId));
@@ -152,13 +152,13 @@ public class ChunkFileService {
         }
         byte[] content = mergeChunks(task, uploadId);
         if (content.length != task.totalSize()) {
-            // R4-1.16：合并结果与声明不一致，任务已确定失败——清理临时分片，避免失败上传滞留磁盘
+            // 合并结果与声明不一致，任务已确定失败——清理临时分片，避免失败上传滞留磁盘
             cleanup(uploadId);
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "合并文件大小与声明不一致");
         }
         if (StringUtils.hasText(task.sha256())
                 && !DigestUtil.sha256Hex(content).equalsIgnoreCase(task.sha256())) {
-            // R4-1.16：内容校验失败，任务已确定失败——清理临时分片
+            // 内容校验失败，任务已确定失败——清理临时分片
             cleanup(uploadId);
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件内容校验失败");
         }
@@ -168,7 +168,7 @@ public class ChunkFileService {
             cleanup(uploadId);
             return response;
         } catch (RuntimeException exception) {
-            // R4-1.16：业务拒绝（类型/扫描/配额/入库失败）后任务已确定失败——清理临时分片，
+            // 业务拒绝（类型/扫描/配额/入库失败）后任务已确定失败——清理临时分片，
             // 避免失败上传的分片在磁盘上滞留成孤儿目录；「分片未上传完整/分片缺失」属可续传
             // 场景，在合并与入库之前抛出，不会走到这里，保留分片供用户续传。
             cleanup(uploadId);
@@ -228,7 +228,7 @@ public class ChunkFileService {
     }
 
     /**
-     * 清理超龄孤儿分片目录（R4-1.16）：临时分片只在 complete 成功或确定失败时清理，中断/放弃
+     * 清理超龄孤儿分片目录：临时分片只在 complete 成功或确定失败时清理，中断/放弃
      * 的任务会留下孤儿目录（Redis 任务 TTL 只管元数据、不管磁盘），认证用户反复 init 后放弃
      * 即可逐步填满磁盘。本方法删除最后一次写入距今超过 {@link #ORPHAN_DIR_MAX_AGE} 的目录；
      * 活动上传会随新分片落盘刷新目录 mtime（且顺延 Redis 任务 TTL），不会被误清。

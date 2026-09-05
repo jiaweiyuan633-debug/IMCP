@@ -22,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 /**
- * 预签名直传/直链（批次2c）。
+ * 预签名直传/直链。
  *
  * <p>上传：签发 PUT 预签名 URL 与对象键，前端直传对象存储绕过应用服务器；直传完成后
  * {@code confirm} 读回对象做病毒扫描/配额/魔数校验后入库（不重复上传），并删除签发期在
@@ -53,7 +53,7 @@ public class PresignedFileService {
     }
 
     public PresignUploadResponse createUpload(PresignUploadRequest request) {
-        // R4-1.15：签发前按声明的 size 拒绝超限文件——超限即不发 URL，与 confirm 有界读回共同构成
+        // 签发前按声明的 size 拒绝超限文件——超限即不发 URL，与 confirm 有界读回共同构成
         // 纵深防御（PUT 预签名 URL 会绕过 multipart 20MB 上限直传对象存储，超大对象整读会 OOM）。
         if (request.getSize() > uploadProperties.getMaxSizeBytes()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
@@ -96,7 +96,7 @@ public class PresignedFileService {
         if (!TenantContext.getTenantId().equals(pending.tenantId())) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND.getCode(), "直传任务不存在或已过期");
         }
-        // R4-1.44：confirm 必须由签发用户本人执行——此前仅校验租户，同租户他人拿到 objectKey
+        // confirm 必须由签发用户本人执行——若仅校验租户，同租户他人拿到 objectKey
         // （出现在 PUT 直传 URL 中）可抢先 confirm，把未上传对象登记到自己名下，绕过配额与归属
         Long currentUserId = SecurityUtils.tryGetUserId();
         if (pending.userId() == null || !pending.userId().equals(currentUserId)) {

@@ -169,7 +169,7 @@ public class MonitorJobService {
     }
 
     private SysJobDO toEntity(JobSaveRequest request) {
-        // 批次2（R4-1.48）：保存前先过 Quartz 安全边界——invokeTarget 格式+白名单校验、
+        // 保存前先过 Quartz 安全边界——invokeTarget 格式+白名单校验、
         // cron 语法校验，非法即拒绝入库（配合 create/update @Transactional，scheduleJob 失败回滚，
         // 杜绝"库里有任务、Quartz 没调度"的幽灵任务）
         if (StringUtils.hasText(request.getInvokeTarget())) {

@@ -36,7 +36,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        // 客户端心跳或业务查询在后续批次扩展，这里保持连接可用
+        // 客户端心跳或业务查询在此扩展，这里保持连接可用
     }
 
     @Override

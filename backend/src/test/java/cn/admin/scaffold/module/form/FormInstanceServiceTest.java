@@ -135,7 +135,7 @@ class FormInstanceServiceTest {
 
     @Test
     void approveMovesSubmittedToApproved() {
-        // R4-1.38：审批先做存在性 + 归属校验（admin 短路），再 CAS
+        // 审批先做存在性 + 归属校验（admin 短路），再 CAS
         when(formInstanceMapper.selectById(5L)).thenReturn(instance(5L, 1L));
         when(dataScopeHelper.isAdmin()).thenReturn(true);
         when(formInstanceMapper.casStatus(5L, "APPROVED")).thenReturn(1);
@@ -190,7 +190,7 @@ class FormInstanceServiceTest {
         assertThat(result.getRecords().get(0).getData()).containsEntry("name", "张三");
     }
 
-    /** R4-1.37：提交记录分页标注行级数据权限（受控表映射见 V61 迁移）。 */
+    /** 提交记录分页标注行级数据权限（受控表映射见 V61 迁移）。 */
     @Test
     void pageIsAnnotatedWithDataScopeForFormInstance() throws NoSuchMethodException {
         DataScope annotation = FormInstanceService.class
@@ -200,7 +200,7 @@ class FormInstanceServiceTest {
         assertThat(annotation.tables()).containsExactly("form_instance");
     }
 
-    // ---------- R4-1.38：单条路径数据权限补漏（getById/approve 归属校验） ----------
+    // ---------- 单条路径数据权限补漏（getById/approve 归属校验） ----------
 
     /** 非管理员读取他人提交记录：越权 FORBIDDEN。 */
     @Test

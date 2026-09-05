@@ -1,5 +1,6 @@
 package cn.admin.scaffold.security;
 
+import cn.admin.scaffold.config.SecurityProperties;
 import cn.admin.scaffold.module.system.mapper.SysMenuMapper;
 import cn.admin.scaffold.module.system.mapper.SysRoleMapper;
 import cn.admin.scaffold.module.system.mapper.SysUserMapper;
@@ -31,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final SysRoleMapper roleMapper;
     private final SysMenuMapper menuMapper;
     private final SysUserMapper userMapper;
+    private final SecurityProperties securityProperties;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -42,13 +44,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtUtil.parse(token);
                 if (tokenService.hasValidAccessToken(claims.getId())) {
                     Long userId = Long.valueOf(claims.getSubject());
-                    // R1-1.7：access token 携带 tenantId，查询角色/权限/用户前先就位租户上下文。
+                    // access token 携带 tenantId，查询角色/权限/用户前先就位租户上下文。
                     // 否则 TenantFilter 设定的默认 tenant_id=1 会让非租户 1 用户的所有认证查询落空（401）。
                     Object tenantClaim = claims.get("tenantId");
                     if (tenantClaim instanceof Number tenantNumber) {
                         TenantContext.setTenantId(tenantNumber.longValue());
                     }
-                    // 批次2（R4-1.48）：角色随权限一并走 Redis 缓存（同 TTL 抖动、同 after-commit 失效），
+                    // 角色随权限一并走 Redis 缓存（同 TTL 抖动、同 after-commit 失效），
                     // 消除此前每请求 2 次 DB 往返（selectRoleCodesByUserId + selectById）对 sys_user 热表的压力
                     List<String> roles = tokenService.getCachedRoles(userId);
                     if (roles == null) {
@@ -74,6 +76,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 .username(claims.get("username", String.class))
                                 .roles(roles)
                                 .perms(perms)
+                                // 口令生命周期判定搭车既有的 selectById 结果（每请求仅一次查库），
+                                // PasswordPolicyEnforcementFilter 直接读主体验证，避免二次查询 sys_user
+                                .passwordChangeRequired(securityProperties.isPasswordChangeRequired(
+                                        user.getMustChangePassword(), user.getPasswordChangedAt()))
                                 .build();
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(

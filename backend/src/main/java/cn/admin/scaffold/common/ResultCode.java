@@ -42,22 +42,22 @@ public enum ResultCode {
     FORBIDDEN(403, "无权限访问"),
     REPEAT_SUBMIT(1030, "请勿重复提交"),
     ACQUIRE_LOCK_TIMEOUT(1031, "系统繁忙，请稍后重试"),
-    // 批次4：报表定义化
+    // 报表定义化
     REPORT_CODE_EXISTS(1032, "报表编码已存在"),
     REPORT_SQL_INVALID(1033, "报表数据源仅支持只读查询"),
-    // 批次4：设备物模型/遥测
+    // 设备物模型/遥测
     THING_MODEL_TYPE_EXISTS(1034, "物模型类型已存在"),
-    // 批次4：导入导出中心
+    // 导入导出中心
     IMPORT_TEMPLATE_CODE_EXISTS(1035, "导入导出模板编码已存在"),
-    // 批次4：低代码表单引擎
+    // 低代码表单引擎
     FORM_CODE_EXISTS(1036, "表单编码已存在"),
     FORM_SCHEMA_INVALID(1037, "表单定义无效"),
     FORM_DATA_INVALID(1038, "表单数据校验不通过"),
-    // 批次 C：数据大屏
+    // 数据大屏
     SCREEN_TEMPLATE_CODE_EXISTS(1039, "大屏模板编码已存在"),
-    // R1-1.7：跨租户同名账号且未指定租户时无法唯一定位
+    // 跨租户同名账号且未指定租户时无法唯一定位
     USERNAME_AMBIGUOUS(1040, "存在同名账号，请填写租户ID后重试"),
-    // R4-1.31：HTTP 语义标准化——标准异常映射精确状态码（业务码仍携带于 Result.code，前端本地化不受影响）
+    // HTTP 语义标准化——标准异常映射精确状态码（业务码仍携带于 Result.code，前端本地化不受影响）
     NOT_FOUND(404, "请求的资源不存在"),
     METHOD_NOT_ALLOWED(405, "请求方法不支持"),
     PAYLOAD_TOO_LARGE(413, "上传内容超过大小限制"),

@@ -4,8 +4,10 @@
 - ``{prefix}:{namespace}``   —— Hash：doc_id → JSON{vector, payload}
 - ``{prefix}:ns:{namespace}`` —— Set：命名空间下全部 doc_id（用于整库删除与计数）
 
-检索采用加载后全量精确计算（scaffold 规模足够，保证召回质量）；
-维度在首次写入时自动探测并锁定，维度不一致的写入会被拒绝，避免检索结果无意义。
+检索采用加载后全量精确计算（scaffold 规模足够，保证召回质量）；检索前先检查
+命名空间大小上限（vector_search_max_vectors），超限拒绝——避免一次性 hgetall
+超大命名空间撑爆内存/线程。维度在首次写入时自动探测并锁定，维度不一致的写入
+会被拒绝，避免检索结果无意义。
 """
 
 from __future__ import annotations
@@ -15,11 +17,17 @@ from typing import Any
 
 from redis.asyncio import Redis
 
+from app.core.config import settings
+from app.core.threads import run_cpu
 from app.vectors.linalg import cosine
 
 
 class VectorDimensionError(ValueError):
     """向量维度与命名空间已锁定维度不一致。"""
+
+
+class NamespaceTooLargeError(ValueError):
+    """命名空间向量数超过精确检索上限（改用专用向量库或缩小命名空间）。"""
 
 
 class RedisVectorStore:
@@ -66,12 +74,18 @@ class RedisVectorStore:
         top_k: int = 5,
         threshold: float = 0.0,
     ) -> list[dict[str, Any]]:
+        # 命名空间大小保护：精确检索需全量加载逐条算余弦，超大命名空间会一次性
+        # hgetall 撑爆内存/线程——超限显式拒绝，提示换专用向量库
+        size = await self.redis.scard(self._ns_key(namespace))
+        limit = settings.vector_search_max_vectors
+        if size > limit:
+            raise NamespaceTooLargeError(
+                f"命名空间 {namespace} 含 {size} 条向量，超过精确检索上限 {limit}，"
+                "请改用 Milvus/pgvector 等向量库或缩小命名空间"
+            )
         raw = await self.redis.hgetall(self._key(namespace))
-        # 批次3（R4-1.49）：余弦扫描是 CPU 密集（全量 hgetall + Python 循环逐条算），
-        # 在事件循环上执行会冻结同进程所有请求/worker——移入线程池执行
-        import asyncio
-
-        return await asyncio.to_thread(self._score_all, raw, query_vector, top_k, threshold)
+        # 余弦扫描是 CPU 密集（逐条 JSON 解码 + 内积循环），放有界线程池执行
+        return await run_cpu(self._score_all, raw, query_vector, top_k, threshold)
 
     def _score_all(
         self,

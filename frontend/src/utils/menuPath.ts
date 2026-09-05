@@ -1,7 +1,7 @@
 import type { MenuNode } from '@/types'
 
 /**
- * 菜单路径解析（R4-1.33：去重）。
+ * 菜单路径解析（去重）。
  *
  * 此前 lastSegment + 路径拼接逻辑在 router/index.ts、router/dynamic.ts、
  * BasicLayout.vue、GlobalSearch.vue 四处各自实现一份，语义完全一致，

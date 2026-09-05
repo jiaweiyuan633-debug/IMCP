@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.22：sys_oauth_client 按租户隔离。SSO 应用为租户私有数据：page 过滤当前租户、
+ * sys_oauth_client 按租户隔离。SSO 应用为租户私有数据：page 过滤当前租户、
  * create 落当前租户、update/status/delete 校验归属；client_id 跨租户全局唯一（SSO 匿名
  * 链路按 client_id selectOne，重名会 TooManyResultsException）。
  */
@@ -86,7 +86,7 @@ class OauthClientServiceTest {
     void createAssignsCurrentTenantAndEncryptsSecret() {
         TenantContext.setTenantId(2L);
         when(oauthClientMapper.selectCount(any())).thenReturn(0L);
-        // R4-1.28：client_secret 落库前必须加密（明文永不入库）
+        // client_secret 落库前必须加密（明文永不入库）
         when(secretCipher.encrypt("secret")).thenReturn("enc:cipher");
 
         oauthClientService.create(request());
@@ -157,6 +157,7 @@ class OauthClientServiceTest {
         SysOauthClientDO owned = new SysOauthClientDO();
         owned.setId(99L);
         owned.setTenantId(2L);
+        owned.setClientId("app-1");
         when(oauthClientMapper.selectOne(any())).thenReturn(owned);
 
         oauthClientService.delete(99L);

@@ -84,7 +84,7 @@ def mask_fields(data: Any, mask_char: str = "*") -> Any:
 
 
 class StreamMasker:
-    """流式 PII 脱敏：滚动缓冲，跨分片 PII 不泄漏（R4-1.34）。
+    """流式 PII 脱敏：滚动缓冲，跨分片 PII 不泄漏。
 
     模型流式输出可能把手机号/身份证号等 PII 拆到相邻多个 delta，逐段脱敏无法
     命中（每个分片都不是完整模式）。本类保留尾部 ``HOLD`` 个原始字符（略大于

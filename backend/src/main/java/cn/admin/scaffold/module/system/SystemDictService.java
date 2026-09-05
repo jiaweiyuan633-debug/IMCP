@@ -84,7 +84,7 @@ public class SystemDictService {
                 .filter(t -> matchesTypeQuery(t, query))
                 .toList();
         long total = all.size();
-        // R4-1.39：pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
+        // pageNum=0/负数时旧式 (pageNum-1)*pageSize 为负，subList 越界抛 500，统一钳制
         int from = PageUtil.fromIndex(query.getPageNum(), query.getPageSize(), all.size());
         int to = PageUtil.toIndex(query.getPageNum(), query.getPageSize(), all.size());
         List<DictTypeVo> records = all.subList(from, to).stream().map(this::toTypeVo).toList();
@@ -141,7 +141,7 @@ public class SystemDictService {
     public void typeDelete(Long id) {
         SysDictTypeDO type = typeMapper.selectById(id);
         if (type != null) {
-            // 批次4（R4-1.50）：逻辑删除 + (tenant_id, dict_type) 唯一键冲突——删除前释放编码唯一键
+            // 逻辑删除 + (tenant_id, dict_type) 唯一键冲突——删除前释放编码唯一键
             type.setDictType(UniqueKeyRelease.releaseCode(type.getDictType()));
             typeMapper.updateById(type);
             typeMapper.deleteById(id);
@@ -155,7 +155,7 @@ public class SystemDictService {
         if (shared == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND);
         }
-        // 批次4（R4-1.50）：共享类型同样释放 dict_type 唯一键（tenant_id=0 维度）
+        // 共享类型同样释放 dict_type 唯一键（tenant_id=0 维度）
         String originalType = shared.getDictType();
         shared.setDictType(UniqueKeyRelease.releaseCode(originalType));
         typeMapper.updateByIdIgnoreTenant(shared);

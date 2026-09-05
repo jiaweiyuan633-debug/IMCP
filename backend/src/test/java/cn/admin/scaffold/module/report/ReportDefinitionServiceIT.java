@@ -136,7 +136,7 @@ class ReportDefinitionServiceIT extends AbstractIntegrationTest {
                 .containsExactly("租户2报表");
     }
 
-    // ---------- 批次7（R4-1.53）：报表执行引擎真实 MySQL 补强测试 ----------
+    // ---------- 报表执行引擎真实 MySQL 补强测试 ----------
 
     @Test
     void executeRejectsSensitiveColumnQuery() {

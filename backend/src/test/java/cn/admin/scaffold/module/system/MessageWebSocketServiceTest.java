@@ -12,7 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/** R4-1.14：WebSocket 每用户并发连接上限，超限回收最旧连接。 */
+/** WebSocket 每用户并发连接上限，超限回收最旧连接。 */
 class MessageWebSocketServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();

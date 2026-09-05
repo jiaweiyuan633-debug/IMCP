@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * 行级数据权限 SQL 改写拦截器（批次2b 起按配置生效）。
+ * 行级数据权限 SQL 改写拦截器（按配置启用）。
  *
  * <p>对命中的受控表追加「关联用户列 IN (当前用户可见集合)」条件；受控表及其关联列的映射
  * 不再硬编码，而是由 {@link DataPermissionRuleResolver} 从 sys_data_permission 配置表读取，
@@ -76,12 +76,12 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
         try {
             Select select = (Select) CCJSqlParserUtil.parse(sql);
             if (!(select.getSelectBody() instanceof PlainSelect plainSelect)) {
-                // 批次4（R4-1.50）：fail-closed——非 PlainSelect（UNION/集合查询等）无法安全
+                // fail-closed：非 PlainSelect（UNION/集合查询等）无法安全
                 // 注入行级条件，直接拒绝执行，杜绝绕过数据权限
                 throw new IllegalStateException("data scope unsupported statement type: " + select.getClass().getSimpleName());
             }
-            // 批次4（R4-1.50）：全树收集表（含子查询/派生表内层）——TablesNamesFinder 递归
-            // 遍历所有层级，修复此前仅顶层 FROM/JOIN 表被注入、受控表出现在子查询中被绕过的问题。
+            // 全树收集表（含子查询/派生表内层）：TablesNamesFinder 递归
+            // 遍历所有层级，避免仅顶层 FROM/JOIN 表被注入、受控表出现在子查询中被绕过。
             // Select 同时实现 Statement 与 Expression，需强转为 Statement 消解 getTables 重载歧义。
             Set<String> tablesInQuery = new TablesNamesFinder().getTables((net.sf.jsqlparser.statement.Statement) select);
             boolean touchesControlled = tablesInQuery.stream().anyMatch(filter.tables()::contains);
@@ -107,15 +107,15 @@ public class DataScopeInnerInterceptor implements InnerInterceptor {
                 return select.toString();
             }
             // 语义边界：受控表出现在「子查询/派生表内层」而顶层未直接引用（controlledInTopLevel=false）
-            // 时，行级条件无法在顶层注入——fail-closed 拒绝，杜绝内层受控表绕过（批次4）。
+            // 时，行级条件无法在顶层注入——fail-closed 拒绝，杜绝内层受控表绕过。
             // 反之顶层涉及受控表但未注入条件，属正常无过滤语义（未配置规则/可见集合为 null），
-            // 保持原 SQL（与批次2b 之前行为一致）。
+            // 保持原 SQL（未启用行级过滤时的行为）。
             if (controlledInTopLevel) {
                 return null;
             }
             throw new IllegalStateException("data scope controlled table only in subquery, unsupported");
         } catch (JSQLParserException | RuntimeException exception) {
-            // 批次4（R4-1.50）：fail-closed——解析/改写失败一律拒绝执行，而非静默放行
+            // fail-closed：解析/改写失败一律拒绝执行，而非静默放行
             log.error("Data scope rewrite failed for sql (rejecting): {}", sql, exception);
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(),
                     "数据权限改写失败，拒绝执行该查询");

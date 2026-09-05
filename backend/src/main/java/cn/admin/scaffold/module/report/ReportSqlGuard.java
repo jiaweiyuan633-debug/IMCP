@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * 报表执行引擎安全守卫（批次4 修复 W1）。
+ * 报表执行引擎安全守卫（只读查询加固）。
  *
  * <p>原实现 {@code validateReadOnlySql} 只做"以 SELECT 开头 + 禁止分号/写关键字"的黑名单校验：
  * <ul>
@@ -92,7 +92,7 @@ public class ReportSqlGuard {
      * AI 网关密钥（ai_service_config.api_key）。
      */
     private static final Map<String, Set<String>> SENSITIVE_TABLE_COLUMNS = Map.ofEntries(
-            // phone/email（R4-1.38）：手机号/邮箱为 PII 列，报表 SQL 读取同样禁止，防经报表导出用户隐私
+            // phone/email：手机号/邮箱为 PII 列，报表 SQL 读取同样禁止，防经报表导出用户隐私
             Map.entry("sys_user", Set.of("password", "totp_secret", "phone", "email")),
             Map.entry("sys_config", Set.of("config_value")),
             Map.entry("sys_channel_config", Set.of("config_json")),

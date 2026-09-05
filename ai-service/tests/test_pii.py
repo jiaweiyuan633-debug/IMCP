@@ -180,7 +180,7 @@ def test_all_kinds_match_rules_order() -> None:
     assert ALL_KINDS == tuple(rule.kind for rule in PII_RULES)
 
 
-# ---------- R4-1.34：流式脱敏（跨分片 PII 不泄漏） ----------
+# ---------- 流式脱敏（跨分片 PII 不泄漏） ----------
 
 
 def _run_stream_masker(text: str, chunk: int = 3) -> str:

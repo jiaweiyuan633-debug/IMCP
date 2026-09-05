@@ -37,7 +37,7 @@ public class SystemMenuService {
 
     public Long create(MenuSaveRequest request) {
         SysMenuDO menu = toEntity(request);
-        // R4-1.36 菜单 id 动态化：id 由数据库自增统一分配，不接受前端/迁移脚本指定。
+        // 菜单 id 动态化：id 由数据库自增统一分配，不接受前端/迁移脚本指定。
         // 此前迁移靠手工维护 id 区间（如 V51 注释「当前最大 165，新增 166~175」），
         // 区间错位/并发插入易冲突覆盖；改用 perm 唯一键定位后，创建方无 id 语义。
         menu.setId(null);
@@ -56,7 +56,7 @@ public class SystemMenuService {
         }
         SysMenuDO updated = toEntity(request);
         menuMapper.updateById(updated);
-        // R4-1.31：仅权限编码（perm）变更才需清权限缓存——名称/图标/排序等改动不影响已缓存的权限集合，
+        // 仅权限编码（perm）变更才需清权限缓存——名称/图标/排序等改动不影响已缓存的权限集合，
         // 且权限编码变更影响所有绑定该菜单的用户、无法精确反查，全清最安全（提交后执行防提交前竞态重缓存）
         if (!Objects.equals(existing.getPerm(), updated.getPerm())) {
             tokenService.evictAllPermissionsAfterCommit();

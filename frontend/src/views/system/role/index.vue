@@ -265,7 +265,7 @@ onMounted(async () => {
     menuTreeData.value = await getMenuTree()
     deptTreeData.value = await getDeptTree()
   } catch {
-    // R4-1.44：菜单/部门树加载失败保持空树（请求层已 toast），避免未捕获 rejection
+    // 菜单/部门树加载失败保持空树（请求层已 toast），避免未捕获 rejection
     menuTreeData.value = []
     deptTreeData.value = []
   }

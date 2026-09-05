@@ -94,13 +94,13 @@ public class McpClientService {
         if (!StringUtils.hasText(url)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "MCP Server 地址不能为空");
         }
-        // R4-1.40：投递时 SSRF 复核——保存时静态校验兜不住"主机名解析到内网 IP"与"保存后 DNS 变更"，
+        // 投递时 SSRF 复核——保存时静态校验兜不住"主机名解析到内网 IP"与"保存后 DNS 变更"，
         // 连接前按解析后的全部地址复核，任一落在内网/保留网段即拒绝
         String ssrfError = SsrfUrlValidator.validateOutboundHttpUrlWithDns(url);
         if (ssrfError != null) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "MCP Server 地址存在 SSRF 风险：" + ssrfError);
         }
-        // R4-1.40：authToken 落库为 SecretCipher 密文，连接前解密为明文放入 Authorization 头；
+        // authToken 落库为 SecretCipher 密文，连接前解密为明文放入 Authorization 头；
         // 存量明文 decrypt 原样放行（兼容），解密失败返回 null（无令牌请求）
         String authToken = secretCipher.decrypt(server.getAuthToken());
         HttpClientSseClientTransport transport = HttpClientSseClientTransport.builder(url)

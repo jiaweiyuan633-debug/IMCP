@@ -62,7 +62,7 @@ export function useTableQuery<T, P extends Record<string, unknown> = Record<stri
   // 仅最新请求允许写回状态；迟到的旧响应直接丢弃，否则慢请求后返回会
   // 覆盖用户当前看到的更新数据（records/total 错乱、loading 提前结束）。
   let requestSeq = 0
-  // R4-1.33：在途请求取消——新请求 abort 上一个、组件卸载 abort 全部，
+  // 在途请求取消——新请求 abort 上一个、组件卸载 abort 全部，
   // 配合 request.ts 对 ERR_CANCELED 的静默透传，让支持 signal 的 fetcher 真正中断网络
   let controller: AbortController | null = null
 
@@ -123,7 +123,7 @@ export function useTableQuery<T, P extends Record<string, unknown> = Record<stri
   }
 
   // 组件卸载时中断仍在途的请求，避免「页面已离开、请求还在飞」的资源浪费。
-  // R4-1.44：先递增 requestSeq——此前仅 abort（且 signal 尚未在 api 层透传时 abort 不中断
+  // 先递增 requestSeq——此前仅 abort（且 signal 尚未在 api 层透传时 abort 不中断
   // 网络），卸载后迟到的成功响应仍会写回已销毁组件的 refs，迟到的失败还会在已离开的页面
   // 弹请求层错误 toast；递增后任何在途请求的 seq !== requestSeq，成功/失败/loading 全被拦截。
   onUnmounted(() => {

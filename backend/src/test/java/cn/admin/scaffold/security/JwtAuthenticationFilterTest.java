@@ -1,6 +1,7 @@
 package cn.admin.scaffold.security;
 
 import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.config.SecurityProperties;
 import cn.admin.scaffold.module.system.entity.SysUserDO;
 import cn.admin.scaffold.module.system.mapper.SysMenuMapper;
 import cn.admin.scaffold.module.system.mapper.SysRoleMapper;
@@ -42,7 +43,8 @@ class JwtAuthenticationFilterTest {
     private final SysMenuMapper menuMapper = mock(SysMenuMapper.class);
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final JwtAuthenticationFilter filter =
-            new JwtAuthenticationFilter(jwtUtil, tokenService, roleMapper, menuMapper, userMapper);
+            new JwtAuthenticationFilter(jwtUtil, tokenService, roleMapper, menuMapper, userMapper,
+                    new SecurityProperties());
     private final HttpServletRequest request = mock(HttpServletRequest.class);
     private final HttpServletResponse response = mock(HttpServletResponse.class);
     private final FilterChain chain = mock(FilterChain.class);
@@ -89,7 +91,7 @@ class JwtAuthenticationFilterTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer abc");
         when(jwtUtil.parse("abc")).thenReturn(claims);
         when(tokenService.hasValidAccessToken("jti-1")).thenReturn(true);
-        // 批次2：角色走 Redis 缓存（未命中才查库并回填）
+        // 角色走 Redis 缓存（未命中才查库并回填）
         when(tokenService.getCachedRoles(1L)).thenReturn(null);
         when(roleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("admin"));
         when(tokenService.getCachedPermissions(1L)).thenReturn(null);
@@ -112,7 +114,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void cachedRolesAvoidDbQuery() throws Exception {
-        // 批次2：角色缓存命中时不再直查 sys_user_role
+        // 角色缓存命中时不再直查 sys_user_role
         Claims claims = validClaims();
         when(request.getHeader("Authorization")).thenReturn("Bearer abc");
         when(jwtUtil.parse("abc")).thenReturn(claims);
@@ -172,7 +174,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void tenantClaimInitializesContextBeforeQueries() throws Exception {
-        // R1-1.7：access token 携带 tenantId，角色/权限/用户查询前租户上下文必须已就位，
+        // access token 携带 tenantId，角色/权限/用户查询前租户上下文必须已就位，
         // 否则默认 tenant_id=1 会让非租户 1 用户的认证查询全部落空（401）
         Claims claims = validClaims();
         when(claims.get("tenantId")).thenReturn(2L);

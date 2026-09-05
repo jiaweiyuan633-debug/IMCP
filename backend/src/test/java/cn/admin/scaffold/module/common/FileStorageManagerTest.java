@@ -180,7 +180,7 @@ class FileStorageManagerTest {
         verify(fileMapper, never()).insert(any(SysFileDO.class));
     }
 
-    // ---------- R4-1.43：历史 /uploads/{objectKey} 归属校验（file-token 签发前防跨租户） ----------
+    // ---------- 历史 /uploads/{objectKey} 归属校验（file-token 签发前防跨租户） ----------
 
     /** URL 精确匹配且租户一致：返回文件，允许签发令牌。 */
     @Test

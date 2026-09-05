@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 预签名直传确认请求（批次2c）：前端 PUT 直传完成后回传 objectKey 入库。
+ * 预签名直传确认请求：前端 PUT 直传完成后回传 objectKey 入库。
  */
 @Data
 public class PresignConfirmRequest {

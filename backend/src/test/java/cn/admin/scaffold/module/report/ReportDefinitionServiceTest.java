@@ -181,7 +181,7 @@ class ReportDefinitionServiceTest {
                 .hasMessageContaining("已停用");
     }
 
-    // ---------- R4-1.37：执行参数防御校验（数量/类型/长度） ----------
+    // ---------- 执行参数防御校验（数量/类型/长度） ----------
 
     @Test
     void executeRejectsTooManyParams() {

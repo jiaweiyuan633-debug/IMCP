@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 数据权限表-列映射新增/编辑请求（批次2b）。
+ * 数据权限表-列映射新增/编辑请求。
  */
 @Data
 public class DataPermissionSaveRequest {

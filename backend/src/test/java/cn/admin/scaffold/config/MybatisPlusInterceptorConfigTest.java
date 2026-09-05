@@ -33,7 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * R1-1.6 回归测试：分页 COUNT 查询必须携带租户与数据权限条件。
+ * 回归测试：分页 COUNT 查询必须携带租户与数据权限条件。
  *
  * <p>背景：PaginationInnerInterceptor 的 COUNT 查询在 willDoQuery 中直接经真实 Executor
  * 执行（不重入拦截器链），COUNT SQL 只取自「当前时刻」的 boundSql。因此条件注入类拦截器
@@ -142,7 +142,7 @@ class MybatisPlusInterceptorConfigTest {
 
     @Test
     void mcpServerSqlCarriesTenantCondition() throws Throwable {
-        // R4-1.17：sys_mcp_server 补进租户名单——他租户 MCP 服务（含 authToken）不能被
+        // sys_mcp_server 补进租户名单——他租户 MCP 服务（含 authToken）不能被
         // 跨租户列出/加载/修改/删除，外部工具调用不得越权携带他租户连接凭据
         TenantContext.setTenantId(5L);
         BoundSql boundSql = new BoundSql(configuration,
@@ -159,7 +159,7 @@ class MybatisPlusInterceptorConfigTest {
 
     @Test
     void tenantTablesIncludeSysMcpServer() {
-        // R4-1.17：白名单含 sys_mcp_server，防名单回退（漏加即回归跨租户越权）
+        // 白名单含 sys_mcp_server，防名单回退（漏加即回归跨租户越权）
         assertThat(MybatisPlusConfig.TENANT_TABLES).contains("sys_mcp_server");
     }
 

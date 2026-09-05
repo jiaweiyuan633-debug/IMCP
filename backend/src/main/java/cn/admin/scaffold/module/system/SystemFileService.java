@@ -30,7 +30,7 @@ public class SystemFileService {
                 .eq(StringUtils.hasText(storageType), SysFileDO::getStorageType, storageType)
                 .orderByDesc(SysFileDO::getId);
         IPage<SysFileDO> result = fileMapper.selectPage(page, wrapper);
-        // R4-1.43：列表不再签发 accessToken——令牌统一由 /api/common/file-token 现取，列表缓存的
+        // 列表不再签发 accessToken——令牌统一由 /api/common/file-token 现取，列表缓存的
         // 令牌 TTL(1h) 后失效，页面停留超过 1h 后点击文件名链接必然 403
         result.getRecords().forEach(file -> file.setContentUrl("/files/" + file.getId()));
         return PageResult.of(result, result.getRecords());

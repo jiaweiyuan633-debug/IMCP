@@ -116,10 +116,10 @@ public class SystemRoleService {
 
     @Transactional
     public void delete(Long id) {
-        // R4-1.31：删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——删除前收集绑定用户，
-        // 提交后失效其角色+权限缓存，使撤销的角色/权限立即生效（批次2：角色缓存一并失效）
+        // 删除角色后拥有者仍持旧权限（缓存 TTL 30 分钟）是缺陷——删除前收集绑定用户，
+        // 提交后失效其角色+权限缓存，使撤销的角色/权限立即生效（角色缓存一并失效）
         List<Long> userIds = userRoleMapper.selectUserIdsByRoleIds(List.of(id));
-        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, code) 唯一键冲突——删除前释放 code 唯一键
+        // 逻辑删除 + (tenant_id, code) 唯一键冲突——删除前释放 code 唯一键
         SysRoleDO role = roleMapper.selectById(id);
         if (role != null) {
             role.setCode(UniqueKeyRelease.releaseCode(role.getCode()));
@@ -139,7 +139,7 @@ public class SystemRoleService {
             roleMenuMapper.insertBatch(roleId, menuIds);
         }
         // 清空与重设都需失效权限缓存（清空后用户仍持旧权限是缺陷）；只失效绑定该角色的用户，避免 KEYS 全扫与缓存雪崩。
-        // R4-1.12：提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧权限）会重新缓存，
+        // 提交前删除存在竞态——并发请求在 evict 后、commit 前读库（旧权限）会重新缓存，
         // 撤销的权限最长残留 30 分钟。改为事务提交后失效。
         tokenService.evictPermissionsByUserIdsAfterCommit(userIds);
     }

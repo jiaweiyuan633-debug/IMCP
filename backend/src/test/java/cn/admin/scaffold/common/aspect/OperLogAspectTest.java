@@ -127,7 +127,7 @@ class OperLogAspectTest {
         verify(operLogMapper).insert(any(SysOperLogDO.class));
     }
 
-    // ---------- R4-1.38：@OperLog.maskFields 发送类正文/参数脱敏 ----------
+    // ---------- @OperLog.maskFields 发送类正文/参数脱敏 ----------
 
     /** 发送渠道消息：content/target 按注解 maskFields 整体打码入操作/审计日志，title 等定位信息保留。 */
     @Test
@@ -165,7 +165,7 @@ class OperLogAspectTest {
         assertThat(entities.auditLog().getParams()).isEqualTo(params);
     }
 
-    // ---------- R4-1.42：上传接口 MultipartFile 只记元信息，不序列化二进制 ----------
+    // ---------- 上传接口 MultipartFile 只记元信息，不序列化二进制 ----------
 
     /** MultipartFile 入参替换为元信息快照（文件名/大小/类型），文件内容不进入日志 JSON。 */
     @Test

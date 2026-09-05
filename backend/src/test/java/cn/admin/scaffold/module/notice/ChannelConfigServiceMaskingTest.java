@@ -144,7 +144,7 @@ class ChannelConfigServiceMaskingTest {
         assertThat(cipher.decryptConfig(saved)).contains("\"secret\":\"fresh-secret\"");
     }
 
-    // ---------- R4-1.38：渠道发送记录 PII 防护（content/target 加密落库，回显解密/fail-closed 打码） ----------
+    // ---------- 渠道发送记录 PII 防护（content/target 加密落库，回显解密/fail-closed 打码） ----------
 
     /** 发送：sender 拿明文发送，落库的 target/content 必须是 enc: 密文，明文不落库。 */
     @Test

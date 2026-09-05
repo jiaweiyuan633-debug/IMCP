@@ -98,7 +98,7 @@ class OutboxDispatcherIT extends AbstractIntegrationTest {
         assertThat(((Number) row.get("retry_count")).intValue()).isEqualTo(1);
         assertThat(row.get("next_retry_at")).isNotNull();
 
-        // R4-1.30：抢占前置——把下次重试时间拨到过去模拟轮询到期，否则 CAS 抢占会因
+        // 抢占前置——把下次重试时间拨到过去模拟轮询到期，否则 CAS 抢占会因
         // next_retry_at 未到期而拒绝（这正是防重复投递的边界），随后手动再投、重试次数继续累加
         jdbcTemplate.update("UPDATE sys_outbox SET next_retry_at = DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE id = ?", id);
         dispatcher.dispatch(id);
@@ -116,7 +116,7 @@ class OutboxDispatcherIT extends AbstractIntegrationTest {
 
     @Test
     void concurrentDispatchClaimsRowOnce() throws Exception {
-        // R4-1.30：模拟「即时投递与定时清扫/多副本清扫」两路并发争抢同一行——CAS 抢占
+        // 模拟「即时投递与定时清扫/多副本清扫」两路并发争抢同一行——CAS 抢占
         // 保证 handler 只被调用一次，杜绝 webhook 等非幂等 handler 的重复副作用
         Long id = publisher.publish("it-count", "{\"x\":1}");
         jdbcTemplate.update("UPDATE sys_outbox SET status = 0, next_retry_at = NULL WHERE id = ?", id);

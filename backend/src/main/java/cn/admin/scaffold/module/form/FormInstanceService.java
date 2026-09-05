@@ -69,7 +69,7 @@ public class FormInstanceService {
     }
 
     /**
-     * 提交记录分页（R4-1.37 行级数据权限）：非管理员仅可见自己提交的记录（submitter_id 命中
+     * 提交记录分页（行级数据权限）：非管理员仅可见自己提交的记录（submitter_id 命中
      * 当前用户可见集合），管理员经 DataScopeAspect.isAdmin 短路不受限；受控表映射已在
      * V61 迁移中注册到 sys_data_permission，后续按权限矩阵调整无需发版。
      */
@@ -85,7 +85,7 @@ public class FormInstanceService {
     }
 
     /**
-     * 提交记录详情（R4-1.38 数据权限单条路径补漏）：page 已按 submitter_id 行级过滤，但 getById
+     * 提交记录详情（数据权限单条路径补漏）：page 已按 submitter_id 行级过滤，但 getById
      * 原无归属校验，非管理员可遍历/猜测 id 读取任意人的表单提交内容。此处补齐同一可见性，
      * 保证"列表可见 = 单条可读"。
      */
@@ -100,7 +100,7 @@ public class FormInstanceService {
 
     /**
      * 审批流转：SUBMITTED → APPROVED/REJECTED。
-     * R4-1.38 先做归属校验（非管理员仅可流转自己可见的提交），再 CAS 条件更新保证原子性：
+     * 先做归属校验（非管理员仅可流转自己可见的提交），再 CAS 条件更新保证原子性：
      * 并发审批时仅一个请求能把 SUBMITTED 流转成功，其余请求命中 0 行被拒绝，避免"先查后改"
      * 窗口内重复/覆盖审批。
      */
@@ -123,7 +123,7 @@ public class FormInstanceService {
     }
 
     /**
-     * 单条归属校验（R4-1.38）：非管理员要求 submitter_id 命中当前用户可见集合（与 page 的
+     * 单条归属校验：非管理员要求 submitter_id 命中当前用户可见集合（与 page 的
      * {@code @DataScope} 同一语义，admin 短路），越权抛 FORBIDDEN。
      */
     private void checkDataScope(FormInstanceDO instance) {

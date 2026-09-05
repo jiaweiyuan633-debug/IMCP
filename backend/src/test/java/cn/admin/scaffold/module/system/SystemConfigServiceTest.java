@@ -19,7 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.31：配置缓存从 @CacheEvict(allEntries=true)（改任意租户配置清空全部租户缓存）
+ * 配置缓存从 @CacheEvict(allEntries=true)（改任意租户配置清空全部租户缓存）
  * 收敛为按键+租户精确失效，避免跨租户无谓的缓存清空。
  */
 @ExtendWith(MockitoExtension.class)

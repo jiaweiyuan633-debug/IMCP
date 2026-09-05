@@ -45,7 +45,7 @@ public class SysQuartzJob implements Job {
         String message = "执行成功";
         String error = null;
         boolean success = true;
-        // R4-1.18：Quartz 执行线程无租户上下文，selectById 会被拦截器注入默认 tenant_id=1，
+        // Quartz 执行线程无租户上下文，selectById 会被拦截器注入默认 tenant_id=1，
         // 非租户 1 的任务取回 null、租户上下文留在默认 1、任务在错租户下执行并写错租户日志。
         // 必须跨租户取回任务，再以任务自有 tenant_id 就位租户上下文。
         SysJobDO job = jobMapper.selectByIdIgnoreTenant(jobId);

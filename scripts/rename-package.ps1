@@ -1,6 +1,6 @@
-# 包名品牌化一键替换（批次9·R4-1.56）
+# 包名品牌化一键替换
 #
-# 背景：仓库后端 Java 包基线现为中性占位 cn.admin.scaffold（原 com.example.admin，批次9 已迁移）。
+# 背景：仓库后端 Java 包基线现为中性占位 cn.admin.scaffold（由原 com.example.admin 迁移而来）。
 # 企业域名确定后，用本脚本一次性把包名/groupId/生成器基线替换为目标域名并移动目录。
 #
 # 用法：

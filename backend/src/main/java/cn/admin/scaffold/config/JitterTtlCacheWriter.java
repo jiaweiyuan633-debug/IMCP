@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 缓存 TTL 抖动写入器（批8e，R4-1.35）。
+ * 缓存 TTL 抖动写入器。
  *
  * <p>包装默认 {@link RedisCacheWriter}，在每次带 TTL 的写入（put/store/putIfAbsent）时对 TTL
  * 施加 ±jitterWindow 的随机偏移。此前 Spring Cache 缓存（configs/dictData）共用固定 30 分钟

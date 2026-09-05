@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 数据权限规则缓存（批次2b 数据权限行级表达式可配置化）。
+ * 数据权限规则缓存（行级表达式可配置化）。
  *
  * <p>DataScopeInnerInterceptor 每次查询通过 {@link #resolve(String)} 取「受控表 -> 用户关联列」映射，
  * 不再使用硬编码 if/else。映射来源为 {@code sys_data_permission} 表，由管理端维护：

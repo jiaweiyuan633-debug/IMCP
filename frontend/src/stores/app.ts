@@ -8,7 +8,7 @@ export interface TabItem {
 export const useAppStore = defineStore('app', {
   state: () => ({
     collapsed: false,
-    // R4-1.33：暗黑主题持久化——初始化即从 localStorage 恢复用户偏好，切换即写回，
+    // 暗黑主题持久化——初始化即从 localStorage 恢复用户偏好，切换即写回，
     // 刷新/重开浏览器不丢主题选择；App.vue 的 themeConfig 已响应 darkTheme 实时应用
     darkTheme: localStorage.getItem('admin_dark_theme') === '1',
     locale: localStorage.getItem('admin_locale') || 'zh-CN',

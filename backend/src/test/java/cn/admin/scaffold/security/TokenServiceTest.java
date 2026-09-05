@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Refresh Token 原子消费单测（R4-1.44 批次17）。
+ * Refresh Token 原子消费单测。
  *
  * <p>verify GETDEL 单命令原子语义：既返回旧值又删除，杜绝 hasKey+delete 两步在并发下
  * 均通过存在性检查导致的轮换失效。
@@ -57,7 +57,7 @@ class TokenServiceTest {
         assertThat(tokenService.consumeRefreshToken("rt-2")).isNull();
     }
 
-    // ---------- 批次2（R4-1.48）：角色缓存（与权限缓存同 TTL 抖动、同失效时机） ----------
+    // ---------- 角色缓存（与权限缓存同 TTL 抖动、同失效时机） ----------
 
     @Test
     void cacheRolesThenGetReturnsCommaJoinedRoles() {

@@ -18,6 +18,10 @@ export function get{{Entity}}Page(params: Record<string, unknown>): Promise<Page
   return request.get('/{{module}}/{{kebab}}', { params })
 }
 
+export function get{{Entity}}ById(id: number): Promise<{{Entity}}Vo> {
+  return request.get(`/{{module}}/{{kebab}}/${id}`)
+}
+
 export function create{{Entity}}(data: {{Entity}}SaveRequest): Promise<number> {
   return request.post('/{{module}}/{{kebab}}', data)
 }

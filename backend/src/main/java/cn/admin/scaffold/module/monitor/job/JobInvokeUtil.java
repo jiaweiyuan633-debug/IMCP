@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Quartz 任务反射调用工具（批次2·R4-1.48 安全加固）。
+ * Quartz 任务反射调用工具（安全加固）。
  *
  * <p>原实现 {@code getBean(parts[0]).getClass().getMethod(parts[1])} 无任何目标白名单，
  * 可命中任意 Spring Bean 的任意 public 无参方法（如 {@code scheduler.shutdown()} 使全集群

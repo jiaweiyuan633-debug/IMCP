@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.form.dto.FormDefinitionQuery;
 import cn.admin.scaffold.module.form.dto.FormDefinitionSaveRequest;
 import cn.admin.scaffold.module.form.entity.FormDefinitionDO;
@@ -108,6 +109,11 @@ public class FormDefinitionService {
     }
 
     public void delete(Long id) {
+        // 逻辑删除前先释放 code 唯一键（(tenant_id, code)）：删除后同名编码可立即重建。
+        // 已提交的 form_instance 自带 form_code 快照，不受定义 code 改名影响。
+        FormDefinitionDO definition = requireById(id);
+        definition.setCode(UniqueKeyRelease.releaseCode(definition.getCode()));
+        formDefinitionMapper.updateById(definition);
         formDefinitionMapper.deleteById(id);
     }
 

@@ -11,7 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/** R4-1.13：投递时 SSRF 复核——非法地址按投递成功丢弃，绝不发起对外请求。 */
+/** 投递时 SSRF 复核——非法地址按投递成功丢弃，绝不发起对外请求。 */
 class AlertWebhookOutboxHandlerTest {
 
     private final RestTemplate restTemplate = mock(RestTemplate.class);

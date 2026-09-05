@@ -80,7 +80,7 @@ onMounted(async () => {
   try {
     data.value = await getServerMonitor()
   } catch {
-    // R4-1.44：监控数据加载失败保持空态（请求层已 toast），避免未捕获 rejection
+    // 监控数据加载失败保持空态（请求层已 toast），避免未捕获 rejection
     data.value = null
   }
 })

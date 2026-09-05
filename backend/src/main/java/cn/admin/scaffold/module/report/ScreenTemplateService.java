@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.ResultCode;
 import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.report.dto.ScreenTemplateSaveRequest;
 import cn.admin.scaffold.module.report.entity.ScreenTemplateDO;
 import cn.admin.scaffold.module.report.mapper.ScreenTemplateMapper;
@@ -90,7 +91,12 @@ public class ScreenTemplateService {
     }
 
     public void delete(Long id) {
-        screenTemplateMapper.deleteById(requireEditable(id).getId());
+        // requireEditable 已约束内置模板不可删、租户归属；删除前释放 (tenant_id, code) 唯一键，
+        // 删除后同名模板可立即重建（逻辑删除行保留做审计，code 后缀 #del# 时间戳区分）
+        ScreenTemplateDO template = requireEditable(id);
+        template.setCode(UniqueKeyRelease.releaseCode(template.getCode()));
+        screenTemplateMapper.updateById(template);
+        screenTemplateMapper.deleteById(template.getId());
     }
 
     /** 内置模板仅可另存为新模板：前端对内置模板展示「另存为」，不可直接覆盖。 */

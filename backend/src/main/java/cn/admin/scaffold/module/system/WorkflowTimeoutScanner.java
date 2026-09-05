@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 工作流节点超时提醒扫描器（批次2 死代码转活）。
+ * 工作流节点超时提醒扫描器。
  *
  * <p>sys_workflow 的 current_node_assigned_at/timeout_notified 字段（V23 建表）此前无任何扫描器消费，
  * 属"字段已建、能力缺实现"。本扫描器每分钟检查审批中的流程：当前节点停留超过节点级
@@ -49,7 +49,7 @@ public class WorkflowTimeoutScanner {
             return;
         }
         try {
-            // R4-1.29：@Scheduled 线程无租户上下文，直接 selectList 会被租户拦截器注入默认
+            // @Scheduled 线程无租户上下文，直接 selectList 会被租户拦截器注入默认
             // tenant_id=1，仅能扫到租户 1 的超时流程、其余租户提醒永不触发（同款缺陷见
             // AiTaskScanner#scanTimeoutTasks 修复）。改为跨租户取全量租户，逐个就位上下文后扫描，
             // 使 selectList/resolveTimeoutHours/updateById 全部按对应租户精确限定。

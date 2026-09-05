@@ -55,7 +55,7 @@ export interface DashboardStatsVo {
   aiTaskSucceeded: number
   aiTaskFailed: number
   aiTaskRunning: number
-  /** R4-1.26：FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败，各桶之和等于 aiTaskFailed */
+  /** FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败，各桶之和等于 aiTaskFailed */
   aiTaskFailedByErrorType?: NameValueVo[]
 }
 
@@ -241,7 +241,7 @@ export function getAuditLogPage(params: Record<string, unknown>, signal?: AbortS
 
 export async function exportAuditLogs(): Promise<void> {
   // blob 响应在拦截器中原样返回完整 AxiosResponse（保留 Content-Disposition 头），
-  // 故显式声明为 AxiosResponse<Blob> 而非解包后的数据（R4-1.32 泛型契约）
+  // 故显式声明为 AxiosResponse<Blob> 而非解包后的数据（泛型契约）
   const response = await request.get<AxiosResponse<Blob>>('/monitor/audit-log/export', {
     responseType: 'blob',
   })

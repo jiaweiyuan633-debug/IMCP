@@ -55,7 +55,7 @@ async def test_duplicate_task_rejected_with_409() -> None:
 
 @pytest.mark.asyncio
 async def test_concurrent_duplicate_task_only_one_succeeds() -> None:
-    """R4-1.30：并发同 task_no 提交只有一方落库成功（SET NX 原子去重，无 check-then-set 竞态）。"""
+    """并发同 task_no 提交只有一方落库成功（SET NX 原子去重，无 check-then-set 竞态）。"""
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     service = _FakeService()
     manager = TaskManager(redis, Settings(worker_count=1), services={"job": service})
@@ -88,7 +88,7 @@ async def test_unsupported_biz_type_rejected() -> None:
 
 @pytest.mark.asyncio
 async def test_timeout_clamped_to_max() -> None:
-    """R4-1.34：超时治理——建单时把超上限的 timeout 裁剪到 max_timeout_seconds。
+    """超时治理——建单时把超上限的 timeout 裁剪到 max_timeout_seconds。
 
     修复前 request.timeout 原样入库：客户端可提交一年级的超大超时，工作协程被
     长时间占用（worker_count 有限，单任务拖垮整条队列），且租约（= 超时 + 宽限）
@@ -115,7 +115,7 @@ async def test_timeout_clamped_to_max() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_clamps_legacy_huge_timeout() -> None:
-    """R4-1.34：执行侧兜底裁剪——修复前入库的超大 timeout 旧任务仍受上限约束。"""
+    """执行侧兜底裁剪——修复前入库的超大 timeout 旧任务仍受上限约束。"""
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     service = _FakeService(sleep=0.01)
     settings = Settings(worker_count=1, max_timeout_seconds=10)
@@ -137,7 +137,7 @@ async def test_execute_clamps_legacy_huge_timeout() -> None:
 
 @pytest.mark.asyncio
 async def test_unknown_provider_task_fails_non_retryable() -> None:
-    """R4-1.34：任务路径未知 provider 属参数错误，立即失败不重试。
+    """任务路径未知 provider 属参数错误，立即失败不重试。
 
     修复前 llm_chat/embedding 服务对未知 provider 抛 KeyError，被 TaskManager
     按可重试异常处理（重试 3 次耗尽才进死信）——参数错误重试毫无意义且浪费

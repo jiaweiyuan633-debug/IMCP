@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * 逻辑删除 + 业务编码唯一键冲突的通用解法（批次4·R4-1.50）。
+ * 逻辑删除 + 业务编码唯一键冲突的通用解法。
  *
  * <p>问题：MyBatis-Plus 逻辑删除后行仍在，但 (tenant_id, 业务编码) 唯一键仍占位，
  * 删除后同名/同编码数据永远无法重建（SystemUserService.create 的 exists 检查自动

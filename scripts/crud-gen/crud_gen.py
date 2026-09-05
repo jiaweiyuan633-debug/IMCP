@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""零依赖 CRUD 代码生成器（R4-1.36，批次9）。
+"""零依赖 CRUD 代码生成器。
 
 根据一个 JSON 规格文件（表 + 字段清单），渲染 MyBatis-Plus 标准 CRUD 全套代码：
   - 后端：DO / Mapper / Query / SaveRequest / Vo / Service / Controller
@@ -30,6 +30,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 
 BASE_PACKAGE = "cn.admin.scaffold.module"
+
+# 模板目录常量：脚本入口与冒烟/单测共用同一来源
+TEMPLATES = SCRIPT_DIR / "templates"
 
 # Java 类型 → TypeScript 类型
 TS_TYPE_MAP = {
@@ -122,6 +125,11 @@ def load_spec(spec_path: Path) -> dict:
     return data
 
 
+def load_example() -> dict:
+    """加载仓库自带的示例规格（spec.example.json），供冒烟/单测使用。"""
+    return load_spec(SCRIPT_DIR / "spec.example.json")
+
+
 def build_model(spec: dict) -> dict:
     validate_spec(spec)
     module = str(spec["module"]).strip()
@@ -193,7 +201,7 @@ def build_model(spec: dict) -> dict:
             return "%s: query.%s as number | undefined," % (f.name, f.name)
         return "%s: (query.%s as string) || undefined," % (f.name, f.name)
 
-    param_lines = [param_line(f) for f in fields if f.query_like or f.query_eq]
+    param_fields = [param_line(f) for f in fields if f.query_like or f.query_eq]
 
     def form_item(f: Field) -> str:
         label = f.comment.replace("'", "\\'")
@@ -217,7 +225,7 @@ def build_model(spec: dict) -> dict:
         "package": package,
         "permPrefix": perm_prefix,
         "datascope": bool(spec.get("datascope")),
-        # 批次8（R4-1.54）：datascope=true 时注入行级数据权限注解/import/租户行，否则为空串。
+        # datascope=true 时注入行级数据权限注解/import/租户行，否则为空串。
         # 模板引擎无 [[if]]，用预展开片段实现条件输出（见 EntityService.java.tpl）
         "datascope_import": ("import cn.admin.scaffold.common.annotation.DataScope;\n"
                              "import cn.admin.scaffold.common.TenantContext;\n")
@@ -238,7 +246,7 @@ def build_model(spec: dict) -> dict:
         "search_fields": search_fields,
         "columns": columns,
         "form_items": form_items,
-        "param_lines": param_lines,
+        "param_fields": param_fields,
     }
 
 

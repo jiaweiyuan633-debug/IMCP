@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Warm-Flow 工作流引擎集成测试（批次7·R4-1.53 补 P0-2 缺口：此前引擎封装零测试）。
+ * Warm-Flow 工作流引擎集成测试（此前引擎封装零测试，本次补齐覆盖）。
  *
  * <p>真实 MySQL + Warm-Flow：启动时 V13 种子流程（general_approval：部门审批 → 管理员终审）
  * 经 {@link WarmFlowLegacyMigrator} 迁移为 Warm-Flow 定义。覆盖：发起 → 部门审批通过 →

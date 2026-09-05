@@ -60,7 +60,7 @@ public class OauthLoginService {
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
     private static final Duration BIND_TTL = Duration.ofMinutes(15);
     private static final Duration LOGIN_TICKET_TTL = Duration.ofSeconds(60);
-    // R4-1.29：匿名绑定端点以「用户名+密码」验证平台账号，与密码登录同等级防暴力破解。
+    // 匿名绑定端点以「用户名+密码」验证平台账号，与密码登录同等级防暴力破解。
     // 失败锁定键带租户——(tenant_id, username) 才唯一（V33），跨租户同名不互锁、不误伤。
     private static final String BIND_FAIL_KEY_PREFIX = "oauth:bind:fail:";
     private static final String BIND_RATE_KEY_PREFIX = "oauth:bind:rate:";
@@ -194,7 +194,7 @@ public class OauthLoginService {
 
     /** 绑定第三方账号到平台账号并登录。 */
     public LoginResponse bind(OauthBindRequest request, HttpServletRequest httpRequest) {
-        // R4-1.29：匿名绑定端点以「用户名+密码」验证平台账号，防护须与密码登录同等级——
+        // 匿名绑定端点以「用户名+密码」验证平台账号，防护须与密码登录同等级——
         // IP 级限流防撒网爆破（取 socket 真实地址，与 ApiRateLimitInterceptor 同源原则）+ 用户名失败锁定。
         if (isBindRateLimited(httpRequest.getRemoteAddr())) {
             throw new BusinessException(ResultCode.LOGIN_TOO_MANY);
@@ -204,8 +204,8 @@ public class OauthLoginService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "绑定凭证无效或已过期");
         }
         checkBindLockout(bindData.getTenantId(), request.getUsername());
-        // R4-1.19：匿名绑定端点无租户上下文，selectOne 会被租户拦截器注入默认 tenant_id=1，
-        // 租户 2 的平台账号按用户名永远查不到、绑定必失败。改走 R1-1.7 的跨租户辅助方法，
+        // 匿名绑定端点无租户上下文，selectOne 会被租户拦截器注入默认 tenant_id=1，
+        // 租户 2 的平台账号按用户名永远查不到、绑定必失败。改走跨租户辅助方法，
         // 并以绑定凭证携带的配置租户精确限定（与 findBinding/bindToUser 同一租户来源）。
         List<SysUserDO> users = userMapper.selectByUsername(request.getUsername(), bindData.getTenantId());
         SysUserDO user = users.isEmpty() ? null : users.get(0);
@@ -253,7 +253,7 @@ public class OauthLoginService {
 
     private OauthToken fetchAccessToken(OauthProvider provider, SysOauthConfigDO config, String code) {
         try {
-            // R4-1.28：appSecret 落库为 AES-GCM 密文，调用第三方前解密（存量明文经 SecretCipher 原样放行）
+            // appSecret 落库为 AES-GCM 密文，调用第三方前解密（存量明文经 SecretCipher 原样放行）
             String appSecret = secretCipher.decrypt(config.getAppSecret());
             if (provider == OauthProvider.WECHAT) {
                 String url = provider.getTokenUrl()
@@ -390,7 +390,7 @@ public class OauthLoginService {
         return fromJson(json, BindData.class);
     }
 
-    // ---------- 绑定暴力破解防护（R4-1.29，与 AuthService 登录防护同等级） ----------
+    // ---------- 绑定暴力破解防护（与 AuthService 登录防护同等级） ----------
 
     private boolean isBindRateLimited(String ip) {
         String key = BIND_RATE_KEY_PREFIX + ip;

@@ -57,7 +57,7 @@ public class SsoAuthService {
         }
         String code = jwtUtil.generateJti();
         // 授权码绑定用户、租户与客户端，一次性消费
-        // （R1-1.7 增加租户段：兑换时先就位租户上下文再查用户，避免非租户 1 用户查不到）
+        // （授权码携带租户段：兑换时先就位租户上下文再查用户，避免非租户 1 用户查不到）
         redisTemplate.opsForValue().set(
                 SSO_CODE_PREFIX + code,
                 SecurityUtils.getUserId() + ":" + TenantContext.getTenantId() + ":" + clientId, CODE_TTL);
@@ -70,9 +70,9 @@ public class SsoAuthService {
     /** 第三方应用用授权码换访问令牌。 */
     public SsoTokenVo token(SsoTokenRequest request) {
         SysOauthClientDO client = requireEnabledClient(request.getClientId());
-        // R2-1.1：client_secret 必须恒定时间比较。String.equals 按字节短路，逐位差异产生
+        // client_secret 必须恒定时间比较。String.equals 按字节短路，逐位差异产生
         // 可观测的耗时差（时序侧信道），允许远程枚举密钥；MessageDigest.isEqual 固定遍历全部字节。
-        // R4-1.28：落库值为 AES-GCM 密文，先解密再与提交值比较（存量明文经 SecretCipher 原样放行）。
+        // 落库值为 AES-GCM 密文，先解密再与提交值比较（存量明文经 SecretCipher 原样放行）。
         if (!constantTimeEquals(secretCipher.decrypt(client.getClientSecret()), request.getClientSecret())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "client_secret 无效");
         }
@@ -86,7 +86,7 @@ public class SsoAuthService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码与客户端不匹配");
         }
         Long userId = Long.valueOf(parts[0]);
-        // R1-1.7：授权码携带租户，兑换时先就位租户上下文再查用户，
+        // 授权码携带租户，兑换时先就位租户上下文再查用户，
         // 避免租户拦截器注入默认 tenant_id=1 查不到非租户 1 用户。
         TenantContext.setTenantId(Long.valueOf(parts[1]));
         SysUserDO user = userMapper.selectById(userId);
@@ -99,8 +99,9 @@ public class SsoAuthService {
         String accessJti = jwtUtil.generateJti();
         String accessToken = jwtUtil.createAccessToken(accessJti, userId, user.getUsername(),
                 user.getTenantId(), roles, perms);
-        // SSO 令牌不签发 refresh token，用空串占位避免 Redis 值判空异常
-        tokenService.saveAccessToken(accessJti, "");
+        // SSO 令牌不签发 refresh token，用空串占位避免 Redis 值判空异常；
+        // 同时登记到 per-user 会话集合——平台侧改密/重置/停用/删除用户时一并吊销第三方应用令牌
+        tokenService.saveAccessToken(accessJti, "", String.valueOf(userId));
         return SsoTokenVo.builder()
                 .accessToken(accessToken)
                 .tokenType("Bearer")

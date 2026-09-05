@@ -16,7 +16,7 @@ class FileAccessFilterTest {
 
     @Test
     void verifiedUploadResponseCarriesPrivateCacheControl() throws Exception {
-        // R3-1.2：静态资源路径原本不带缓存头，前端列表/预览重复全量下载；
+        // 静态资源路径原本不带缓存头，前端列表/预览重复全量下载；
         // 校验通过后补 Cache-Control，max-age 与令牌有效期对齐
         String path = "/uploads/2026/01/01/abc.png";
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -44,7 +44,7 @@ class FileAccessFilterTest {
         assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isNull();
     }
 
-    // ---------- R4-1.39：; 矩阵参数绕过 IDOR 修复 ----------
+    // ---------- ; 矩阵参数绕过 IDOR 修复 ----------
 
     /** /files/{id};x 经矩阵参数变体绕过旧正则（不命中 /files/\d+），规范化后必须校验 token，匿名无 token 拒绝。 */
     @Test

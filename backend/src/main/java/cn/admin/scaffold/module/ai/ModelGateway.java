@@ -65,7 +65,7 @@ public class ModelGateway {
                     .forEach(m -> messages.add(Map.of("role", m.getRole(), "content", m.getContent())));
         }
 
-        // R4-1.40：apiKey 落库为 SecretCipher 密文，直连 LLM 前解密为明文供 Bearer 鉴权
+        // apiKey 落库为 SecretCipher 密文，直连 LLM 前解密为明文供 Bearer 鉴权
         config.setApiKey(secretCipher.decrypt(config.getApiKey()));
         long start = System.currentTimeMillis();
         String content = resolveProvider(config.getProvider())

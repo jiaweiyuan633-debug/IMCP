@@ -98,7 +98,7 @@ public class McpConfigService {
         return server;
     }
 
-    /** R4-1.40：authToken 落库加密（SecretCipher，"enc:" 前缀幂等跳过）——此前明文落库，数据库泄露即第三方凭据泄露。 */
+    /** authToken 落库加密（SecretCipher，"enc:" 前缀幂等跳过）——明文落库时数据库泄露即第三方凭据泄露。 */
     private String encryptToken(String token) {
         if (!StringUtils.hasText(token) || secretCipher.isEncrypted(token)) {
             return token;
@@ -107,7 +107,7 @@ public class McpConfigService {
     }
 
     /**
-     * R4-1.40：保存时静态 SSRF 校验（协议/主机/IP 字面量，不发 DNS）——外部 MCP 地址若指向
+     * 保存时静态 SSRF 校验（协议/主机/IP 字面量，不发 DNS）——外部 MCP 地址若指向
      * 内网/云元数据，平台服务端作为跳板可探测内网。投递时 McpClientService 还会做 DNS 复核。
      */
     private void validateUrl(String url) {

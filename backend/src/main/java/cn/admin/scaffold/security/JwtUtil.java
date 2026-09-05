@@ -26,7 +26,7 @@ public class JwtUtil {
     }
 
     /**
-     * 签发访问令牌。R1-1.7：token 携带 tenantId，认证链（JwtAuthenticationFilter / refresh）
+     * 签发访问令牌。token 携带 tenantId，认证链（JwtAuthenticationFilter / refresh）
      * 在首个数据库查询前先据其就位租户上下文，避免租户拦截器注入默认 tenant_id=1 使
      * 非租户 1 用户的角色/权限/用户查询全部落空。
      */

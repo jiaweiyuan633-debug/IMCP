@@ -8,7 +8,7 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     accessToken: getAccessToken(),
     userInfo: null as UserInfo | null,
-    // R4-1.47（批次1）：记录"必须修改密码"状态（默认口令首登 / 密码过期），由路由守卫强制跳转改密页
+    // 记录"必须修改密码"状态（默认口令首登 / 密码过期），由路由守卫强制跳转改密页
     mustChangePassword: false,
   }),
   getters: {

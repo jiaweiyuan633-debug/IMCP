@@ -2,7 +2,8 @@
 # nginx-unprivileged 以 UID 101 运行（与 k8s securityContext.runAsUser 对齐），监听 8080
 FROM node:22-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# corepack 固定 pnpm 版本（与 package.json packageManager / CI pnpm 11.16.0 对齐）
+RUN corepack enable && corepack prepare pnpm@11.16.0 --activate
 # 国内网络直连 npmjs 慢且易超时，用 .npmrc 切 npmmirror（pnpm 只认 .npmrc / pnpm config，
 # 不认 npm_config_registry 环境变量）
 RUN echo "registry=https://registry.npmmirror.com" > .npmrc

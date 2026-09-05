@@ -352,7 +352,7 @@ if (Invoke-Kubectl -Arguments @('get', 'crd', 'applications.argoproj.io') -Quiet
 Write-Host ''
 Write-Host ("verify-cluster result: PASS={0} FAIL={1} INFO={2}" -f $script:PassCount, $script:FailCount, $script:InfoCount)
 if ($script:FailCount -gt 0) {
-    Write-Host '判定：存在 FAIL → No-Go（先整改再复检）。'
+    Write-Host '判定：存在 FAIL → No-Go（处理后再复检）。'
     Write-Host '重试提示：按上方 [FAIL] 说明与 docs/deploy/cluster-go-nogo.md §2-§6 处置后重新执行本脚本（默认只读集群可重复运行；-ProbeRWX 会临时创建并删除探测 PVC）。'
     exit 1
 }

@@ -110,7 +110,7 @@ public class FileContentController {
     }
 
     /**
-     * R3-1.2：文件受访问令牌保护（URL 携带绑定用户的 token），是私有资源，
+     * 文件受访问令牌保护（URL 携带绑定用户的 token），是私有资源，
      * 只允许浏览器（含缓存复用）缓存，禁止共享代理/CDN 缓存——public 会让
      * 公共缓存保留含 token 的 URL，扩大令牌泄露面。max-age 与令牌有效期对齐，
      * 缓存命中时令牌必然仍有效。

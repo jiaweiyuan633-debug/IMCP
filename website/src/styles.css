@@ -181,6 +181,13 @@ a {
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .btn-primary {
   background: var(--brand);
   color: #fff;
@@ -462,6 +469,19 @@ a {
   color: #e2e8f0;
 }
 
+/* 演示模式占位：env 未注入联系方式时的中性提示 */
+.contact-demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: #94a3b8;
+}
+
+.contact-demo svg {
+  flex: none;
+}
+
 .contact-form {
   background: #fff;
   color: var(--ink);
@@ -502,6 +522,27 @@ a {
   color: var(--accent) !important;
   font-weight: 600;
   margin: 0;
+}
+
+/* 演示模式 / 提交失败提示 */
+.demo-tip {
+  color: #b45309 !important;
+  font-weight: 600;
+  margin: 0;
+}
+
+.submit-tip.error {
+  color: #dc2626 !important;
+}
+
+/* honeypot：移出可视区且不可 Tab 聚焦，仅机器人自动填写命中 */
+.hp-wrap {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 .site-footer {

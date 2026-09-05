@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 预签名直传/直链端点（批次2c）。
+ * 预签名直传/直链端点。
  */
 @RestController
 @RequestMapping("/api/common/file/presign")

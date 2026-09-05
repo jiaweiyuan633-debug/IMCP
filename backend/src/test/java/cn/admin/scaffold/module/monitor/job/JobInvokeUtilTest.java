@@ -16,7 +16,7 @@ class JobInvokeUtilTest {
 
     @Test
     void rejectsFormatWithNonAlphanumericChars() {
-        // 批次2：invokeTarget 仅允许字母数字下划线——路径穿越/类名注入/空格一律拒绝
+        // invokeTarget 仅允许字母数字下划线——路径穿越/类名注入/空格一律拒绝
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("a/b.c"));
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("a.b;DROP"));
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("a b.c"));
@@ -27,7 +27,7 @@ class JobInvokeUtilTest {
 
     @Test
     void rejectsUnregisteredBeanMethod() {
-        // 批次2：未在注册表登记的方法一律不可触发——即使 bean 存在且有无参方法
+        // 未在注册表登记的方法一律不可触发——即使 bean 存在且有无参方法
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("demoTask.shutdown"));
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("scheduler.shutdown"));
         assertThrows(IllegalArgumentException.class, () -> JobInvokeUtil.validate("tokenService.evictAllPermissions"));
@@ -35,7 +35,7 @@ class JobInvokeUtilTest {
 
     @Test
     void acceptsRegisteredBeanMethod() {
-        // 批次2：显式登记的方法放行（demoTask.runDemo 为内置示例）
+        // 显式登记的方法放行（demoTask.runDemo 为内置示例）
         assertDoesNotThrow(() -> JobInvokeUtil.validate("demoTask.runDemo"));
     }
 

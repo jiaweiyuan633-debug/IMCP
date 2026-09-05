@@ -58,7 +58,7 @@ public class SystemConfigService {
         checkKeyUnique(request.getConfigKey(), null);
         SysConfigDO config = toEntity(request);
         configMapper.insert(config);
-        // R4-1.31：原 @CacheEvict(allEntries=true) 改任意租户配置会清空全部租户缓存，改为按键+租户精确失效
+        // 不再用 @CacheEvict(allEntries=true)（改任意租户配置会清空全部租户缓存），改为按键+租户精确失效
         evictConfig(request.getConfigKey());
         return config.getId();
     }
@@ -81,7 +81,7 @@ public class SystemConfigService {
 
     public void delete(Long id) {
         SysConfigDO existing = configMapper.selectById(id);
-        // 批次4（R4-1.50）：逻辑删除 + (tenant_id, config_key) 唯一键冲突——删除前释放编码唯一键
+        // 逻辑删除 + (tenant_id, config_key) 唯一键冲突——删除前释放编码唯一键
         if (existing != null) {
             String originalKey = existing.getConfigKey();
             existing.setConfigKey(UniqueKeyRelease.releaseCode(existing.getConfigKey()));

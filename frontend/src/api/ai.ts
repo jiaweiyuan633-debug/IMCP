@@ -30,7 +30,7 @@ export interface AiTaskVo {
   bizType: string
   bizId?: number
   serviceCode: string
-  /** 服务展示名（R4-1.24 列表批量解析，缺省回退 serviceCode） */
+  /** 服务展示名（列表批量解析，缺省回退 serviceCode） */
   serviceName?: string
   status: string
   paramsJson?: string
@@ -41,7 +41,7 @@ export interface AiTaskVo {
   timeoutSeconds: number
   callbackUrl?: string
   createdBy?: number
-  /** 创建人姓名（R4-1.24 列表批量解析，缺省留空由前端兜底 '-'） */
+  /** 创建人姓名（列表批量解析，缺省留空由前端兜底 '-'） */
   createdByName?: string
   createdAt?: string
   updatedAt?: string
@@ -96,7 +96,7 @@ export interface AiTaskRetryResult {
   failedIds: number[]
 }
 
-/** R4-1.25：批量重试终态失败任务（后端单次上限 100），返回成功/跳过/失败分类计数。 */
+/** 批量重试终态失败任务（后端单次上限 100），返回成功/跳过/失败分类计数。 */
 export function retryAiTasks(ids: number[]): Promise<AiTaskRetryResult> {
   return request.post('/ai/tasks/retry', { ids })
 }

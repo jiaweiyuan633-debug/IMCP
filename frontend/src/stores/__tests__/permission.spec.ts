@@ -4,7 +4,7 @@ import { usePermissionStore } from '@/stores/permission'
 import type { UserInfo } from '@/types'
 
 /**
- * R4-1.53（批次7）：权限 store 契约测试——setRoutes 应用菜单/权限/路由加载标记，
+ * 权限 store 契约测试——setRoutes 应用菜单/权限/路由加载标记，
  * reset 全量清空。此前 router/stores 为前端安全相关逻辑但零测试（覆盖率门槛被
  * utils 100% 拉高掩盖）。
  */

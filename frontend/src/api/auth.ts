@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 import type { CaptchaResponse, LoginConfigVo, LoginForm, LoginResponse, UserInfo } from '@/types'
 
-// R4-1.32：所有调用显式携带 <T>，与函数声明的返回类型对齐——
+// 所有调用显式携带 <T>，与函数声明的返回类型对齐——
 // 泛型化 request 使"接口实际数据形状"与"api 声明的返回类型"在编译期绑定。
 export function login(data: LoginForm): Promise<LoginResponse> {
   return request.post<LoginResponse>('/auth/login', data)

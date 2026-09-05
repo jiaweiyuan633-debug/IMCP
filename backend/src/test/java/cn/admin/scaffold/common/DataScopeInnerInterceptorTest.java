@@ -117,7 +117,7 @@ class DataScopeInnerInterceptorTest {
         assertThat(boundSql.getSql()).contains("sys_field_audit_log.user_id IN (3, 7)");
     }
 
-    // ---------- 批次4（R4-1.50）：子查询绕过 fail-closed + 非 PlainSelect 拒绝 ----------
+    // ---------- 子查询绕过 fail-closed + 非 PlainSelect 拒绝 ----------
 
     @Test
     void rejectsControlledTableOnlyInSubquery() {

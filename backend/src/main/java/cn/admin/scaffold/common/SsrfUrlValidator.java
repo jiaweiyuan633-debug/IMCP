@@ -7,7 +7,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 
 /**
- * 出站 HTTP(S) URL 的 SSRF 防护校验（R4-1.13）。
+ * 出站 HTTP(S) URL 的 SSRF 防护校验。
  *
  * <p>告警 Webhook、通用 Webhook 渠道等入口允许管理员配置任意 URL，若服务端直接请求，
  * 恶意或误配的地址可把服务端当跳板探测/攻击内网（云元数据 169.254.169.254、内网管理面、

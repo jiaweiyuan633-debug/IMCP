@@ -49,7 +49,7 @@ class DataPermissionRuleResolverTest {
         assertThat(resolver.resolve("sys_login_log").usernameColumn()).isEqualTo("username");
     }
 
-    /** R4-1.37：V61 注册的提交记录/导入导出任务表映射可被解析器识别。 */
+    /** V61 注册的提交记录/导入导出任务表映射可被解析器识别。 */
     @Test
     void resolvesBatch10RegisteredBusinessTables() {
         when(mapper.selectList(any())).thenReturn(List.of(

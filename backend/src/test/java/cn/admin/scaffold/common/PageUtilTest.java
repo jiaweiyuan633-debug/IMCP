@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 内存分页越界钳制（R4-1.39）：pageNum=0/负数或 pageSize≤0 时旧逻辑 (pageNum-1)*pageSize
+ * 内存分页越界钳制：pageNum=0/负数或 pageSize≤0 时旧逻辑 (pageNum-1)*pageSize
  * 为负/越界，subList 抛 IndexOutOfBoundsException 落 500；PageUtil 钳制后归位安全区间。
  */
 class PageUtilTest {

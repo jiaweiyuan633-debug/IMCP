@@ -19,7 +19,7 @@ public class AiCallbackRequest {
     private Object result;
     private String error;
 
-    /** R4-1.20：AI 侧失败分类（timeout / non_retryable / retries_exhausted），成功回调为 null。 */
+    /** AI 侧失败分类（timeout / non_retryable / retries_exhausted），成功回调为 null。 */
     @JsonProperty("reason")
     private String errorType;
 }

@@ -59,9 +59,9 @@ public class DistributedLock {
     /**
      * 便捷重载：默认最多等 3s、租约交给看门狗自动续期（执行时长不限）。
      *
-     * <p>R4-1.30 修正：此前固定 10s 租约且无看门狗续期，执行超过 10s 锁即自动释放，
-     * 另一实例可并发进入临界区（如大文件合并）；改为 0 租约启用 Redisson 看门狗，
-     * 长任务锁不会中途丢失。
+     * <p>租约语义：固定短租约且无看门狗续期时，执行超过租约时长锁会自动释放，
+     * 另一实例可并发进入临界区（如大文件合并）。此处以 0 租约启用 Redisson 看门狗
+     * 自动续期，长任务锁不会中途丢失。
      */
     public <T> T execute(String lockKey, Supplier<T> action) {
         return execute(lockKey, Duration.ofSeconds(3), Duration.ZERO, action);

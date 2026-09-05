@@ -46,7 +46,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R1-1.7 回归测试：登录/刷新链路必须跨租户定位用户，且 token 携带租户上下文。
+ * 回归测试：登录/刷新链路必须跨租户定位用户，且 token 携带租户上下文。
  *
  * <p>根因：登录、刷新、JWT 过滤器查询租户表时租户上下文尚未就位，租户拦截器注入默认
  * tenant_id=1，非租户 1 用户无法登录/刷新。修复：login 改用豁免租户拦截器的 selectByUsername
@@ -190,7 +190,7 @@ class AuthServiceLoginTest {
         when(claims.getSubject()).thenReturn("10");
         when(claims.get("tenantId")).thenReturn(2L);
         when(jwtUtil.parse("refresh-token")).thenReturn(claims);
-        // R4-1.44：refresh 改为原子消费（GETDEL），stub 返回签发时存入的 userId
+        // refresh 改为原子消费（GETDEL），stub 返回签发时存入的 userId
         when(tokenService.consumeRefreshToken("rt-1")).thenReturn("10");
         AtomicLong tenantAtUserQuery = new AtomicLong();
         SysUserDO user = tenantUser(10L, 2L, "zhangsan");
@@ -212,7 +212,7 @@ class AuthServiceLoginTest {
 
     @Test
     void refreshRejectsWhenRefreshTokenAlreadyConsumed() {
-        // R4-1.44：原子消费（GETDEL）下，已被并发请求消费/已过期的 refresh token 返回 null，
+        // 原子消费（GETDEL）下，已被并发请求消费/已过期的 refresh token 返回 null，
         // 必须拒绝而非继续签发——原 hasKey+delete 两步会让并发双请求都通过检查各自换新
         Claims claims = mock(Claims.class);
         when(claims.getId()).thenReturn("rt-1");
@@ -226,7 +226,7 @@ class AuthServiceLoginTest {
         verify(userMapper, never()).selectById(any());
     }
 
-    // ---------- R4-1.39：登录失败锁定键带租户维度 + 超过阈值指数退避 ----------
+    // ---------- 登录失败锁定键带租户维度 + 超过阈值指数退避 ----------
 
     /** 锁定键按请求租户维度落键：租户 2 的 victim 被锁，不再连带锁掉租户 1 同名账号。 */
     @Test

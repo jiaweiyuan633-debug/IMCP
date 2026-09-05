@@ -23,14 +23,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.4 + R4-1.9：AI 任务 SSE 轮询任务的生命周期与连接治理。SseEmitter 在未关联 HTTP 响应的
+ * AI 任务 SSE 轮询任务的生命周期与连接治理。SseEmitter 在未关联 HTTP 响应的
  * 纯单元测试环境下不触发 onCompletion/onError 回调，故无法直接断言「emitter 完成 → future 取消」；
  * 测试改为锁定可观测契约：
  * 1) 轮询任务首轮显式推延一个周期（线程池实现 (Runnable, Duration) 重载硬编码 delay=0）；
  * 2) emit() 对终态/异常调用 complete/completeWithError（emitter 完成后 send 抛 ISE）；
  * 3) cancelScheduledTask 的取消语义（cancel(false)、空引用安全）；
- * 4) R4-1.9：连接时先经 AiTaskService.openStream 校验访问权，拒绝则不建立连接、不调度轮询；
- * 5) R4-1.9：每用户连接上限，超限回收最旧连接（complete() 使旧 emitter send 抛 ISE）。
+ * 4) 连接时先经 AiTaskService.openStream 校验访问权，拒绝则不建立连接、不调度轮询；
+ * 5) 每用户连接上限，超限回收最旧连接（complete() 使旧 emitter send 抛 ISE）。
  */
 class AiTaskStreamServiceTest {
 
@@ -75,7 +75,7 @@ class AiTaskStreamServiceTest {
 
     @Test
     void accessDeniedAtConnectTimeRejectsWithoutSchedulingPolling() {
-        // R4-1.9：openStream 抛 FORBIDDEN（非管理员查看他人任务）→ 连接被拒，不建立 emitter 也不调度
+        // openStream 抛 FORBIDDEN（非管理员查看他人任务）→ 连接被拒，不建立 emitter 也不调度
         when(taskService.openStream(1L, USER_ID))
                 .thenThrow(new BusinessException(ResultCode.FORBIDDEN));
 
@@ -170,7 +170,7 @@ class AiTaskStreamServiceTest {
 
     @Test
     void cancelScheduledTaskIsNullSafe() {
-        // futureRef 未填充（调度尚未完成）时调用不抛异常
+        // futureRef 未填充（调度尚未启动）时调用不抛异常
         assertThatCode(() -> AiTaskStreamService.cancelScheduledTask(new AtomicReference<>()))
                 .doesNotThrowAnyException();
     }

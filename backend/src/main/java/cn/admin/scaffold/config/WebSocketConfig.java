@@ -17,7 +17,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final MessageWebSocketHandler messageWebSocketHandler;
 
-    // 与 SecurityConfig 同源同兜底：未配置时拒绝全部跨域来源（R4-1.45）
+    // 与 SecurityConfig 同源同兜底：未配置时拒绝全部跨域来源
     @Value("${app.cors.allowed-origin-patterns:}")
     private String allowedOriginPatterns;
 

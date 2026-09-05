@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * R4-1.29：工作流超时扫描器多租户回归。修复前 @Scheduled 线程无租户上下文，selectList 被
+ * 工作流超时扫描器多租户回归。修复前 @Scheduled 线程无租户上下文，selectList 被
  * 租户拦截器注入默认 tenant_id=1，仅扫到租户 1；修复后按 selectTenantIds 逐租户就位上下文，
  * 断言 updateById 时 ThreadLocal 恒等于流程归属租户（租户 2 的提醒可正常触发）。
  */

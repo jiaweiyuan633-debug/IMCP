@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 /**
  * 导入导出任务实体。任务由 ImportExportJobProcessor 轮询处理，状态机 PENDING→PROCESSING→SUCCEEDED/FAILED。
  * 注意：import_export_job 表无 updated_by 列，实体不声明该字段。
- * createdBy（R4-1.38）为批10 数据权限按创建人过滤的关联列，创建任务时由 Service 显式填充。
+ * createdBy 为数据权限按创建人过滤的关联列（此前因实体未声明而落空），创建任务时由 Service 显式填充。
  */
 @Data
 @TableName("import_export_job")

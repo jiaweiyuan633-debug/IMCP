@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.admin.scaffold.common.BusinessException;
 import cn.admin.scaffold.common.PageResult;
 import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.UniqueKeyRelease;
 import cn.admin.scaffold.module.notice.dto.MessageTemplateQuery;
 import cn.admin.scaffold.module.notice.dto.MessageTemplateSaveRequest;
 import cn.admin.scaffold.module.notice.dto.MessageTemplateSendRequest;
@@ -76,6 +77,13 @@ public class MessageTemplateService {
 
     @Transactional
     public void delete(Long id) {
+        // 逻辑删除前先释放 template_code 唯一键（(tenant_id, template_code)）：删除后同编码模板可立即重建
+        SysMessageTemplateDO template = templateMapper.selectById(id);
+        if (template == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND);
+        }
+        template.setTemplateCode(UniqueKeyRelease.releaseCode(template.getTemplateCode()));
+        templateMapper.updateById(template);
         templateMapper.deleteById(id);
     }
 

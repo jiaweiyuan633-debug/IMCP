@@ -5,6 +5,7 @@ import cn.admin.scaffold.common.ResultCode;
 import cn.admin.scaffold.security.ApiPermAuthorizationFilter;
 import cn.admin.scaffold.security.JwtAuthenticationFilter;
 import cn.admin.scaffold.security.JwtProperties;
+import cn.admin.scaffold.security.PasswordPolicyEnforcementFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -38,18 +39,21 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final PasswordPolicyEnforcementFilter passwordPolicyEnforcementFilter;
     private final ApiPermAuthorizationFilter apiPermAuthorizationFilter;
     private final ObjectMapper objectMapper;
 
     // 兜底为空串而非 "*"：未配置（含 application.yml 缺省段被移除）时拒绝全部跨域来源，
-    // 与 application-prod.yml 的"缺省拒绝"对齐，避免凭据跨域意外全开（R4-1.45）。
+    // 与 application-prod.yml 的"缺省拒绝"对齐，避免凭据跨域意外全开。
     @Value("${app.cors.allowed-origin-patterns:}")
     private String allowedOriginPatterns;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          PasswordPolicyEnforcementFilter passwordPolicyEnforcementFilter,
                           ApiPermAuthorizationFilter apiPermAuthorizationFilter,
                           ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.passwordPolicyEnforcementFilter = passwordPolicyEnforcementFilter;
         this.apiPermAuthorizationFilter = apiPermAuthorizationFilter;
         this.objectMapper = objectMapper;
     }
@@ -59,6 +63,11 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
+                // 全局安全响应头：显式声明 X-Content-Type-Options: nosniff（防浏览器 MIME 嗅探执行
+                // 非预期类型响应）与 frame-options（防点击劫持）；其余默认头（HSTS 等）保持框架默认
+                .headers(headers -> headers
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .frameOptions(Customizer.withDefaults()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -101,7 +110,9 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, accessDeniedException) ->
                                 writeError(response, HttpServletResponse.SC_FORBIDDEN, ResultCode.FORBIDDEN)))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(apiPermAuthorizationFilter, JwtAuthenticationFilter.class);
+                // 链路顺序：JWT 认证 → 口令生命周期强制（受限账号除白名单外 403）→ API 资源权限校验
+                .addFilterAfter(passwordPolicyEnforcementFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(apiPermAuthorizationFilter, PasswordPolicyEnforcementFilter.class);
         return http.build();
     }
 

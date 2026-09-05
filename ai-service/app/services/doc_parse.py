@@ -6,18 +6,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 from typing import Any
 
+from app.core.threads import run_cpu
 from app.rag import UnsupportedFormatError, parse_document
 from app.services.base import BaseTaskService
 from app.services.context import ServiceContext
 from app.tasks.errors import NonRetryableError
 
-# 批次3（R4-1.49）：单文档解码后字节上限（50MB）——超大文档在事件循环线程池中
-# 长时间占用执行线程、放大租约窗口，且拖慢同进程所有请求
+# 单文档解码后字节上限（50MB）——超大文档长时间占用有界 CPU 线程、放大租约窗口
 MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
+# base64 长度上限（对 MAX_DOCUMENT_BYTES 的编码上界，按 4/3 扩容并向上取整）：
+# 先于解码预估长度、超限直接拒绝，避免为超大 payload 白白解码
+MAX_ENCODED_LENGTH = ((MAX_DOCUMENT_BYTES + 2) // 3) * 4
 
 
 class DocParseService(BaseTaskService):
@@ -29,15 +31,19 @@ class DocParseService(BaseTaskService):
         content_b64 = params.get("content_b64")
         if not filename or not content_b64:
             raise ValueError("filename 与 content_b64 必填")
-        # 批次3：base64 解码与文档解析均为 CPU 密集（100 页 PDF 可冻结事件循环数秒），
-        # 移入线程池执行；解析前做字节上限与超时裁剪
-        content = await asyncio.to_thread(base64.b64decode, content_b64)
+        # 解码前按编码长度预估拒绝超大输入（base64 解码与解析均为 CPU 密集且线程内
+        # 不可中断，只能以输入规模预检 + 有界线程池控制占用）
+        if len(str(content_b64)) > MAX_ENCODED_LENGTH:
+            raise NonRetryableError(
+                f"文档超过 {MAX_DOCUMENT_BYTES // 1024 // 1024}MB 上限，请拆分后上传"
+            )
+        content = await run_cpu(base64.b64decode, content_b64)
         if len(content) > MAX_DOCUMENT_BYTES:
             raise NonRetryableError(
                 f"文档超过 {MAX_DOCUMENT_BYTES // 1024 // 1024}MB 上限，请拆分后上传"
             )
         try:
-            pages = await asyncio.to_thread(parse_document, filename, content)
+            pages = await run_cpu(parse_document, filename, content)
         except UnsupportedFormatError as exception:
             raise NonRetryableError(str(exception)) from exception
         return {

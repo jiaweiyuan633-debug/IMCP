@@ -1,7 +1,7 @@
 package cn.admin.scaffold.common;
 
 /**
- * 内存分页越界钳制（R4-1.39）：pageNum/pageSize 直接来自客户端查询参数，pageNum=0/负数时
+ * 内存分页越界钳制：pageNum/pageSize 直接来自客户端查询参数，pageNum=0/负数时
  * (pageNum-1)*pageSize 为负，subList 负下标抛 IndexOutOfBoundsException 落 500（DoS 面）。
  * 统一钳制 pageNum≥1、pageSize≥1 后计算 from/to，与 MyBatis-Plus {@code PaginationInnerInterceptor
  * .setMaxLimit} 的 DB 分页上界配合，堵住分页参数的越界 500 与全表分页。

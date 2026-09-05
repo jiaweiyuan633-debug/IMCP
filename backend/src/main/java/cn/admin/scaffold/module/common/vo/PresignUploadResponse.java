@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 预签名直传签发响应（批次2c）。
+ * 预签名直传签发响应。
  * supported=false 表示存储后端不支持预签名，前端应回退普通/分片上传。
  */
 @Data
