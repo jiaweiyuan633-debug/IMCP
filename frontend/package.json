@@ -41,7 +41,7 @@
     "eslint-plugin-vue": "^9.32.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.4.2",
-    "storybook": "^10.5.7",
+    "storybook": "^10.6.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.66.0",
     "unplugin-vue-components": "^32.1.0",
