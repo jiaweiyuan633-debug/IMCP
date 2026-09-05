@@ -1,0 +1,46 @@
+# AlertManager 配置
+#
+# 与 prometheus.yml / prometheus-rules.yml 同目录挂载。
+#
+# 原 ops@example.com 为占位接收器——部署后告警无法触达，等于静默漏报。
+# 生产必须按真实通知渠道替换下方 receivers（二选一或同时）：
+#   1. 钉钉/企微/飞书/Slack 机器人：取消 webhook_configs 注释并填机器人 URL；
+#   2. 邮件：配置 email_configs 的 to 与全局 smtp 段。
+# 部署后必须用 `amtool alertmanager notify` 或触发一条测试告警验证发送成功。
+#
+# 若以容器方式部署 AlertManager，建议用环境变量注入而非改本文件：
+#   docker run --name alertmanager -p 9093:9093 \
+#     -v $(pwd)/k8s/monitoring:/etc/alertmanager:ro \
+#     -e ALERTMANAGER_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=xxx \
+#     prom/alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+# （配合下方 envsubst 或 sed 替换占位符）
+route:
+  # 相同告警名 + 作业归组，避免刷屏
+  group_by: ['alertname', 'job']
+  group_wait: 30s        # 同组首条告警等待窗口，聚合突发告警
+  group_interval: 5m     # 同组新告警发送间隔
+  repeat_interval: 4h    # 未恢复告警的重复提醒间隔
+  receiver: default
+
+receivers:
+  - name: default
+    # 示例 1：钉钉机器人（替换 URL 后启用；send_resolved 恢复时也通知）
+    # webhook_configs:
+    #   - url: https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN
+    #     send_resolved: true
+    # 示例 2：企业微信机器人
+    # webhook_configs:
+    #   - url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY
+    #     send_resolved: true
+    # 示例 3：邮件（需同时配置下方 smtp 全局段）
+    # email_configs:
+    #   - to: ops@your-company.com
+    #     send_resolved: true
+
+# 邮件发送全局配置（启用 email_configs 时取消注释并填写真实 SMTP）
+# global:
+#   smtp_smarthost: smtp.your-company.com:465
+#   smtp_from: alertmanager@your-company.com
+#   smtp_auth_username: alertmanager@your-company.com
+#   smtp_auth_password: YOUR_SMTP_PASSWORD
+#   smtp_require_tls: true

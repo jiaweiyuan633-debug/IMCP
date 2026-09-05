@@ -1,0 +1,106 @@
+package cn.admin.scaffold.security;
+
+import cn.admin.scaffold.config.SecurityProperties;
+import cn.admin.scaffold.module.system.mapper.SysMenuMapper;
+import cn.admin.scaffold.module.system.mapper.SysRoleMapper;
+import cn.admin.scaffold.module.system.mapper.SysUserMapper;
+import cn.admin.scaffold.module.system.entity.SysUserDO;
+import cn.admin.scaffold.common.TenantContext;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtUtil jwtUtil;
+    private final TokenService tokenService;
+    private final SysRoleMapper roleMapper;
+    private final SysMenuMapper menuMapper;
+    private final SysUserMapper userMapper;
+    private final SecurityProperties securityProperties;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        String token = resolveToken(request);
+        if (StringUtils.hasText(token)
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                Claims claims = jwtUtil.parse(token);
+                if (tokenService.hasValidAccessToken(claims.getId())) {
+                    Long userId = Long.valueOf(claims.getSubject());
+                    // access token 携带 tenantId，查询角色/权限/用户前先就位租户上下文。
+                    // 否则 TenantFilter 设定的默认 tenant_id=1 会让非租户 1 用户的所有认证查询落空（401）。
+                    Object tenantClaim = claims.get("tenantId");
+                    if (tenantClaim instanceof Number tenantNumber) {
+                        TenantContext.setTenantId(tenantNumber.longValue());
+                    }
+                    // 角色随权限一并走 Redis 缓存（同 TTL 抖动、同 after-commit 失效），
+                    // 消除此前每请求 2 次 DB 往返（selectRoleCodesByUserId + selectById）对 sys_user 热表的压力
+                    List<String> roles = tokenService.getCachedRoles(userId);
+                    if (roles == null) {
+                        roles = roleMapper.selectRoleCodesByUserId(userId);
+                        tokenService.cacheRoles(userId, roles);
+                    }
+                    List<String> perms = tokenService.getCachedPermissions(userId);
+                    if (perms == null) {
+                        perms = menuMapper.selectPermsByUserId(userId);
+                        tokenService.cachePermissions(userId, perms);
+                    }
+                    SysUserDO user = userMapper.selectById(userId);
+                    if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+                        SecurityContextHolder.clearContext();
+                    } else {
+                        // DB 为用户租户权威来源：用户被迁移租户后以库表为准
+                        if (user.getTenantId() != null) {
+                            TenantContext.setTenantId(user.getTenantId());
+                        }
+                        LoginUser loginUser = LoginUser.builder()
+                                .userId(userId)
+                                .deptId(user.getDeptId())
+                                .username(claims.get("username", String.class))
+                                .roles(roles)
+                                .perms(perms)
+                                // 口令生命周期判定搭车既有的 selectById 结果（每请求仅一次查库），
+                                // PasswordPolicyEnforcementFilter 直接读主体验证，避免二次查询 sys_user
+                                .passwordChangeRequired(securityProperties.isPasswordChangeRequired(
+                                        user.getMustChangePassword(), user.getPasswordChangedAt()))
+                                .build();
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        loginUser, null, loginUser.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                }
+            } catch (JwtException | IllegalArgumentException ignored) {
+                SecurityContextHolder.clearContext();
+            }
+        }
+        filterChain.doFilter(request, response);
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (StringUtils.hasText(header) && header.startsWith(SecurityUtils.BEARER_PREFIX)) {
+            return header.substring(SecurityUtils.BEARER_PREFIX.length());
+        }
+        return null;
+    }
+}
+

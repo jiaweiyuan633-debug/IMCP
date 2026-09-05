@@ -1,0 +1,278 @@
+import request from '@/utils/request'
+import type { AxiosResponse } from 'axios'
+import { parseContentDispositionFilename, triggerBlobDownload } from '@/utils/download'
+import type { PageResult } from '@/types'
+
+export interface LoginLogVo {
+  id: number
+  username: string
+  ip?: string
+  userAgent?: string
+  status: number
+  message?: string
+  loginTime?: string
+}
+
+export interface OperLogVo {
+  id: number
+  userId?: number
+  module?: string
+  action?: string
+  method?: string
+  requestUrl?: string
+  requestMethod?: string
+  params?: string
+  result?: string
+  status: number
+  errorMsg?: string
+  ip?: string
+  durationMs?: number
+  operTime?: string
+}
+
+export interface OnlineUserVo {
+  tokenId: string
+  userId: number
+  username: string
+  ip?: string
+  userAgent?: string
+  loginTime?: string
+}
+
+/** 通用「名称-数值」统计项（图表数据），与后端 report.vo.NameValueVo 对齐。 */
+export interface NameValueVo {
+  name: string
+  value: number
+}
+
+export interface DashboardStatsVo {
+  userCount: number
+  roleCount: number
+  menuCount: number
+  loginLogCount: number
+  operLogCount: number
+  aiTaskTotal: number
+  aiTaskSucceeded: number
+  aiTaskFailed: number
+  aiTaskRunning: number
+  /** FAILED 任务按失败分类(error_type)分层计数；"other" 兜底 error_type 为空的失败，各桶之和等于 aiTaskFailed */
+  aiTaskFailedByErrorType?: NameValueVo[]
+}
+
+export function getLoginLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<LoginLogVo>> {
+  return request.get('/monitor/login-log', { params, signal })
+}
+
+export function getOperLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<OperLogVo>> {
+  return request.get('/monitor/oper-log', { params, signal })
+}
+
+export function getOnlineUsers(): Promise<OnlineUserVo[]> {
+  return request.get('/monitor/online')
+}
+
+export function kickOnlineUser(tokenId: string): Promise<void> {
+  return request.delete(`/monitor/online/${tokenId}`)
+}
+
+export function clearCacheKey(key: string): Promise<void> {
+  return request.delete(`/monitor/cache/${encodeURIComponent(key)}`)
+}
+
+export function getDashboardStats(): Promise<DashboardStatsVo> {
+  return request.get('/monitor/stats')
+}
+
+export interface JobVo {
+  id: number
+  jobName: string
+  jobGroup: string
+  invokeTarget: string
+  cronExpression: string
+  misfirePolicy?: string
+  concurrent: number
+  status: number
+  remark?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function getJobPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<JobVo>> {
+  return request.get('/monitor/job', { params, signal })
+}
+
+export function createJob(data: Record<string, unknown>): Promise<number> {
+  return request.post('/monitor/job', data)
+}
+
+export function updateJob(data: Record<string, unknown>): Promise<void> {
+  return request.put('/monitor/job', data)
+}
+
+export function deleteJob(id: number): Promise<void> {
+  return request.delete(`/monitor/job/${id}`)
+}
+
+export function changeJobStatus(id: number, status: number): Promise<void> {
+  return request.put(`/monitor/job/${id}/status`, { status })
+}
+
+export function runJob(id: number): Promise<void> {
+  return request.post(`/monitor/job/${id}/run`)
+}
+
+export interface JobLogVo {
+  id: number
+  jobName?: string
+  jobGroup?: string
+  invokeTarget?: string
+  jobMessage?: string
+  status: number
+  exceptionInfo?: string
+  startTime?: string
+  endTime?: string
+}
+
+export function getJobLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<JobLogVo>> {
+  return request.get('/monitor/job/log', { params, signal })
+}
+
+export interface SchedulerStatusVo {
+  clustered: boolean
+  instanceId: string
+  instanceName: string
+  threadPoolSize: number
+  nodeCount: number
+  jobCount: number
+  triggerCount: number
+  pausedTriggerCount: number
+  errorTriggerCount: number
+  firedTriggerCount: number
+  overdueTriggerCount: number
+}
+
+export function getSchedulerStatus(): Promise<SchedulerStatusVo> {
+  return request.get('/monitor/job/scheduler/status')
+}
+
+export interface ServerMonitorVo {
+  osName: string
+  osArch: string
+  hostName: string
+  cpuCores: number
+  cpuLoad: number
+  memTotal: number
+  memUsed: number
+  memUsagePercent: number
+  jvmMax: number
+  jvmUsed: number
+  jvmUsagePercent: number
+  uptimeSeconds: number
+  disks: { name: string; total: number; used: number; usagePercent: number }[]
+}
+
+export function getServerMonitor(): Promise<ServerMonitorVo> {
+  return request.get('/monitor/server')
+}
+
+export interface SqlLogVo {
+  id: number
+  sqlText?: string
+  method?: string
+  durationMs?: number
+  success: number
+  errorMsg?: string
+  createdAt?: string
+}
+
+export function getSqlLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<SqlLogVo>> {
+  return request.get('/monitor/sql-log', { params, signal })
+}
+
+export interface AlertRuleVo {
+  id: number
+  ruleName: string
+  metric: string
+  operator: string
+  threshold: number
+  enabled: number
+  severity?: string
+  silenceMinutes?: number
+  webhookUrl?: string
+  remark?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function getAlertRulePage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<AlertRuleVo>> {
+  return request.get('/monitor/alert-rule', { params, signal })
+}
+
+export function createAlertRule(data: Record<string, unknown>): Promise<number> {
+  return request.post('/monitor/alert-rule', data)
+}
+
+export function updateAlertRule(data: Record<string, unknown>): Promise<void> {
+  return request.put('/monitor/alert-rule', data)
+}
+
+export function deleteAlertRule(id: number): Promise<void> {
+  return request.delete(`/monitor/alert-rule/${id}`)
+}
+
+export function runAlertRuleCheck(): Promise<number> {
+  return request.post('/monitor/alert-rule/run')
+}
+
+export interface AuditLogVo {
+  id: number
+  userId?: number
+  module?: string
+  action?: string
+  params?: string
+  result?: string
+  status: number
+  createdAt?: string
+}
+
+export function getAuditLogPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<AuditLogVo>> {
+  return request.get('/monitor/audit-log', { params, signal })
+}
+
+export async function exportAuditLogs(): Promise<void> {
+  // blob 响应在拦截器中原样返回完整 AxiosResponse（保留 Content-Disposition 头），
+  // 故显式声明为 AxiosResponse<Blob> 而非解包后的数据（泛型契约）
+  const response = await request.get<AxiosResponse<Blob>>('/monitor/audit-log/export', {
+    responseType: 'blob',
+  })
+  // 优先使用后端 Content-Disposition 文件名（含导出时间戳），缺失时回退默认名
+  const filename = parseContentDispositionFilename(response.headers['content-disposition']) || 'audit-log.csv'
+  triggerBlobDownload(response.data, filename)
+}
+
+export interface FieldAuditLogVo {
+  id: number
+  userId?: number
+  module?: string
+  entityName?: string
+  entityId?: number
+  action?: string
+  changedFields?: string
+  beforeData?: string
+  afterData?: string
+  status: number
+  createdAt?: string
+}
+
+export interface FieldChange {
+  field: string
+  label: string
+  before: string | null
+  after: string | null
+}
+
+export function getFieldAuditPage(params: Record<string, unknown>, signal?: AbortSignal): Promise<PageResult<FieldAuditLogVo>> {
+  return request.get('/monitor/field-audit', { params, signal })
+}
+
+

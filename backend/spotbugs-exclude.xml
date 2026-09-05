@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs 排除白名单（批次9·R4-1.55 起随 spotbugs:check 绑 verify 成为硬门禁）。
+
+  设计原则：
+  1. 只豁免"设计内、无真实暴露路径"的引用暴露（EI 系列）；DM_CONVERT_CASE / BX_UNBOXING / REC /
+     NP / DE / UWF / OBL / RV / ST_WRITE 等一律代码真修，不进白名单；
+  2. 豁免按"类范畴/命名后缀"落到白名单并写理由，审计可复核；
+  3. Lombok 生成方法本可按 @lombok.Generated（backend/lombok.config）精确豁免，但 SpotBugs 4.8.6
+     filter 的 Annotation 子句只匹配 bug 主类的类级注解、方法级注解不生效（实测仅 $Builder 整类
+     命中），故改按承载类范畴豁免；@lombok.Generated 仍保留，供审计/IDE 区分生成代码。
+
+  规则索引：
+  - 规则1：module.*.(dto|vo|entity) 传输/ORM 容器——Jackson/MyBatis 反射读写，调用方从不回写内部引用。
+  - 规则2：其余 cn.admin.scaffold.* 主代码类的 EI_EXPOSE_REP2——两类设计内场景：
+          a) Spring 容器注入协作 bean 存字段（controller/service/filter/interceptor/aspect，单例注入非外部可篡改）；
+          b) record/@AllArgsConstructor 规范构造器存参（事件/上下文/结果载体）。
+          注意 EI_EXPOSE_REP（getter 回传内部引用）不在此列：缓存态 getter 等真实风险仍被拦截。
+  - 规则3：Lombok @Builder 生成的 *$*Builder 累加器类。
+  - 规则4：命名后缀为 Request/Vo/Query/DO/Event/Result/Info/Properties/Response 等的
+           传输/配置容器（含 $Builder 嵌套）；与规则1不同包位置的同类容器一并按设计豁免。
+  - 规则5：个案（手写代码，改造成本高于风险，逐条注明；新增须评审）。
+-->
+<FindBugsFilter>
+    <!-- 规则1：dto / vo / entity 传输容器（含其嵌套类）上的 EI 系列。 -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="~cn\.admin\.scaffold\.module\.[A-Za-z0-9_]+\.(dto|vo|entity)\.[A-Za-z0-9_$]*"/>
+    </Match>
+
+    <!-- 规则2：其余主代码类的 EI_EXPOSE_REP2（Spring 注入 / record 规范构造器）。 -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="~cn\.admin\.scaffold\.(module|common|config|security)\.[A-Za-z0-9_$.]*"/>
+    </Match>
+
+    <!-- 规则3：Lombok @Builder 生成的 Builder 累加器类。 -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="~cn\.admin\.scaffold\.[A-Za-z0-9_$.]*\$[A-Za-z0-9_]*Builder$"/>
+    </Match>
+
+    <!-- 规则4：传输/配置容器命名后缀（含嵌套）。 -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="~cn\.admin\.scaffold\..*(Request|Vo|Dto|DO|Query|Event|Result|Info|Properties|Response|Form|Schema|Bo|BO)$"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="~cn\.admin\.scaffold\..*\$[A-Za-z0-9_]*(Request|Vo|Dto|DO|Query|Event|Result|Info|Properties|Response|Form|Schema|Bo|BO)$"/>
+    </Match>
+
+    <!-- 规则5：个案说明（手写代码中"改造成本高于风险"或框架既定模式，逐条注明；新增须评审）。
+         5.1 DataScopeContext$Filter —— 数据权限上下文请求线程内只读数据载体（ThreadLocal 生命周期），
+             由 DataScopeInnerInterceptor 构建 SQL 后即弃用，无跨请求引用逃逸。
+         5.2 OutboxPublisher OBL —— lambda 里创建的 PreparedStatement 由 JdbcTemplate.execute
+             try/finally 负责关闭；分析器无法跨回调识别该义务。
+         5.3 SpringContextHolder ST_WRITE —— ApplicationContextAware 框架回调写静态上下文的既定写法。
+         5.4 CT_CONSTRUCTOR_THROW ×4 —— FileAccessService/SecretCipher/TotpService/MinioFileStorage
+             构造期对缺失/默认密钥做 fail-fast 校验（缺失即启动失败，属安全设计）；类由容器直建、
+             无继承/终结器攻击面（JDK21 已弃用 finalizer），抛异常留待构造中的半初始化对象无实际风险。
+         5.5 REC_CATCH_EXCEPTION —— 9 个站点全部为"try 内含声明受检异常调用、catch(Exception) 编译必需"的代码，
+             分析器对库方法 throws 建模不全致误报（编译器为准，已用 clean compile 验证收窄即编译失败）：
+             FileStorage.open throws Exception（FileStorageManager.readBackBounded）、
+             jakarta.mail.MessagingException（MailChannelSender.send）、
+             Jackson2 JsonProcessingException（FormSchemaValidator/ChannelConfigCipher/SmsChannelSender/
+             WebhookChannelSender/MessagePushRedisListener 的 readTree/readValue/writeValueAsString/treeToValue）。
+         5.6 SIC_INNER_SHOULD_BE_STATIC_ANON（风格级 Low）—— MybatisPlusConfig 一次性 TenantLineHandler
+             匿名策略对象；ThingModelService/WarmFlowProcessDefService/WarmFlowWorkflowService 的
+             Jackson TypeReference 匿名子类为「类型捕获」标准写法（须保持子类形态以保留泛型类型参数）。 -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="cn.admin.scaffold.common.DataScopeContext$Filter"/>
+    </Match>
+    <Match>
+        <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE"/>
+        <Class name="cn.admin.scaffold.common.outbox.OutboxPublisher"/>
+    </Match>
+    <Match>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+        <Class name="cn.admin.scaffold.common.SpringContextHolder"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+        <Class name="cn.admin.scaffold.common.FileAccessService"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+        <Class name="cn.admin.scaffold.common.SecretCipher"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+        <Class name="cn.admin.scaffold.module.auth.TotpService"/>
+    </Match>
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+        <Class name="cn.admin.scaffold.module.common.MinioFileStorage"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.common.FileStorageManager"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.notice.channel.MailChannelSender"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.form.FormSchemaValidator"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.notice.ChannelConfigCipher"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.notice.channel.SmsChannelSender"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.notice.channel.WebhookChannelSender"/>
+    </Match>
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="cn.admin.scaffold.module.system.MessagePushRedisListener"/>
+    </Match>
+    <Match>
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+    </Match>
+</FindBugsFilter>

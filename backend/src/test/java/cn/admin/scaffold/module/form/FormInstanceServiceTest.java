@@ -1,0 +1,271 @@
+package cn.admin.scaffold.module.form;
+
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import cn.admin.scaffold.common.BusinessException;
+import cn.admin.scaffold.common.PageResult;
+import cn.admin.scaffold.common.ResultCode;
+import cn.admin.scaffold.common.TenantContext;
+import cn.admin.scaffold.common.annotation.DataScope;
+import cn.admin.scaffold.module.form.dto.FormInstanceQuery;
+import cn.admin.scaffold.module.form.dto.FormInstanceSubmitRequest;
+import cn.admin.scaffold.module.form.entity.FormDefinitionDO;
+import cn.admin.scaffold.module.form.entity.FormInstanceDO;
+import cn.admin.scaffold.module.form.mapper.FormDefinitionMapper;
+import cn.admin.scaffold.module.form.mapper.FormInstanceMapper;
+import cn.admin.scaffold.module.form.vo.FormInstanceVo;
+import cn.admin.scaffold.module.system.DataScopeHelper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * 表单提交服务单测：数据校验传导、未发布拒绝、状态流转。
+ */
+@ExtendWith(MockitoExtension.class)
+class FormInstanceServiceTest {
+
+    @Mock
+    private FormInstanceMapper formInstanceMapper;
+
+    @Mock
+    private FormDefinitionMapper formDefinitionMapper;
+
+    @Mock
+    private FormSchemaValidator schemaValidator;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    @Mock
+    private DataScopeHelper dataScopeHelper;
+
+    @InjectMocks
+    private FormInstanceService formInstanceService;
+
+    @BeforeAll
+    static void registerMybatisPlusTableInfo() {
+        registerTableInfo(FormDefinitionDO.class);
+        registerTableInfo(FormInstanceDO.class);
+    }
+
+    private static void registerTableInfo(Class<?> entityClass) {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""), entityClass);
+    }
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void submitToPublishedDefinitionPersists() throws JsonProcessingException {
+        when(formDefinitionMapper.selectOne(any())).thenReturn(publishedDef(1L, "FORM-SUB"));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"name\":\"张三\"}");
+        doAnswer(invocation -> {
+            ((FormInstanceDO) invocation.getArgument(0)).setId(21L);
+            return 1;
+        }).when(formInstanceMapper).insert(any(FormInstanceDO.class));
+
+        Long id = formInstanceService.submit(submitRequest("BIZ-001", "FORM-SUB", Map.of("name", "张三")));
+
+        assertThat(id).isEqualTo(21L);
+        ArgumentCaptor<FormInstanceDO> captor = ArgumentCaptor.forClass(FormInstanceDO.class);
+        verify(formInstanceMapper).insert(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo("SUBMITTED");
+        assertThat(captor.getValue().getFormCode()).isEqualTo("FORM-SUB");
+        assertThat(captor.getValue().getFormId()).isEqualTo(1L);
+    }
+
+    @Test
+    void submitToDraftDefinitionRejected() {
+        FormDefinitionDO draft = publishedDef(2L, "FORM-DRAFT");
+        draft.setStatus(0);
+        when(formDefinitionMapper.selectOne(any())).thenReturn(draft);
+
+        assertThatThrownBy(() -> formInstanceService.submit(submitRequest("BIZ-002", "FORM-DRAFT", Map.of())))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.DATA_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void submitToMissingDefinitionRejected() {
+        when(formDefinitionMapper.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> formInstanceService.submit(submitRequest("BIZ-003", "FORM-NONE", Map.of())))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(ResultCode.DATA_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void submitPropagatesDataValidationError() {
+        when(formDefinitionMapper.selectOne(any())).thenReturn(publishedDef(3L, "FORM-VAL"));
+        doThrow(new BusinessException(ResultCode.FORM_DATA_INVALID.getCode(), "字段【姓名】为必填项"))
+                .when(schemaValidator).validateData(any(), any());
+
+        assertThatThrownBy(() -> formInstanceService.submit(submitRequest("BIZ-004", "FORM-VAL", Map.of())))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("姓名");
+    }
+
+    @Test
+    void approveMovesSubmittedToApproved() {
+        // 审批先做存在性 + 归属校验（admin 短路），再 CAS
+        when(formInstanceMapper.selectById(5L)).thenReturn(instance(5L, 1L));
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(formInstanceMapper.casStatus(5L, "APPROVED")).thenReturn(1);
+
+        formInstanceService.approve(5L, "APPROVED");
+
+        verify(formInstanceMapper).casStatus(5L, "APPROVED");
+    }
+
+    @Test
+    void approveRejectsInvalidTargetStatus() {
+        assertThatThrownBy(() -> formInstanceService.approve(5L, "PROCESSING"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("非法审批状态");
+    }
+
+    @Test
+    void approveRejectsAlreadyProcessedState() {
+        // CAS 命中 0 行 = 记录不存在或已被并发流转 → 拒绝，防止重复/覆盖审批
+        when(formInstanceMapper.selectById(6L)).thenReturn(instance(6L, 1L));
+        when(dataScopeHelper.isAdmin()).thenReturn(true);
+        when(formInstanceMapper.casStatus(6L, "REJECTED")).thenReturn(0);
+
+        assertThatThrownBy(() -> formInstanceService.approve(6L, "REJECTED"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("待审批");
+    }
+
+    @Test
+    void pageFiltersByFormCode() throws JsonProcessingException {
+        FormInstanceDO ins = new FormInstanceDO();
+        ins.setId(1L);
+        ins.setFormCode("FORM-P");
+        ins.setDataJson("{\"name\":\"张三\"}");
+        ins.setStatus("SUBMITTED");
+        @SuppressWarnings("unchecked")
+        IPage<FormInstanceDO> page = mock(IPage.class);
+        when(page.getRecords()).thenReturn(List.of(ins));
+        when(page.getTotal()).thenReturn(1L);
+        when(page.getCurrent()).thenReturn(1L);
+        when(page.getSize()).thenReturn(10L);
+        when(formInstanceMapper.selectPage(any(), any())).thenReturn(page);
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(Map.of("name", "张三"));
+
+        FormInstanceQuery query = new FormInstanceQuery();
+        query.setPageNum(1);
+        query.setPageSize(10);
+        query.setFormCode("FORM-P");
+        PageResult<FormInstanceVo> result = formInstanceService.page(query);
+
+        assertThat(result.getRecords()).hasSize(1);
+        assertThat(result.getRecords().get(0).getData()).containsEntry("name", "张三");
+    }
+
+    /** 提交记录分页标注行级数据权限（受控表映射见 V61 迁移）。 */
+    @Test
+    void pageIsAnnotatedWithDataScopeForFormInstance() throws NoSuchMethodException {
+        DataScope annotation = FormInstanceService.class
+                .getMethod("page", FormInstanceQuery.class)
+                .getAnnotation(DataScope.class);
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.tables()).containsExactly("form_instance");
+    }
+
+    // ---------- 单条路径数据权限补漏（getById/approve 归属校验） ----------
+
+    /** 非管理员读取他人提交记录：越权 FORBIDDEN。 */
+    @Test
+    void getByIdRejectsOthersSubmissionForNonAdmin() {
+        when(formInstanceMapper.selectById(100L)).thenReturn(instance(100L, 2L));
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(1L));
+
+        assertThatThrownBy(() -> formInstanceService.getById(100L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getCode())
+                .isEqualTo(ResultCode.FORBIDDEN.getCode());
+    }
+
+    /** 非管理员读取自己的提交：放行并完整回显 data。 */
+    @Test
+    void getByIdAllowsOwnSubmissionForNonAdmin() throws JsonProcessingException {
+        FormInstanceDO ins = instance(101L, 1L);
+        ins.setDataJson("{\"name\":\"张三\"}");
+        when(formInstanceMapper.selectById(101L)).thenReturn(ins);
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(1L));
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(Map.of("name", "张三"));
+
+        FormInstanceVo vo = formInstanceService.getById(101L);
+
+        assertThat(vo.getSubmitterId()).isEqualTo(1L);
+        assertThat(vo.getData()).containsEntry("name", "张三");
+    }
+
+    /** 非管理员审批他人提交：越权 FORBIDDEN，且不触发 CAS 流转。 */
+    @Test
+    void approveRejectsOthersSubmissionForNonAdmin() {
+        when(formInstanceMapper.selectById(102L)).thenReturn(instance(102L, 2L));
+        when(dataScopeHelper.isAdmin()).thenReturn(false);
+        when(dataScopeHelper.allowedUserIds()).thenReturn(List.of(1L));
+
+        assertThatThrownBy(() -> formInstanceService.approve(102L, "APPROVED"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getCode())
+                .isEqualTo(ResultCode.FORBIDDEN.getCode());
+        verify(formInstanceMapper, never()).casStatus(any(), any());
+    }
+
+    private FormInstanceDO instance(Long id, Long submitterId) {
+        FormInstanceDO ins = new FormInstanceDO();
+        ins.setId(id);
+        ins.setSubmitterId(submitterId);
+        ins.setStatus("SUBMITTED");
+        return ins;
+    }
+
+    private FormDefinitionDO publishedDef(Long id, String code) {
+        FormDefinitionDO def = new FormDefinitionDO();
+        def.setId(id);
+        def.setCode(code);
+        def.setStatus(1);
+        return def;
+    }
+
+    private FormInstanceSubmitRequest submitRequest(String bizNo, String formCode, Map<String, Object> data) {
+        FormInstanceSubmitRequest request = new FormInstanceSubmitRequest();
+        request.setBizNo(bizNo);
+        request.setFormCode(formCode);
+        request.setData(data);
+        return request;
+    }
+}

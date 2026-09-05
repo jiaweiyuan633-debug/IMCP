@@ -1,0 +1,240 @@
+server:
+  port: ${SERVER_PORT:8080}
+  # 优雅停机：先停止接收新请求，给在途请求留出完成窗口
+  shutdown: graceful
+  # R2-1.3：限流/登录按 request.getRemoteAddr() 计算匿名身份，从不信任客户端可伪造的 X-Forwarded-For。
+  # 默认 none = remoteAddr 恒为 TCP 源地址（反代部署时为反代出口 IP，不可伪造；全站共享桶，更严不更松）。
+  # 仅当部署在受信任反向代理之后且代理已正确覆盖/重写 XFF 时，由运维显式注入
+  # SERVER_FORWARD_HEADERS_STRATEGY=native（或 framework），remoteAddr 才反映真实客户端 IP，获得精确限流。
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
+
+spring:
+  application:
+    name: admin-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  profiles:
+    # 默认 prod：忘记注入 SPRING_PROFILES_ACTIVE 的部署将直接 fail-fast
+    # （JWT/TOTP/MCP 密钥缺失即启动失败），杜绝静默携带公开 dev 密钥上线。
+    # 本地开发/联调请显式注入 SPRING_PROFILES_ACTIVE=dev（或 test）。
+    active: ${SPRING_PROFILES_ACTIVE:prod}
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      # 键名含点需用 [] 转义（Spring Boot relaxed binding 支持）
+      "[org.quartz.scheduler.instanceName]": adminScheduler
+      "[org.quartz.scheduler.instanceId]": AUTO
+      # 集群多副本启动错峰，降低同一时刻全部实例争抢调度表的竞态
+      "[org.quartz.scheduler.startupDelay]": 5
+      # 每个实例的调度线程池：多副本各持独立线程，Quartz 集群保证触发器只被一个节点消费
+      "[org.quartz.threadPool.class]": org.quartz.simpl.SimpleThreadPool
+      "[org.quartz.threadPool.threadCount]": 8
+      "[org.quartz.threadPool.threadPriority]": 5
+      "[org.quartz.jobStore.isClustered]": true
+      # 集群节点心跳间隔（毫秒），节点宕机后其他节点以此为准接管其触发器
+      "[org.quartz.jobStore.clusterCheckinInterval]": 15000
+      # 触发器错过触发多少毫秒后按 misfire 策略处理
+      "[org.quartz.jobStore.misfireThreshold]": 60000
+      # MySQL 使用标准 JDBC delegate
+      "[org.quartz.jobStore.driverDelegateClass]": org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+  datasource:
+    hikari:
+      pool-name: AdminHikariCP
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  flyway:
+    # V44 消息模板列注释含 ${key} 占位符文本（仅注释，非 Flyway 注入），
+    # Flyway 默认占位符替换会解析 ${key} 报 No value provided → 全部环境启动失败。
+    # 无任何迁移依赖 Flyway 占位符，统一关闭替换，保留字面量 ${key}。
+    placeholder-replacement: false
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:}
+  metrics:
+    # 多服务共用 Prometheus 时按应用名区分指标（prometheus 抓取目标 job 亦可区分）；
+    # micrometer-registry-prometheus 在 classpath 时默认启用 prometheus 导出
+    tags:
+      application: ${spring.application.name}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      # 暴露 /actuator/health/readiness 与 /actuator/health/liveness 供 k8s 探针细分
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{40} - %msg%n"
+
+# 可靠性纵深（批次1）：Resilience4j 熔断实例参数
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+    instances:
+      # 告警 Webhook 外发：持续失败即打开熔断，避免对故障第三方无脑重试拖垮自身
+      alertWebhook:
+        base-config: default
+  retry:
+    instances:
+      alertWebhook:
+        max-attempts: 3
+        wait-duration: 1s
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+jwt:
+  secret: ${JWT_SECRET:}
+  access-token-expire-minutes: ${JWT_ACCESS_EXPIRE_MINUTES:120}
+  refresh-token-expire-days: ${JWT_REFRESH_EXPIRE_DAYS:7}
+
+app:
+  callback-base-url: ${CALLBACK_BASE_URL:http://127.0.0.1:8080}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  ai-base-url: ${AI_BASE_URL:}
+  upload-path: ${UPLOAD_PATH:uploads}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin}
+      bucket: ${MINIO_BUCKET:admin}
+    scan:
+      enabled: ${FILE_SCAN_ENABLED:false}
+      fail-open: ${FILE_SCAN_FAIL_OPEN:false}
+      clamav:
+        host: ${CLAMAV_HOST:localhost}
+        port: ${CLAMAV_PORT:3310}
+        timeout-seconds: ${CLAMAV_TIMEOUT_SECONDS:10}
+  totp:
+    encryption-key: ${TOTP_ENCRYPTION_KEY:}
+  sql-log-threshold-ms: ${SQL_LOG_THRESHOLD_MS:50}
+  cors:
+    # 允许来源（逗号分隔）；生产由 CORS_ALLOWED_ORIGIN_PATTERNS 显式注入，缺省拒绝
+    # 5173 为本机 Vite 开发端口；8088/127.0.0.1:8088 为 Docker 本地栈前端（docker-compose FRONTEND_PORT）
+    # 浏览器对 POST/XHR 总是携带 Origin 头（即使同源反代），来源不在白名单会 403 Invalid CORS request
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8088,http://127.0.0.1:8088}
+  api-rate-limit-per-minute: ${API_RATE_LIMIT_PER_MINUTE:300}
+  upload:
+    max-size-mb: ${UPLOAD_MAX_SIZE_MB:20}
+    allowed-extensions: ${UPLOAD_ALLOWED_EXTENSIONS:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip}
+  chunk-dir-sweep:
+    # 分片临时目录清理间隔：中断/放弃上传遗留的孤儿分片目录按此周期回收（多副本经锁互斥）
+    interval-ms: ${CHUNK_DIR_SWEEP_INTERVAL_MS:1800000}
+  report:
+    # 报表执行单次查询行数硬上限：执行引擎追加/收紧 LIMIT，防止拉爆结果集
+    max-rows: ${REPORT_MAX_ROWS:5000}
+  ai:
+    scan-interval-ms: ${AI_SCAN_INTERVAL_MS:30000}
+  mcp:
+    # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端以 Authorization: Bearer 携带；
+    # 非 dev 环境未注入或等于开发默认值时 McpAuthFilter fail-closed 拒绝一切连接
+    auth-token: ${MCP_AUTH_TOKEN:dev-mcp-token}
+  milvus:
+    # RAG 向量检索（可选）：默认关闭走 MySQL ngram 全文检索（零依赖）；
+    # enabled=true 时启用 Milvus 向量检索，Milvus 运行不可用时检索自动降级回 MySQL。
+    enabled: ${MILVUS_ENABLED:false}
+    host: ${MILVUS_HOST:localhost}
+    port: ${MILVUS_PORT:19530}
+    secure: ${MILVUS_SECURE:false}
+    username: ${MILVUS_USERNAME:}
+    password: ${MILVUS_PASSWORD:}
+    database: ${MILVUS_DATABASE:default}
+    # 向量维度：须与集合已建维度一致（text-embedding-3-small=1536）；变更需重建集合
+    dim: ${MILVUS_DIM:1536}
+    connect-timeout-seconds: ${MILVUS_CONNECT_TIMEOUT_SECONDS:5}
+    embedding:
+      # OpenAI 兼容 /embeddings 端点：留空则用本地确定性哈希向量（可运行但语义性弱）。
+      # 本地全栈：http://ai-service:8000/api/v1/embeddings（鉴权 Bearer 为 AI_AUTH_TOKEN）
+      endpoint: ${MILVUS_EMBEDDING_ENDPOINT:}
+      api-key: ${MILVUS_EMBEDDING_API_KEY:}
+      model: ${MILVUS_EMBEDDING_MODEL:text-embedding-3-small}
+      timeout-seconds: ${MILVUS_EMBEDDING_TIMEOUT_SECONDS:10}
+  # 公告 SSE 长连接心跳间隔（毫秒）：定期发送注释帧保活（穿透反代空闲读超时）并回收僵死连接
+  notice-sse-heartbeat-ms: ${NOTICE_SSE_HEARTBEAT_MS:30000}
+  # 公告 SSE 每用户并发连接上限：超限回收最旧连接（防单账号脚本无限开流耗尽异步线程/内存）
+  notice-sse-max-connections-per-user: ${NOTICE_SSE_MAX_CONNECTIONS_PER_USER:5}
+  # AI 任务 SSE 每用户并发连接上限：超限回收最旧连接（R4-1.9，同公告 SSE 防护模式——
+  # 每条连接除异步 Servlet 请求外还占用共享调度池上一个 2s 轮询任务，资源放大更甚）
+  ai-task-sse-max-connections-per-user: ${AI_TASK_SSE_MAX_CONNECTIONS_PER_USER:5}
+  screen:
+    # 数据大屏 SSE 实时推送间隔（毫秒）：连接保持期间按此节奏广播聚合快照
+    push-interval-ms: ${SCREEN_PUSH_INTERVAL_MS:30000}
+    # 数据大屏 SSE 每租户并发连接上限：超限回收最旧连接（防单账号循环取票开流耗尽异步线程/内存）
+    max-connections-per-tenant: ${SCREEN_MAX_CONNECTIONS_PER_TENANT:5}
+  websocket:
+    # 站内消息 WebSocket 每用户并发连接上限：超限回收最旧连接（R4-1.14，同 SSE 防护模式——
+    # 长连接无心跳回收，单账号可循环取票开流堆积 TCP 连接并放大每轮推送开销）
+    max-connections-per-user: ${WEBSOCKET_MAX_CONNECTIONS_PER_USER:5}
+  security:
+    # 批次1·安全阻断：默认口令强制首登改密 + 密码过期策略 + refresh token httpOnly Cookie
+    # 生产默认开启；本地 dev/test 覆盖为 false 保持 admin/admin123 可直接登录的开发/CI 体验
+    # （e2e/smoke/load-test 依赖该默认口令，见 V63 迁移注释与 application-dev/test.yml）。
+    # force-password-change 同时是"服务端口令生命周期强制"开关：开启后除改密/登出/刷新/自身
+    # 信息接口外，被标记(must_change_password=1)或口令过期的账号一律 403（服务端兜底，绕过
+    # 前端的 CLI/非浏览器客户端同样被拦）。
+    force-password-change: ${FORCE_PASSWORD_CHANGE:true}
+    password-expire-days: ${PASSWORD_EXPIRE_DAYS:90}
+    # API 资源权限规则严格模式（默认 false）：开启后已认证请求命不中 sys_api_perm 规则即 403，
+    # 用于暴露规则漏配；开启前须确保受管接口均已登记规则（个人自助端点自动豁免）
+    api-perm-strict: ${API_PERM_STRICT:false}
+    refresh-cookie-name: ${REFRESH_COOKIE_NAME:admin_refresh_token}
+    # Secure 仅生产（https）开启；本地 http 下 Secure cookie 不会被浏览器保存
+    refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:false}
+    refresh-cookie-path: ${REFRESH_COOKIE_PATH:/api}
+    refresh-cookie-same-site: ${REFRESH_COOKIE_SAME_SITE:Lax}
+
+importexport:
+  job:
+    # 任务轮询间隔（毫秒）：处理器每隔该时长取一条 PENDING 任务处理
+    poll-millis: ${IMPORTEXPORT_JOB_POLL_MILLIS:5000}
+    # PROCESSING 卡死回收阈值（毫秒）：超过该时长仍处 PROCESSING 的任务重置为 PENDING 重新排队
+    processing-timeout-millis: ${IMPORTEXPORT_JOB_PROCESSING_TIMEOUT_MILLIS:600000}
+    # 单次导出最大行数：超限拒绝生成文件，防止全量拉爆内存与超大文件
+    export-max-rows: ${IMPORTEXPORT_JOB_EXPORT_MAX_ROWS:100000}
+
+knife4j:
+  enable: true
+
+warm-flow:
+  enabled: true
+  banner: false
+  logic-delete: true
+  logic-delete-value: "1"
+  logic-not-delete-value: "0"
+  data-source-type: mysql

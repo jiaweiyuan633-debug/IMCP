@@ -1,0 +1,167 @@
+# 本地全栈容器编排（开发/演示用）：docker compose up -d --build
+#
+# 注意：生产部署以 Helm（k8s/helm/admin-scaffold）为唯一来源，本文件不参与生产。
+# 后端在此显式注入 dev 配置层（application.yml 默认 prod，本文件必须覆盖为 dev）：
+# swagger 开、dev 明文密钥兜底、Flyway 自动执行迁移目录下的全部迁移。
+# 前端容器镜像内的 nginx 不代理 /api（K8s 由 Ingress 直达后端），本地无 Ingress，
+# 故挂载 docker/nginx.conf 覆盖代理配置，把 /api、/uploads、/files 反代到 backend 容器
+# （/files 为受令牌保护的文件内容，与 K8s Ingress 路径集合对齐）。
+name: admin-scaffold
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: admin_scaffold
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      # 主机 6380，避免与本机原生 Redis(6379) 冲突；应用间走容器网络 redis:6379
+      - "${REDIS_PORT:-6380}:6379"
+
+  # Zipkin 链路追踪（可选，profile 门控）：docker compose --profile monitoring up -d zipkin。
+  # 后端 Micrometer Tracing(Brave) 经 ZIPKIN_ENDPOINT 上报，未启动时上报自动丢弃不影响业务。
+  zipkin:
+    profiles: ["monitoring"]
+    image: openzipkin/zipkin:3
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: admin_scaffold
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # 链路追踪（可选）：Zipkin 上报端点（docker compose --profile monitoring 启动 zipkin 服务）；
+      # 未启动时 Brave 异步发送自动丢弃，不阻塞业务
+      ZIPKIN_ENDPOINT: ${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
+      # 本地全栈默认 dev 配置层：swagger 开、dev 明文密钥兜底、Flyway 基线迁移
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8080
+      CALLBACK_BASE_URL: http://backend:8080
+      AI_BASE_URL: http://ai-service:8000
+      # RAG 向量检索（可选）：默认关闭走 MySQL 全文检索；开启向量检索需同时 --profile milvus
+      MILVUS_ENABLED: ${MILVUS_ENABLED:-false}
+      MILVUS_HOST: milvus
+      MILVUS_PORT: "19530"
+      MILVUS_DATABASE: default
+      # 真实 embedding：指向 ai-service 的 /api/v1/embeddings，Bearer 鉴权与 AUTH_TOKEN 一致
+      MILVUS_EMBEDDING_ENDPOINT: http://ai-service:8000/api/v1/embeddings
+      MILVUS_EMBEDDING_API_KEY: ${AI_AUTH_TOKEN:-dev-ai-service-token}
+      MILVUS_EMBEDDING_MODEL: ${MILVUS_EMBEDDING_MODEL:-text-embedding-3-small}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # 上传文件持久化（本地存储 root 为容器内 /app/uploads）
+      - uploads-data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  # Milvus 向量检索（可选，profile 门控）：默认不启动，避免本地无谓占用内存。
+  # 启用向量检索知识库：docker compose --profile milvus up -d && 设 MILVUS_ENABLED=true 重启 backend。
+  # 使用官方 standalone 镜像内嵌 etcd/minio（单机演示足够），生产以 k8s StatefulSet 为准（k8s/milvus）。
+  milvus:
+    profiles: ["milvus"]
+    image: milvusdb/milvus:v2.4.11
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      MINIO_USE_EMBED: "true"
+      MINIO_DATA_DIR: /var/lib/milvus/minio
+      MINIO_ROOT_USER: milvusadmin
+      MINIO_ROOT_PASSWORD: milvusadmin123
+      TZ: Asia/Shanghai
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      # 9091 为 Milvus proxy 健康端口；探测失败仅标记 unhealthy，不阻塞 backend（后端会自动降级 MySQL）
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9091/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "9091:9091"
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      # 与后端 AiServiceConfig.apiKey 保持一致；本文件为本地开发兜底默认，
+      # 生产由 k8s Secret 注入（AUTH_TOKEN 代码中无默认值，未注入时 AI 服务启动失败）
+      AUTH_TOKEN: ${AI_AUTH_TOKEN:-dev-ai-service-token}
+      # 回调 SSRF 防护白名单：任务回调只允许打到后端（与 backend 的 CALLBACK_BASE_URL 对齐）。
+      # 留空则 AI 服务仅允许回调 localhost 回环地址——容器间回调（backend:8080）必须显式注入。
+      CALLBACK_ALLOWED_ORIGINS: '["http://backend:8080"]'
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "${AI_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    volumes:
+      # 本地代理：/api 与 /uploads 反代 backend，SSE 关闭缓冲
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8088}:8080"
+
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    ports:
+      - "${WEBSITE_PORT:-8081}:8080"
+
+volumes:
+  mysql-data:
+  redis-data:
+  uploads-data:
+  milvus-data:

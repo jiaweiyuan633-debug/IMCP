@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <!-- 版本演进：3.3.5 → 3.4.5 → 3.5.12。
+             CVE 覆盖：spring-boot-starter-actuator 的两个鉴权绕过（CVE-2026-22731 Health Group
+             附加路径 / CVE-2026-22733 CloudFoundry 端点）仅在 3.5.12 / 4.0.4 修复，3.4.x 分支无补丁
+             （trivy 硬门禁命中，security-scan 转绿所必需）。
+             兼容修复：3.5.12 测试装配下各 *IT 上下文不再共享，warm-flow 的 SpringUtil 静态
+             ApplicationContext（首写后不再更新）致后创建上下文 initFlow 反查 WarmFlowProperties 时
+             双候选 NoUnique——由 config/WarmFlowConfig 的 @Primary WarmFlowProperties 消歧
+             （详见该类注释）。3.4.5 未触发是因为当时多 IT 共享同一上下文。 -->
+        <version>3.5.12</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>cn.admin.scaffold</groupId>
+    <artifactId>admin-backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>admin-backend</name>
+    <description>Java backend for admin scaffold</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- 保持 3.5.7：其传递的 JSqlParser 4.x 与 ReportSqlGuard（TablesNamesFinder 扩展点）兼容；
+             3.5.16 传递 JSqlParser 5.1（破坏性变更）会使报表 SQL 守卫的多项拦截失效。升级需同步适配
+             守卫解析层（JSqlParser 5 的 TablesNamesFinder/parse 行为变化），列入后续专项批次。 -->
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <hutool.version>5.8.32</hutool.version>
+        <knife4j.version>4.5.0</knife4j.version>
+        <!-- 覆盖 Boot BOM 管理的 testcontainers 版本：1.19.8 对 Docker 29.x npipe API 协商失败（BadRequest 400） -->
+        <testcontainers.version>1.21.3</testcontainers.version>
+        <!-- 批次2（R4-1.48）：显式覆盖 snakeyaml 至 2.6——Boot 3.3 时代 BOM 管理的 2.2 存在
+             CVE-2024-57649（栈耗尽 DoS，2.3+ 修复）；Boot 3.4.5 BOM 已管理 2.6，此处显式声明
+             防止将来 BOM 回退，并保证解析器安全基线明确 -->
+        <snakeyaml.version>2.6</snakeyaml.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-quartz</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- 多渠道消息：邮件发送（SMTP 动态配置） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <!-- RAG 知识库：Milvus 向量检索客户端（可选启用，默认回退 MySQL 全文检索） -->
+        <dependency>
+            <groupId>io.milvus</groupId>
+            <artifactId>milvus-sdk-java</artifactId>
+            <version>2.4.11</version>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：分布式锁 + 接口幂等（Redisson RLock / Idempotent）。
+             3.52.0（2026-03，与 Boot 3.5 同期线）：3.30.0 的 starter 绑定 redisson-spring-data-32
+             （适配 spring-data-redis 3.2），而 Boot 3.5.12 BOM 管理 spring-data-redis 3.5.12——
+             3.5 在 DefaultedRedisConnection 新增/重排 pExpire 等默认方法，旧适配层未覆盖致登录
+             缓存过期走 RedisTemplate.expire 时默认方法自递归（StackOverflowError → 登录 500）。
+             3.52.0 绑定 redisson-spring-data-35（适配 spring-data-redis 3.5.x），消除该缺口；
+             实际 spring-data-redis 仍由 Boot BOM 钉回 3.5.12。 -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <version>3.52.0</version>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：外部调用重试（spring-retry，版本由 Boot BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：熔断/舱壁/限时（resilience4j 2.2.x 支持 Spring Boot 3.x） -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+        </dependency>
+        <!-- 结构化 JSON 日志：供 Loki(promtail)/ELK(filebeat) 采集 -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+        <!-- MCP 模型上下文协议：Server(SSE) + Client 双端 -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>0.11.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-spring-webmvc</artifactId>
+            <version>0.11.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara.warm</groupId>
+            <artifactId>warm-flow-mybatis-plus-sb3-starter</artifactId>
+            <version>1.8.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+        <dependency>
+            <!-- POI 4.1.2（EasyExcel 传递）锁定 commons-io 2.11，但 commons-compress 1.26 需要
+                 2.13+ 的 org.apache.commons.io.build.AbstractStreamBuilder → EasyExcel 写 xlsx
+                 时 NoClassDefFoundError。显式覆盖到 2.16.1（与 POI 4.1.2 向后兼容）。 -->
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.16.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.6.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>${knife4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 可靠性纵深（批次1）：集成测试容器（MySQL/Redis，版本由 Boot BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <!-- 脚手架基线门槛：批8（R4-1.35）补审计/脱敏/缓存抖动测试后实测
+                                             LINE≈42.7%/BRANCH≈38.7%/METHOD≈39.9%，门槛随之上调至 0.40/0.36/0.37。
+                                             门槛略低于实测以留抖动余量、保证门禁真实生效（新增未测试代码即拦截）。
+                                             后续批次补测试后应随覆盖提升继续上调。 -->
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.40</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.36</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>METHOD</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.37</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- 集成测试（Testcontainers，*IT 后缀）绑定 verify 阶段：mvn test 只跑单测，
+                 mvn verify 全量（CI 用 verify）。无 Docker 时由 DockerExecutionCondition 整体
+                 disabled（R4-1.36 起），不再报 context 加载失败。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <!-- 批次7（R4-1.53）接入；批次9（R4-1.55）由 report-only 切为硬门禁。
+                 enforce 语义（本地实测 4.8.6.4）：<failOnError>false</failOnError> 时无论多少
+                 bug 均不失败（纯报告）；切 true 后 check 在存在未豁免 bug 时即失败并输出
+                 "failed with N bugs"。存量 445 条经 backend/spotbugs-exclude.xml 白名单
+                 （Lombok 生成方法 EI 豁免，见 lombok.config 的 @lombok.Generated）+ 真修清零后
+                 长期为 0：新增任何未豁免 bug（含 DM_CONVERT_CASE/BX/REC 等）都会使 mvn verify 红。 -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.8.6.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>true</failOnError>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

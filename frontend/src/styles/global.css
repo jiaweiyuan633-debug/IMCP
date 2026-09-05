@@ -1,0 +1,30 @@
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+.ant-table {
+  min-width: 640px;
+}
+
+.pro-search-form {
+  flex-wrap: wrap;
+}
+
+.node-row {
+  grid-template-columns: 1fr 1fr 140px 32px;
+}
+
+@media (max-width: 767px) {
+  .node-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .node-row .ant-select {
+    grid-column: span 2;
+  }
+
+  .ant-form-inline .ant-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+}

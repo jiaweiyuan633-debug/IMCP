@@ -1,0 +1,264 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Backend tests
+        working-directory: backend
+        run: mvn -q verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Frontend lint
+        working-directory: frontend
+        run: pnpm lint
+      - name: Frontend tests (with coverage gate)
+        working-directory: frontend
+        run: pnpm exec vitest run --coverage
+      - name: Frontend build
+        working-directory: frontend
+        run: pnpm build
+
+  ai-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: AI tests (with coverage gate)
+        working-directory: ai-service
+        # --locked 是 uv 的参数须置于命令前（uv run --locked pytest）；
+        # 误放 pytest 后会因 unrecognized arguments 触发 pytest usage error(exit 4)
+        run: uv run --locked pytest -q
+      - name: AI lint
+        working-directory: ai-service
+        run: uv run ruff check .
+
+  website:
+    # website 与 frontend 同为 pnpm 项目（pnpm-lock.yaml），此前用 npm install 安装会
+    # 绕过 pnpm 依赖解析导致锁文件与解析结果漂移；改为与 frontend job 一致的 pnpm 安装
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+      - name: Website build
+        working-directory: website
+        run: pnpm build
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secrets scan
+        # gitleaks-action@v2 的 action.yml 不声明任何 with 输入（配置全走 GITLEAKS_* env），
+        # 传 with.fail 会被 runner 以 "Unexpected input(s) 'fail'" 拒绝并报错；发现泄漏即
+        # 使 job 失败是 v2 的硬门禁默认行为。env.GITHUB_TOKEN 供其在 PR 上评论泄漏（push
+        # 无 PR 时自动跳过）；本仓库为个人账号，无需 GITLEAKS_LICENSE。
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trivy filesystem scan
+        # 用 v0.36.0：v0.29.0 内部引用 aquasecurity/setup-trivy@v0.2.2（该 tag 不存在），
+        # 在 runner 上会解析失败；新版已修正内部依赖。tag 均带 v 前缀。
+        # format:sarif+output 使命中报告只写 trivy-results.sarif 不打印控制台——由下方
+        # failure() 上传步骤归档，便于失败时直接下载 SARIF 定位（不必临时改 table 重跑）。
+        # limit-severities-for-sarif: trivy-action v0.36.0 的 entrypoint.sh 在 format=sarif
+        # 且未设本输入时会 unset TRIVY_SEVERITY（日志打印 "Building SARIF report with all
+        # severities"），使 severity 门禁失效——低于阈值（如 MEDIUM）的命中同样令 exit-code 1。
+        # 置 true 后 SARIF 与退出码仅反映 severity 所选档位（HIGH,CRITICAL），与本 job 硬门禁
+        # 意图一致（2026-09-05 实测：DB 新增的 mail/spring-retry/echarts MEDIUM 曾误触发）。
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          limit-severities-for-sarif: true
+          exit-code: 1
+          severity: HIGH,CRITICAL
+      - name: Upload trivy SARIF on failure
+        # trivy 命中漏洞时 exit 1 使上一步失败；此步在失败时仍执行，归档 SARIF 供定位。
+        # 成功时 sarif 无命中（或为空文件），if-no-files-found 不产生冗余产物。
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results.sarif
+          path: trivy-results.sarif
+          if-no-files-found: ignore
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: astral-sh/setup-uv@v5
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java,javascript,python
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  e2e:
+    # Playwright E2E 冒烟：docker compose 起 mysql/redis/backend/
+    # ai-service/frontend/website 全栈，跑 admin 登录→看板 与 官网预约两条链路。
+    # backend 无 healthcheck，--wait 只等 mysql/redis healthy，故额外轮询登录配置接口
+    # 确认应用就绪（Flyway 迁移完成）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: e2e/pnpm-lock.yaml
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: pnpm exec playwright install --with-deps chromium
+      # Playwright 运行时转译 TS 但不做类型检查；tsconfig 为 strict 无 typecheck script 时
+      # 类型错误不会被 CI 捕获，故在起栈前显式跑 tsc --noEmit 作为门禁
+      - name: E2E typecheck
+        working-directory: e2e
+        run: pnpm run typecheck
+      - name: Start stack
+        run: docker compose up -d --build --wait --wait-timeout 360
+      - name: Wait for backend API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/auth/login-config >/dev/null 2>&1; then
+              echo "backend ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "backend not ready in time; dumping logs:"
+          docker compose logs backend mysql --tail 100
+          exit 1
+      - name: Run E2E tests
+        working-directory: e2e
+        run: ADMIN_URL=http://localhost:8088 WEBSITE_URL=http://localhost:8081 pnpm exec playwright test
+
+  docker-build:
+    # 构建并（配置了 DOCKER_REGISTRY 时）推送四端镜像。
+    # 注意：GitHub Actions 的 secrets 上下文不能直接用于 step 级 if 判断，
+    # 需先在 job 级 env 解析（secrets 可用于 job 级 env），登录/推送再按 env 门控，
+    # 避免登录步骤被静默跳过。未配置 registry（fork / 本地仓库）时仅构建不推送。
+    # 镜像 tag 使用不可变 commit sha；配置 registry 时追加 latest。
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ai-service, website]
+    env:
+      REGISTRY_ENABLED: ${{ secrets.DOCKER_REGISTRY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to container registry
+        if: env.REGISTRY_ENABLED == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: ${{ env.REGISTRY_ENABLED == 'true' }}
+          tags: ${{ env.REGISTRY_ENABLED == 'true' && format('{0}/admin-backend:{1},{0}/admin-backend:latest', secrets.DOCKER_REGISTRY, github.sha) || format('admin-backend:{0}', github.sha) }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build and push ai-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: ai-service
+          push: ${{ env.REGISTRY_ENABLED == 'true' }}
+          tags: ${{ env.REGISTRY_ENABLED == 'true' && format('{0}/ai-service:{1},{0}/ai-service:latest', secrets.DOCKER_REGISTRY, github.sha) || format('ai-service:{0}', github.sha) }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: ${{ env.REGISTRY_ENABLED == 'true' }}
+          tags: ${{ env.REGISTRY_ENABLED == 'true' && format('{0}/admin-frontend:{1},{0}/admin-frontend:latest', secrets.DOCKER_REGISTRY, github.sha) || format('admin-frontend:{0}', github.sha) }}
+          # VITE_API_BASE_URL 由 secret 注入；未配置时为空 → 构建走同源 /api 反代
+          build-args: VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build and push website image
+        uses: docker/build-push-action@v6
+        with:
+          context: website
+          push: ${{ env.REGISTRY_ENABLED == 'true' }}
+          tags: ${{ env.REGISTRY_ENABLED == 'true' && format('{0}/website:{1},{0}/website:latest', secrets.DOCKER_REGISTRY, github.sha) || format('website:{0}', github.sha) }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  crud-gen:
+    # CRUD 生成器自带单测：防止生成模板/包路径变更静默破坏"新增业务模块"链路
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: CRUD generator tests
+        working-directory: scripts/crud-gen
+        run: python -m unittest discover -s tests -v

@@ -1,0 +1,22 @@
+{
+  "name": "y15-platform-website",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@11.16.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^0.468.0",
+    "vue": "^3.5.13",
+    "workbox-window": "^7.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "vite-plugin-pwa": "^0.21.1",
+    "vite": "^7.0.0"
+  }
+}

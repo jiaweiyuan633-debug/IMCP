@@ -1,0 +1,179 @@
+# 镜像一律使用不可变 tag，禁止默认 latest：latest 的拉取语义依赖 K8s 按 tag 的隐式
+# imagePullPolicy=Always，节点缓存陈旧后无法复现实际运行版本，回滚与审计都不可靠。
+# 发布时以 commit sha / 正式版本覆盖下列 tag；示例 1.0.0 与 Chart.yaml appVersion 对齐，
+# 仅作占位，不代表真实构建产物。
+images:
+  backend: admin-backend:1.0.0
+  ai: ai-service:1.0.0
+  frontend: frontend:1.0.0
+  website: website:1.0.0
+
+# 私有镜像仓库拉取凭证：元素为 {"name": "<imagePullSecret 名>"}；空列表时不注入
+# imagePullSecrets（模板用 {{- with .Values.imagePullSecrets }} 包裹）。集群已在
+# ServiceAccount 上挂 registry 凭证时保持为空即可。
+imagePullSecrets: []
+
+replicas:
+  backend: 2
+  ai: 2
+  frontend: 2
+  website: 2
+
+resources:
+  backend:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  ai:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  frontend:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  website:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+securityContext:
+  backend:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  ai:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  frontend:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  website:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+
+config:
+  dbHost: mysql
+  dbPort: "3306"
+  dbName: admin_scaffold
+  dbUser: root
+  redisHost: redis
+  redisPort: "6379"
+  redisUrl: redis://redis:6379/0
+  # 内部服务主机名：留空由模板按 {{ .Release.Name }} 推导（release 名为 admin 时即
+  # admin-backend / admin-ai / admin-frontend），与模板 Service 命名保持一致；非默认
+  # release 名或自定义 Service 名时须显式覆盖为实际地址。
+  callbackBaseUrl: ""
+  aiBaseUrl: ""
+  # RAG 向量检索（可选）：false 走 MySQL ngram 全文检索（零依赖）；true 需先部署 k8s/milvus
+  milvusEnabled: false
+  milvusHost: milvus
+  milvusPort: "19530"
+  milvusDatabase: default
+  # OpenAI 兼容 /embeddings 端点：指向 ai-service 的 /api/v1/embeddings；留空则用本地哈希向量
+  milvusEmbeddingEndpoint: ""
+  milvusEmbeddingApiKey: ""
+  milvusEmbeddingModel: text-embedding-3-small
+  # 生产必须显式注入，否则后端生产配置层（application-prod.yml）启动失败（fail-fast）；
+  # 留空由模板按 {{ .Release.Name }}-frontend 推导（见上注释）
+  frontendUrl: ""
+  # CORS 允许的前端域名（逗号分隔，可含 * 通配），注入 CORS_ALLOWED_ORIGIN_PATTERNS。
+  # 生产缺省为空串即拒绝全部跨域来源（application-prod.yml），未配置时后台前端 API 请求
+  # 会 403 Invalid CORS request。默认 https://admin.example.com 与 ingress.host 一致，
+  # scheme（https）与 TLS 默认开启匹配——更换域名必须同时覆盖 ingress.host 与
+  # corsAllowedOriginPatterns，二者不一致会导致前端 API 请求 403 或证书域名不符
+  corsAllowedOriginPatterns: https://admin.example.com
+  # 可选：Redis 主从哨兵高可用。不设（留空）则后端走 redisHost/redisPort 单实例；
+  # 设置 master 时后端自动切换为哨兵拓扑（application-prod.yml on-property 激活）。
+  # 空值时模板不注入 REDIS_SENTINEL_MASTER，避免空字符串误激活哨兵段。
+  redisSentinelMaster: ""
+  # 逗号分隔哨兵节点：host1:26379,host2:26379，与 master 成对设置
+  redisSentinelNodes: ""
+  # 哨兵节点自身认证口令（可选）
+  redisSentinelPassword: ""
+  # 链路追踪（可选）：Zipkin HTTP 上报端点，如 http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans。
+  # 留空时模板注入 MANAGEMENT_TRACING_ENABLED=false 显式关闭链路追踪——空 endpoint 下 Spring Boot 仍会
+  # 实例化 Zipkin Sender/AsyncZipkinSpanHandler（zipkin auto-config 无端点非空条件），每次 flush 构造
+  # 非法 URI 失败丢 span，故必须显式关闭而非仅"不注入"。配置端点时注入 true + ZIPKIN_ENDPOINT 开启上报。
+  zipkinEndpoint: ""
+  # AI 服务生产配置：此前 Helm 无 LLM_PROVIDERS/WORKER_COUNT 注入通道，
+  # K8s 下 ai-service 永远以 mock 提供方运行（16 维 mock 向量），检索结果失真且无报错。
+  # llmProviders 为 JSON 字符串（含 API Key），如：
+  #   '{"deepseek": {"base_url": "https://api.deepseek.com", "api_key": "sk-xxx", "model": "deepseek-chat"}}'
+  # 推荐把 API Key 拆到 secret.aiLlmApiKeys 经模板注入（避免明文进 ConfigMap）
+  aiLlmProviders: ""
+  aiWorkerCount: "2"
+  aiOcrProvider: "mock"
+  aiOcrFailFast: "false"
+
+# 上传文件持久化：本地存储（app.storage.type=local，默认）多副本必须共享同一存储卷，
+# 否则文件散落在各 Pod 本地盘且 Pod 重建即丢。多副本需 ReadWriteMany（RWX）存储类。
+storage:
+  enabled: true
+  className: ""
+  accessMode: ReadWriteMany
+  size: 10Gi
+  # 后端上传目录（挂载点），同时作为 /uploads 静态资源根目录
+  uploadPath: /data/uploads
+  # 优雅停机宽限期（秒）：> 后端关闭超时（prod 配置 30s），留出在途请求排空时间
+  terminationGracePeriodSeconds: 60
+
+# 密钥一律不留默认值：部署时必须通过 --set secret.*=... 显式注入，
+# 留空或未注入时 all.yaml 顶部 fail 校验将终止渲染，杜绝明文默认密钥上生产。
+# externalSecret 指定已存在的 Secret 名称（如 External Secrets Operator
+# 或手工创建的 Secret），设置后跳过内部 Secret 创建与 fail 校验，envFrom 直接引用外部
+# Secret——GitOps 场景用 ESO/Vault 注入密钥时无需在 values 里填任何明文。
+secret:
+  dbPassword: ""
+  jwtSecret: ""
+  totpEncryptionKey: ""
+  # AI 服务鉴权密钥：与后端 AiServiceConfig.apiKey 保持一致（入站任务鉴权 + 回调 HMAC 签名）
+  aiAuthToken: ""
+  # MCP Server 端点鉴权令牌：Claude Desktop 等外部客户端连接 /mcp 时以 Authorization: Bearer 携带
+  mcpAuthToken: ""
+  # 外部 Secret 名称（可选）：设置后本 Chart 不创建 Secret、不校验空值，
+  # 引用该 Secret 的 DB_PASSWORD/JWT_SECRET/TOTP_ENCRYPTION_KEY/AUTH_TOKEN/MCP_AUTH_TOKEN 键
+  existingSecret: ""
+
+ingress:
+  host: admin.example.com
+  # TLS 默认开启：生产 HTTP 明文既不安全也不可审计。enabled=true 而 clusterIssuer 为空时
+  # all.yaml 顶部会 fail-fast 终止渲染——部署方必须显式提供 issuer，或显式置 enabled=false
+  # 关闭 TLS。上传体积注解（proxy-body-size）独立于 TLS 恒注入（网关默认 1MB，后端允许
+  # 20MB 上传必 413）。
+  tls:
+    enabled: true
+    # cert-manager ClusterIssuer 名称（如 letsencrypt-prod / ca-issuer），TLS 开启时必填
+    clusterIssuer: ""
+  # 强制 HTTPS 跳转（ingress-nginx force-ssl-redirect），默认开启与 TLS 配套
+  forceHttps: true
+  # 上传请求体上限（与后端 multipart max-file-size 对齐，默认 20m）
+  proxyBodySize: "20m"
+

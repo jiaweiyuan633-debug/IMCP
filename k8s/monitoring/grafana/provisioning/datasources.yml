@@ -1,0 +1,13 @@
+# Grafana 数据源预置（供 provisioning 目录挂载或并入现有 Grafana）。
+# uid 固定为 prometheus，dashboard JSON 内按 uid 静态引用，无需模板变量。
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # 假定 Prometheus 与本 Grafana 同命名空间且 Service 名为 prometheus；
+    # 跨命名空间请改全限定名，如 http://prometheus.monitoring.svc.cluster.local:9090
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

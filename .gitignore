@@ -1,0 +1,66 @@
+# Java
+backend/target/
+*.class
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.eslintcache
+website/node_modules/
+website/dist/
+website/.vite/
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+.pnpm-store/
+
+# Python
+ai-service/.venv/
+ai-service/.pytest_cache/
+ai-service/.ruff_cache/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local env
+.env
+*.local
+
+# 环境与凭据文件（.env.* 覆盖 production/本地 env；示例文件 .env.example 仍显式提交）
+.env.*
+!.env.example
+!.env.production
+*.key
+*.pem
+*.p12
+*.jks
+
+# 日志
+*.log
+
+# Local MySQL dev data
+.mysql-dev/
+
+# Local runtime
+.runtime/
+logs/
+uploads/
+backups/
+
+# 测试覆盖率产物
+frontend/coverage/
+ai-service/.coverage
+ai-service/htmlcov/
+# Storybook 构建产物
+frontend/storybook-static/
+
+# Claude Code 本地配置
+.claude/

@@ -1,0 +1,116 @@
+# Milvus 向量检索（可选组件，独立部署）：standalone 单实例，内嵌 etcd/MinIO（演示/中小规模够用）。
+# 应用：
+#   kubectl apply -f k8s/milvus/
+#   # 后端接入：helm 升级时注入以下 values 后重启 backend
+#   --set milvus.enabled=true --set milvus.host=milvus --set milvus.embeddingEndpoint=http://ai-service:8000/api/v1/embeddings
+# 数据持久化：milvus-data PVC（默认 local 存储类；生产按环境调整 storageClassName）。
+# 生产规模化建议改用 Helm chart（milvus-operator）并分离 etcd/MinIO 到独立有状态副本。
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus
+  namespace: default
+  labels:
+    app: milvus
+spec:
+  selector:
+    app: milvus
+  ports:
+    - name: grpc
+      port: 19530
+      targetPort: 19530
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: milvus
+  namespace: default
+  labels:
+    app: milvus
+spec:
+  serviceName: milvus
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus
+  template:
+    metadata:
+      labels:
+        app: milvus
+    spec:
+      containers:
+        - name: milvus
+          image: milvusdb/milvus:v2.4.11
+          imagePullPolicy: IfNotPresent
+          args: ["milvus", "run", "standalone"]
+          env:
+            # 内嵌 etcd/MinIO：单机可用，避免额外部署依赖
+            - name: ETCD_USE_EMBED
+              value: "true"
+            - name: ETCD_DATA_DIR
+              value: /var/lib/milvus/etcd
+            - name: MINIO_USE_EMBED
+              value: "true"
+            - name: MINIO_DATA_DIR
+              value: /var/lib/milvus/minio
+            - name: MINIO_ROOT_USER
+              value: milvusadmin
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: milvus-minio
+                  key: password
+                  optional: true
+            - name: TZ
+              value: Asia/Shanghai
+          ports:
+            - containerPort: 19530
+              name: grpc
+            - containerPort: 9091
+              name: metrics
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/milvus
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+# MinIO 内嵌账号口令：可选 Secret。缺省时回退到镜像默认 milvusadmin/ milvusadmin123；
+# 生产必须创建（kubectl create secret generic milvus-minio --from-literal=password=...）
+apiVersion: v1
+kind: Secret
+metadata:
+  name: milvus-minio
+  namespace: default
+type: Opaque
+stringData:
+  password: "milvusadmin123"

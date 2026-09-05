@@ -1,0 +1,97 @@
+# 生产配置层：由 SPRING_PROFILES_ACTIVE=prod 激活（application.yml 默认即 prod；本地开发须显式注入 dev/test）
+#
+# 设计原则：
+# 1. 密钥/口令一律不提供默认值 —— 缺失即 placeholder 解析失败，应用启动直接失败（fail-fast），
+#    绝不允许静默回落 dev 明文兜底（JwtProperties / TotpService 会在非 dev 下拒绝开发默认密钥）。
+# 2. 关闭接口文档与信息泄露面：springdoc / knife4j / health 详情。
+# 3. 采样率降为 0.1（P1-10 可观测性），默认值即可，环境变量可覆盖。
+# 4. 优雅停机（P2-15 高可用）：滚动更新/缩容时 readiness 先转 Down 摘流量再关闭，
+#    不中断在途请求；需配合 Deployment terminationGracePeriodSeconds（宽限期 > 关闭超时）。
+server:
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    # 生产默认启用 JDBC TLS（useSSL=true）但允许回退（requireSSL=false）以免锁定尚无证书的现网；
+    # allowPublicKeyRetrieval=true 兼容 caching_sha2_password 首次认证。
+    # 注意：useSSL=true + requireSSL=false 是"尽力加密"而非强制——MySQL 服务端 CA 校验体系就绪后
+    # 应显式注入 DB_REQUIRE_SSL=true（并配合 serverSslCert 或受信 CA 库校验服务端证书）。
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=${DB_USE_SSL:true}&requireSSL=${DB_REQUIRE_SSL:false}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY:true}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 生产严禁对非空库自动打基线：迁移一致性由 validate-on-migrate（Flyway 默认开启）保障
+    baseline-on-migrate: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  callback-base-url: ${CALLBACK_BASE_URL}
+  frontend-url: ${FRONTEND_URL}
+  mcp:
+    # 生产不设默认：缺失时 placeholder 解析失败启动即失败；非 dev 下等于 dev 默认值时 MCP 拒绝连接
+    auth-token: ${MCP_AUTH_TOKEN}
+  upload-path: ${UPLOAD_PATH:uploads}
+  storage:
+    type: ${STORAGE_TYPE:local}
+  cors:
+    # 生产无默认来源：必须通过 CORS_ALLOWED_ORIGIN_PATTERNS 显式配置前端域名，缺省即拒绝跨域
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
+  totp:
+    # 生产不设默认：缺失或等于 dev 兜底密钥时 TotpService 构造器将抛异常
+    encryption-key: ${TOTP_ENCRYPTION_KEY}
+  security:
+    # 生产强制默认口令首登改密（V63 已标记默认哈希账号，登录响应 mustChangePassword=true）
+    force-password-change: ${FORCE_PASSWORD_CHANGE:true}
+    # https 部署下 refresh token cookie 必须带 Secure（防中间人窃取）
+    refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:true}
+
+jwt:
+  # 生产不设默认：缺失、等于 dev/占位密钥或长度不足时 JwtProperties 校验将抛异常
+  secret: ${JWT_SECRET}
+---
+# Redis 主从哨兵（可选，P2-15 高可用）：仅当注入 REDIS_SENTINEL_MASTER 时激活本段，
+# 切换为主从哨兵拓扑（Spring 检测到 sentinel 配置即优先于上方 host/port 单实例）；
+# 未注入时沿用单实例 standalone 配置（默认）。哨兵连接为惰性，节点故障自动切换主从。
+# 注意：Helm 图表对空值不注入 REDIS_SENTINEL_MASTER（避免空字符串误激活本段）。
+spring:
+  config:
+    activate:
+      on-property: REDIS_SENTINEL_MASTER
+  data:
+    redis:
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      sentinel:
+        # 哨兵监控的主节点名；与 nodes 必须成对注入，否则 placeholder 解析失败启动即报错
+        master: ${REDIS_SENTINEL_MASTER}
+        # 逗号分隔的哨兵节点列表，如 host1:26379,host2:26379
+        nodes: ${REDIS_SENTINEL_NODES}
+        # 哨兵节点自身的认证口令（可选）
+        password: ${REDIS_SENTINEL_PASSWORD:}

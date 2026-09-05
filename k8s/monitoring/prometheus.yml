@@ -1,0 +1,54 @@
+# Prometheus 采集配置
+#
+# 供平台/运维团队直接挂载到 Prometheus 容器，或并入现有 Prometheus 联邦采集。
+# 启动命令示例：
+#   prometheus --config.file=prometheus.yml --web.enable-lifecycle
+#
+# 抓取目标使用全限定域名（FQDN）跨命名空间指向业务服务：
+#   - 监控栈（Prometheus/Grafana）部署在 monitoring 命名空间；
+#   - 业务服务由 Helm 以 release=admin-scaffold 部署在 admin-scaffold 命名空间，
+#     实际 Service 名为 <release>-backend / <release>-ai（templates/all.yaml）。
+# 若 Helm release 或命名空间不同，需同步修改下方 targets 的 FQDN。
+# 采集后端 /actuator/prometheus（Spring Boot Actuator + Micrometer）与
+# ai-service /metrics（prometheus_client：代码在根路径 /metrics，
+# main.py 注释明确"标准 scrape 路径就是根 /metrics"，此前配置 /api/v1/metrics 致抓取
+# 404 → up{job="ai-service"}==0 上线即持续误报 AIServiceDown）。
+global:
+  scrape_interval: 15s      # 采集周期：指标粒度与存储成本平衡点
+  evaluation_interval: 15s  # 告警规则评估周期
+  external_labels:
+    cluster: admin-scaffold
+
+rule_files:
+  - prometheus-rules.yml
+
+scrape_configs:
+  # 后端 Java 服务：Micrometer → Prometheus registry，经 actuator 暴露
+  - job_name: admin-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["admin-scaffold-backend.admin-scaffold.svc.cluster.local:8080"]
+
+  # AI 服务：FastAPI + prometheus_client。
+  # 指标端点在根路径 /metrics（原 /api/v1/metrics 与代码不符，
+  # 抓取 404 会令 up{job="ai-service"}==0 误报 AIServiceDown）。
+  - job_name: ai-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["admin-scaffold-ai.admin-scaffold.svc.cluster.local:8000"]
+
+  # Zipkin 自身指标（可选）：Zipkin 3 内置 Prometheus 端点 /prometheus，须先部署 Zipkin（docker-compose --profile monitoring）
+  # - job_name: zipkin
+  #   metrics_path: /prometheus
+  #   static_configs:
+  #     - targets: ["zipkin:9411"]
+
+  # ---- 基础设施导出器（按需启用，须先部署对应 exporter 与 Service）----
+  # Redis 指标：需部署 redis-exporter 监听 9121 端口
+  # - job_name: redis-exporter
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  # MySQL 指标：需部署 mysqld-exporter 监听 9104 端口
+  # - job_name: mysqld-exporter
+  #   static_configs:
+  #     - targets: ["mysqld-exporter:9104"]

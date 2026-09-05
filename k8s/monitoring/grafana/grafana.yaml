@@ -1,0 +1,114 @@
+# Grafana 部署清单（可观测性）
+#
+# 设计原则与 k8s/monitoring 其余文件一致：配置以独立文件为单一来源，不经本清单内联，
+# 避免两份声明漂移。部署顺序（幂等，配置变更后重跑同款命令即可热更新；
+# 命令须与下方 Deployment/Service 同命名空间 monitoring）：
+#   kubectl create configmap grafana-datasources -n monitoring \
+#     --from-file=provisioning/datasources.yml --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl create configmap grafana-dashboard-provider -n monitoring \
+#     --from-file=provisioning/dashboards.yml --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl create configmap grafana-dashboards -n monitoring \
+#     --from-file=dashboards/ --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl apply -f grafana.yaml
+#
+# 管理员口令：默认 admin/admin，建议先建 Secret（不建则回落默认）：
+#   kubectl create secret generic grafana-admin --from-literal=admin-password='<强口令>' -n monitoring
+#
+# 命名空间：本清单部署于 monitoring。监控栈（Prometheus + Grafana）同命名空间，
+# 故数据源 URL 用短名 http://prometheus:9090 即可；prometheus.yml 采集目标以 FQDN
+# 跨命名空间指向 admin-scaffold 命名空间的业务 Service（详见 k8s/monitoring/prometheus.yml）。
+# monitoring 命名空间需提前创建（kubectl create namespace monitoring，
+# 或见同目录 README.md 部署第 0 步）。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472            # Grafana 官方镜像默认 UID
+        runAsGroup: 472
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.1.0
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
+                  optional: true
+            # 控制台告警：非必须，关闭避免多副本争抢告警状态
+            - name: GF_UNIFIED_ALERTING_ENABLED
+              value: "false"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
