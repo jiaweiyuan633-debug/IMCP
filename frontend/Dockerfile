@@ -1,6 +1,6 @@
 # 多阶段构建：pnpm 构建 + 非 root nginx 托管
 # nginx-unprivileged 以 UID 101 运行（与 k8s securityContext.runAsUser 对齐），监听 8080
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 # corepack 固定 pnpm 版本（与 package.json packageManager / CI pnpm 11.16.0 对齐）
 RUN corepack enable && corepack prepare pnpm@11.16.0 --activate
