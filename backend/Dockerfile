@@ -10,7 +10,7 @@ RUN mvn -B -q dependency:go-offline
 COPY src ./src
 RUN mvn -B -q package -DskipTests
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 RUN useradd -r -u 10001 -g root app && chown -R app:root /app
 COPY --from=build /app/target/admin-backend-0.0.1-SNAPSHOT.jar app.jar
