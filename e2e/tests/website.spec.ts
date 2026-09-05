@@ -4,7 +4,8 @@ import { expect, test } from '@playwright/test'
 // 预约表单明确提示未启用且按钮禁用，不再假装提交成功；虚构联系方式不再渲染。
 test('官网首屏与预约表单（默认演示模式）', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: '智能管理平台' })).toBeVisible()
+  // h2「30 分钟了解智能管理平台…」也含产品名子串，name 需 exact 精确匹配避免 strict 冲突
+  await expect(page.getByRole('heading', { name: '智能管理平台', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '免费试用' }).click()
   await expect(page.getByRole('heading', { name: '30 分钟了解智能管理平台是否适合你' })).toBeVisible()
 

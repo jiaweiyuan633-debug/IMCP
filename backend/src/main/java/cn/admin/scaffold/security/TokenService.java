@@ -202,7 +202,7 @@ public class TokenService {
     public List<OnlineUserVo> listOnlineUsers() {
         Set<String> keys = scanKeys(ONLINE_KEY + "*");
         List<OnlineUserVo> onlineUsers = new ArrayList<>(16);
-        if (keys == null || keys.isEmpty()) {
+        if (keys.isEmpty()) {
             return onlineUsers;
         }
         for (String key : keys) {
@@ -234,7 +234,7 @@ public class TokenService {
         }
         if (key.endsWith("*")) {
             Set<String> keys = scanKeys(key);
-            if (keys != null && !keys.isEmpty()) {
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         } else {
@@ -326,7 +326,7 @@ public class TokenService {
 
     public void evictAllPermissions() {
         Set<String> keys = scanKeys(PERMS_KEY + "*");
-        if (keys != null && !keys.isEmpty()) {
+        if (!keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
     }

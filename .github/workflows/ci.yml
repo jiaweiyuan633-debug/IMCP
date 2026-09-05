@@ -52,8 +52,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: AI tests (with coverage gate)
         working-directory: ai-service
-        # --locked 防锁文件漂移；pytest 覆盖率门禁由 pyproject addopts 生效
-        run: uv run pytest -q --locked
+        # --locked 是 uv 的参数须置于命令前（uv run --locked pytest）；
+        # 误放 pytest 后会因 unrecognized arguments 触发 pytest usage error(exit 4)
+        run: uv run --locked pytest -q
       - name: AI lint
         working-directory: ai-service
         run: uv run ruff check .
@@ -91,7 +92,8 @@ jobs:
           # 显式 fail——该 action 默认只出报告不失败，密钥门禁形同虚设
           fail: true
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.29.0
+        # 版本 tag 带 v 前缀：@0.29.0 无对应 tag 会被 GitHub 判 "unable to find version"
+        uses: aquasecurity/trivy-action@v0.29.0
         with:
           scan-type: fs
           scan-ref: .
