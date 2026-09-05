@@ -30,7 +30,7 @@
         <!-- 保持 3.5.7：其传递的 JSqlParser 4.x 与 ReportSqlGuard（TablesNamesFinder 扩展点）兼容；
              3.5.16 传递 JSqlParser 5.1（破坏性变更）会使报表 SQL 守卫的多项拦截失效。升级需同步适配
              守卫解析层（JSqlParser 5 的 TablesNamesFinder/parse 行为变化），列入后续专项批次。 -->
-        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <hutool.version>5.8.32</hutool.version>
         <knife4j.version>4.5.0</knife4j.version>
