@@ -91,7 +91,7 @@ jobs:
         # 传 with.fail 会被 runner 以 "Unexpected input(s) 'fail'" 拒绝并报错；发现泄漏即
         # 使 job 失败是 v2 的硬门禁默认行为。env.GITHUB_TOKEN 供其在 PR 上评论泄漏（push
         # 无 PR 时自动跳过）；本仓库为个人账号，无需 GITLEAKS_LICENSE。
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Trivy filesystem scan
