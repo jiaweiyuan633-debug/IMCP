@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - name: AI tests (with coverage gate)
         working-directory: ai-service
         # --locked 是 uv 的参数须置于命令前（uv run --locked pytest）；
@@ -119,7 +119,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
