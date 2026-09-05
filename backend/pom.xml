@@ -30,7 +30,7 @@
              守卫解析层（JSqlParser 5 的 TablesNamesFinder/parse 行为变化），列入后续专项批次。 -->
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
-        <hutool.version>5.8.32</hutool.version>
+        <hutool.version>5.8.47</hutool.version>
         <knife4j.version>4.5.0</knife4j.version>
         <!-- 覆盖 Boot BOM 管理的 testcontainers 版本：1.19.8 对 Docker 29.x npipe API 协商失败（BadRequest 400） -->
         <testcontainers.version>1.21.3</testcontainers.version>
